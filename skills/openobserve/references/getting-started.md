@@ -7,7 +7,8 @@ Authentication is HTTP Basic — email + password — or a pre-generated token.
 ## Interactive setup (humans, on a terminal)
 
 ```
-openobserve-cli config init
+openobserve-cli config init --pretty   # interactive TUI (recommended for humans)
+openobserve-cli config init             # plain line-by-line wizard (works over a pipe)
 ```
 
 Prompts for the server URL, organization, auth scheme and credentials, verifies
@@ -15,6 +16,10 @@ them against the server, then writes a context to
 `~/.angelmsger/openobserve/config.yaml` and stores the secret in the OS keychain
 (falling back to a `0600` file when no keychain is available). Re-run it any time
 to add or update a context; `config init --context prod` names the context.
+
+`--pretty` renders an interactive TUI and requires a terminal (otherwise it
+fails with `PRETTY_NEEDS_TTY`); the plain wizard reads stdin line by line, so it
+also works non-interactively for scripted setup.
 
 `auth login` is the lighter form: it re-prompts only for credentials of the
 already-configured context.

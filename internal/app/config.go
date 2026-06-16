@@ -27,19 +27,16 @@ func newConfigInitCmd(s *appState) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "init",
 		Short: "Interactively configure a context and store credentials",
-		Long: "Walks through server URL, organization and credentials, verifies them,\n" +
-			"then writes a named context plus the secret. Requires an interactive\n" +
-			"terminal; for headless use set OPENOBSERVE_URL / OPENOBSERVE_ORG /\n" +
-			"OPENOBSERVE_EMAIL / OPENOBSERVE_PASSWORD (or OPENOBSERVE_TOKEN).",
+		Long: "Collects a server URL, organization and credentials, verifies them,\n" +
+			"then writes a named context plus the secret. With --pretty it runs an\n" +
+			"interactive TUI (requires a terminal); without it, a plain line-by-line\n" +
+			"wizard that also works over a pipe. For fully headless setup, set\n" +
+			"OPENOBSERVE_URL / OPENOBSERVE_ORG / OPENOBSERVE_EMAIL /\n" +
+			"OPENOBSERVE_PASSWORD (or OPENOBSERVE_TOKEN) instead.",
+		Example: "  openobserve-cli config init --pretty   # interactive TUI (recommended)\n" +
+			"  openobserve-cli config init             # plain line-by-line wizard (scripts, non-TTY)",
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			if !stdinIsTTY() {
-				return cerrors.New(cerrors.CategoryConfig, "INIT_NEEDS_TTY",
-					"config init requires an interactive terminal").
-					WithHint("In CI / agent sandboxes use environment variables instead: " +
-						"OPENOBSERVE_URL, OPENOBSERVE_ORG, OPENOBSERVE_EMAIL, OPENOBSERVE_PASSWORD (or OPENOBSERVE_TOKEN).").
-					WithNextSteps("openobserve-cli auth status")
-			}
 			cur := s.cfg()
 			def := initValues{
 				baseURL: cur.BaseURL,
@@ -47,9 +44,15 @@ func newConfigInitCmd(s *appState) *cobra.Command {
 				scheme:  cur.Auth.Scheme,
 				email:   cur.Auth.Username,
 			}
-			// --pretty drives the interactive TUI; otherwise plain line prompts.
+			// --pretty drives the interactive TUI and requires a terminal;
+			// without it, plain line prompts that also work over a pipe.
 			collect := runInitPrompts
 			if s.gflags.pretty {
+				if !stdinIsTTY() {
+					return cerrors.New(cerrors.CategoryUsage, "PRETTY_NEEDS_TTY",
+						"--pretty requires an interactive terminal for `config init`").
+						WithHint("Drop --pretty or run from a terminal.")
+				}
 				collect = runInitForm
 			}
 			vals, err := collect(def)

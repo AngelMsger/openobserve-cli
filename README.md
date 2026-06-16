@@ -104,7 +104,7 @@ fish and PowerShell are supported too — see `openobserve-cli completion --help
 ## Quick start
 
 ```bash
-openobserve-cli config init           # interactive setup (server, org, credentials)
+openobserve-cli config init --pretty  # interactive TUI setup (recommended for humans)
 openobserve-cli doctor                # verify configuration and connectivity
 
 openobserve-cli org list              # discover organizations

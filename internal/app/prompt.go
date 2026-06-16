@@ -28,9 +28,16 @@ func promptLine(label, def string) (string, error) {
 	return line, nil
 }
 
-// promptSecret reads a secret from stdin without echoing it.
+// promptSecret reads a secret from stdin. On an interactive terminal it reads
+// without echoing; without a TTY (a pipe / script) it falls back to a plain
+// line read so non-interactive setup still works — at the cost of the secret
+// being echoed by whatever is feeding stdin.
 func promptSecret(label string) (string, error) {
 	fmt.Fprintf(os.Stderr, "%s: ", label)
+	if !term.IsTerminal(int(os.Stdin.Fd())) {
+		line, err := readLine()
+		return strings.TrimSpace(line), err
+	}
 	b, err := term.ReadPassword(int(os.Stdin.Fd()))
 	fmt.Fprintln(os.Stderr)
 	if err != nil {
