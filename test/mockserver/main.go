@@ -44,8 +44,8 @@ func main() {
 			"list": []map[string]any{
 				{
 					"name": "app", "stream_type": "logs",
-					"stats":  map[string]any{"doc_num": 1234, "storage_size": 12.5},
-					"schema": []map[string]any{{"name": "_timestamp", "type": "Int64"}, {"name": "level", "type": "Utf8"}, {"name": "log", "type": "Utf8"}},
+					"stats":    map[string]any{"doc_num": 1234, "storage_size": 12.5},
+					"schema":   []map[string]any{{"name": "_timestamp", "type": "Int64"}, {"name": "level", "type": "Utf8"}, {"name": "log", "type": "Utf8"}},
 					"settings": map[string]any{"full_text_search_keys": []string{"log"}},
 				},
 				{"name": "web", "stream_type": "logs", "stats": map[string]any{"doc_num": 42}},

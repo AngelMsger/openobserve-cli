@@ -16,7 +16,7 @@ endif
 
 SKILL_DIR ?= $(HOME)/.claude/skills
 
-.PHONY: build test e2e lint fmt vet docs install install-skill tidy clean
+.PHONY: build test e2e lint fmt vet docs cross install install-skill tidy clean
 
 build:
 	CGO_ENABLED=0 go build -trimpath -ldflags "$(LDFLAGS)" -o bin/$(BINARY) ./cmd/openobserve-cli
@@ -37,6 +37,10 @@ vet:
 
 tidy:
 	go mod tidy
+
+# Cross-compile every supported platform into dist/ (used by the release workflow).
+cross:
+	VERSION=$(VERSION) COMMIT=$(COMMIT) ./scripts/build.sh
 
 # Regenerate the CLI reference under docs/cli/ from the cobra command tree.
 docs:
