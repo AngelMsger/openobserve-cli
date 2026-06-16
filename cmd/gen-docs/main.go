@@ -26,7 +26,7 @@ const outDir = "docs/cli"
 
 // pagesURL is where the generated index.html is published; README.md links
 // command rows to anchors there.
-const pagesURL = "https://AngelMsger.github.io/openobserve-cli/cli/"
+const pagesURL = "https://angelmsger.github.io/openobserve-cli/cli/"
 
 // repoURL is the GitHub repository.
 const repoURL = "https://github.com/AngelMsger/openobserve-cli"
