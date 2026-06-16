@@ -6,9 +6,8 @@ repository. It is intentionally short.
 ## What this is
 
 `openobserve-cli` is an agent-facing CLI for OpenObserve (O2): discover streams
-and run SQL searches over logs / metrics / traces. It follows the conventions in
-`../../docs/agent-facing-cli-best-practices.md` and mirrors the architecture of
-the sibling `confluence-cli` / `bitbucket-cli` (Go + Cobra).
+and run SQL searches over logs / metrics / traces. It is a Go + Cobra CLI that
+mirrors the architecture of the sibling `confluence-cli` / `bitbucket-cli`.
 
 ## Layout
 

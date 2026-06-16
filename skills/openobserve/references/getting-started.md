@@ -37,6 +37,44 @@ export OPENOBSERVE_TOKEN='cm9vdEBleGFtcGxlLmNvbTpDb21wbGV4cGFzcw=='
 `OPENOBSERVE_TOKEN` is the base64 portion of a Basic credential; a full
 `Basic …` / `Bearer …` value is also accepted and passed through verbatim.
 
+## SSO / OAuth (dex, Authentik, Okta, Azure…): use a Service Account
+
+When OpenObserve logs users in through an external identity provider (dex,
+Authentik, Okta, Azure AD, …), those users have **no local password**, so they
+cannot authenticate the CLI directly — every OpenObserve API call, including this
+CLI's, uses HTTP Basic auth, not the browser OAuth flow. The supported path for
+programmatic / CLI / agent access alongside SSO is a **Service Account**: a
+non-human account that holds a long-lived token and cannot log into the UI.
+
+1. In OpenObserve, an admin goes to **IAM → Service Accounts → Add Service
+   Account**, enters an email + name, and saves. A **token** is generated (shown
+   once — copy it).
+2. Assign the service account a role under **IAM → Roles**, or it can't read your
+   streams.
+3. Authenticate the CLI with the service-account **email** + **token** (the token
+   is used in the password position of Basic auth):
+
+   ```
+   # interactive
+   openobserve-cli config init        # scheme: basic, Email: <sa-email>, Password: <token>
+
+   # headless / agent
+   export OPENOBSERVE_URL=https://your-openobserve-host
+   export OPENOBSERVE_ORG=<org>
+   export OPENOBSERVE_EMAIL=<service-account-email>
+   export OPENOBSERVE_PASSWORD=<service-account-token>
+   ```
+
+Notes:
+
+- OpenObserve also offers an SSO **token-exchange** endpoint that turns an
+  IdP-issued JWT into a short-lived (~30 min) Bearer token. The CLI can carry it
+  via `OPENOBSERVE_TOKEN='Bearer <jwt>'`, but its expiry makes it unsuitable for a
+  long-running CLI — prefer a Service Account's durable token.
+- The bootstrap `root` user (`ZO_ROOT_USER_EMAIL` / `ZO_ROOT_USER_PASSWORD`) keeps
+  Basic auth even when SSO is on; usable for quick checks, but prefer a
+  permission-scoped Service Account over root credentials for agents.
+
 ## Verify
 
 ```
