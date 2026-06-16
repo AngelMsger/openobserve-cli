@@ -1,0 +1,476 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>openobserve-cli — CLI reference</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<nav class="nav">
+  <div class="nav-inner">
+    <a class="brand" href="../">openobserve-cli</a>
+    <div class="nav-links">
+      <a href="../">Home</a>
+      <a class="is-cli" href="../#commands">Commands</a>
+      <a href="https://github.com/AngelMsger/openobserve-cli">GitHub</a>
+    </div>
+  </div>
+</nav>
+<div class="layout">
+  <aside class="side">
+    <div class="side-group">
+      <div class="side-title">auth</div>
+      <a href="#openobserve-cli-auth">openobserve-cli auth</a>
+      <a href="#openobserve-cli-auth-login">openobserve-cli auth login</a>
+      <a href="#openobserve-cli-auth-logout">openobserve-cli auth logout</a>
+      <a href="#openobserve-cli-auth-status">openobserve-cli auth status</a>
+      </div>
+    <div class="side-group">
+      <div class="side-title">config</div>
+      <a href="#openobserve-cli-config">openobserve-cli config</a>
+      <a href="#openobserve-cli-config-contexts">openobserve-cli config contexts</a>
+      <a href="#openobserve-cli-config-init">openobserve-cli config init</a>
+      <a href="#openobserve-cli-config-show">openobserve-cli config show</a>
+      <a href="#openobserve-cli-config-use-context">openobserve-cli config use-context</a>
+      </div>
+    <div class="side-group">
+      <div class="side-title">doctor</div>
+      <a href="#openobserve-cli-doctor">openobserve-cli doctor</a>
+      </div>
+    <div class="side-group">
+      <div class="side-title">org</div>
+      <a href="#openobserve-cli-org">openobserve-cli org</a>
+      <a href="#openobserve-cli-org-list">openobserve-cli org list</a>
+      <a href="#openobserve-cli-org-use">openobserve-cli org use</a>
+      </div>
+    <div class="side-group">
+      <div class="side-title">search</div>
+      <a href="#openobserve-cli-search">openobserve-cli search</a>
+      <a href="#openobserve-cli-search-histogram">openobserve-cli search histogram</a>
+      <a href="#openobserve-cli-search-run">openobserve-cli search run</a>
+      </div>
+    <div class="side-group">
+      <div class="side-title">skill</div>
+      <a href="#openobserve-cli-skill">openobserve-cli skill</a>
+      <a href="#openobserve-cli-skill-install">openobserve-cli skill install</a>
+      <a href="#openobserve-cli-skill-path">openobserve-cli skill path</a>
+      <a href="#openobserve-cli-skill-show">openobserve-cli skill show</a>
+      <a href="#openobserve-cli-skill-uninstall">openobserve-cli skill uninstall</a>
+      </div>
+    <div class="side-group">
+      <div class="side-title">stream</div>
+      <a href="#openobserve-cli-stream">openobserve-cli stream</a>
+      <a href="#openobserve-cli-stream-get">openobserve-cli stream get</a>
+      <a href="#openobserve-cli-stream-list">openobserve-cli stream list</a>
+      <a href="#openobserve-cli-stream-schema">openobserve-cli stream schema</a>
+      <a href="#openobserve-cli-stream-stats">openobserve-cli stream stats</a>
+      </div>
+    <div class="side-group">
+      <div class="side-title">version</div>
+      <a href="#openobserve-cli-version">openobserve-cli version</a>
+      </div>
+    
+  </aside>
+  <main class="cli-main">
+    <span class="eyebrow">Reference</span>
+    <h1>CLI reference</h1>
+    <p class="lead">openobserve-cli discovers streams and runs SQL searches over logs,
+metrics and traces in OpenObserve (O2). It emits agent-friendly JSON
+with structured errors, and works with self-hosted and Cloud instances.</p>
+    <p class="lead">Generated from the command tree, so it always matches <code>--help</code>.</p>
+
+    <section class="cmd">
+      <h2>Global flags</h2>
+      <p class="short">Persistent flags accepted by every command.</p>
+      <table>
+        <thead><tr><th>Flag</th><th>Default</th><th>Description</th></tr></thead>
+        <tbody>
+        <tr><td><code>--allow-writes</code></td><td><code>false</code></td><td>override read-only mode (defaults.read_only / OPENOBSERVE_CLI_READ_ONLY) for this invocation</td></tr>
+        <tr><td><code>--base-url</code></td><td></td><td>OpenObserve server URL (overrides config), e.g. http://localhost:5080</td></tr>
+        <tr><td><code>--config</code></td><td></td><td>config directory (default ~/.angelmsger/openobserve)</td></tr>
+        <tr><td><code>--fields</code></td><td></td><td>comma-separated dot-path fields to keep</td></tr>
+        <tr><td><code>--format, -f</code></td><td></td><td>output format: json, table or ndjson</td></tr>
+        <tr><td><code>--org</code></td><td></td><td>organization identifier (overrides config)</td></tr>
+        <tr><td><code>--pretty</code></td><td><code>false</code></td><td>human-friendly mode for interactive terminal use only (agents/scripts should omit): TUI in `config init`, colorized JSON elsewhere; errors without a TTY</td></tr>
+        <tr><td><code>--timeout</code></td><td></td><td>request timeout, e.g. 30s</td></tr>
+        <tr><td><code>--use-context</code></td><td></td><td>use a named context for this invocation</td></tr>
+        <tr><td><code>--verbose, -v</code></td><td><code>false</code></td><td>log request lines on stderr</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    
+    <section class="cmd" id="openobserve-cli-auth">
+      <h2>openobserve-cli auth<span class="group-tag">command group</span></h2>
+      <p class="short">Log in, check identity and log out</p>
+      <pre>openobserve-cli auth</pre>
+      
+      
+      
+    </section>
+    
+    <section class="cmd" id="openobserve-cli-auth-login">
+      <h2>openobserve-cli auth login</h2>
+      <p class="short">Store credentials for the active context (interactive)</p>
+      <pre>openobserve-cli auth login</pre>
+      <p class="long">Prompts for the password (basic) or token, verifies it against the
+server, and stores it in the OS keychain. Requires an interactive
+terminal; in CI / agent sandboxes set OPENOBSERVE_EMAIL &#43;
+OPENOBSERVE_PASSWORD or OPENOBSERVE_TOKEN instead.</p>
+      
+      
+    </section>
+    
+    <section class="cmd" id="openobserve-cli-auth-logout">
+      <h2>openobserve-cli auth logout</h2>
+      <p class="short">Remove the stored credential for the active context</p>
+      <pre>openobserve-cli auth logout</pre>
+      
+      
+      
+    </section>
+    
+    <section class="cmd" id="openobserve-cli-auth-status">
+      <h2>openobserve-cli auth status</h2>
+      <p class="short">Show the active identity and verify connectivity</p>
+      <pre>openobserve-cli auth status</pre>
+      
+      
+      
+    </section>
+    
+    <section class="cmd" id="openobserve-cli-config">
+      <h2>openobserve-cli config<span class="group-tag">command group</span></h2>
+      <p class="short">Set up and inspect configuration and contexts</p>
+      <pre>openobserve-cli config</pre>
+      
+      
+      
+    </section>
+    
+    <section class="cmd" id="openobserve-cli-config-contexts">
+      <h2>openobserve-cli config contexts</h2>
+      <p class="short">List configured contexts and which one is current</p>
+      <pre>openobserve-cli config contexts</pre>
+      
+      
+      
+    </section>
+    
+    <section class="cmd" id="openobserve-cli-config-init">
+      <h2>openobserve-cli config init</h2>
+      <p class="short">Interactively configure a context and store credentials</p>
+      <pre>openobserve-cli config init [flags]</pre>
+      <p class="long">Collects a server URL, organization and credentials, verifies them,
+then writes a named context plus the secret. With --pretty it runs an
+interactive TUI (requires a terminal); without it, a plain line-by-line
+wizard that also works over a pipe. For fully headless setup, set
+OPENOBSERVE_URL / OPENOBSERVE_ORG / OPENOBSERVE_EMAIL /
+OPENOBSERVE_PASSWORD (or OPENOBSERVE_TOKEN) instead.</p>
+      <h3>Options</h3>
+      <table>
+        <thead><tr><th>Flag</th><th>Default</th><th>Description</th></tr></thead>
+        <tbody>
+        <tr><td><code>--context</code></td><td><code>default</code></td><td>name for the context to create or update</td></tr>
+        </tbody>
+      </table>
+      <h3>Examples</h3><pre>  openobserve-cli config init --pretty   # interactive TUI (recommended)
+  openobserve-cli config init             # plain line-by-line wizard (scripts, non-TTY)</pre>
+    </section>
+    
+    <section class="cmd" id="openobserve-cli-config-show">
+      <h2>openobserve-cli config show</h2>
+      <p class="short">Show the resolved configuration with field provenance</p>
+      <pre>openobserve-cli config show</pre>
+      
+      
+      
+    </section>
+    
+    <section class="cmd" id="openobserve-cli-config-use-context">
+      <h2>openobserve-cli config use-context</h2>
+      <p class="short">Set the current context</p>
+      <pre>openobserve-cli config use-context &lt;name&gt;</pre>
+      
+      
+      
+    </section>
+    
+    <section class="cmd" id="openobserve-cli-doctor">
+      <h2>openobserve-cli doctor</h2>
+      <p class="short">Check configuration, credentials and connectivity</p>
+      <pre>openobserve-cli doctor</pre>
+      <p class="long">Runs a quick health check: is a server configured, are credentials
+present, and can the server be reached and authenticated. Each check
+reports ok/failed so an agent can self-diagnose environment problems.</p>
+      
+      
+    </section>
+    
+    <section class="cmd" id="openobserve-cli-org">
+      <h2>openobserve-cli org<span class="group-tag">command group</span></h2>
+      <p class="short">List organizations and set the default one</p>
+      <pre>openobserve-cli org</pre>
+      <p class="long">Organizations scope every OpenObserve request. `org list` discovers
+the identifiers your credential can use; `org use` records one as the
+default so later commands need no --org.</p>
+      
+      
+    </section>
+    
+    <section class="cmd" id="openobserve-cli-org-list">
+      <h2>openobserve-cli org list</h2>
+      <p class="short">List organizations the credential can access</p>
+      <pre>openobserve-cli org list</pre>
+      
+      
+      
+    </section>
+    
+    <section class="cmd" id="openobserve-cli-org-use">
+      <h2>openobserve-cli org use</h2>
+      <p class="short">Set the default organization in the active context</p>
+      <pre>openobserve-cli org use &lt;identifier&gt;</pre>
+      
+      
+      
+    </section>
+    
+    <section class="cmd" id="openobserve-cli-search">
+      <h2>openobserve-cli search<span class="group-tag">command group</span></h2>
+      <p class="short">Run SQL searches over logs, metrics and traces</p>
+      <pre>openobserve-cli search</pre>
+      <p class="long">Search is the heart of the CLI. `search run` returns matching rows;
+`search histogram` returns time-bucketed counts so you can see volume
+and shape before pulling raw rows. Time ranges are given in human form
+(--since 1h, or --from/--to); the CLI converts them to the microsecond
+epochs OpenObserve needs.</p>
+      
+      
+    </section>
+    
+    <section class="cmd" id="openobserve-cli-search-histogram">
+      <h2>openobserve-cli search histogram</h2>
+      <p class="short">Return time-bucketed counts (the volume map before raw rows)</p>
+      <pre>openobserve-cli search histogram [flags]</pre>
+      <p class="long">Runs a histogram(_timestamp, &lt;interval&gt;) aggregation so you can see how
+many rows fall in each time bucket — the shape of the data — before
+deciding which window to pull raw rows from with `search run`.</p>
+      <h3>Options</h3>
+      <table>
+        <thead><tr><th>Flag</th><th>Default</th><th>Description</th></tr></thead>
+        <tbody>
+        <tr><td><code>--from</code></td><td></td><td>range start: RFC3339, an epoch, 2006-01-02, or now-1h</td></tr>
+        <tr><td><code>--interval</code></td><td><code>1m</code></td><td>bucket width: 30s, 1m, 5m, 1h, 1d</td></tr>
+        <tr><td><code>--since</code></td><td></td><td>look back this far from now, e.g. 15m, 1h, 24h, 7d</td></tr>
+        <tr><td><code>--stream</code></td><td></td><td>stream to aggregate (required)</td></tr>
+        <tr><td><code>--to</code></td><td></td><td>range end (default now)</td></tr>
+        <tr><td><code>--where</code></td><td></td><td>WHERE clause to filter, e.g. &#34;level = &#39;ERROR&#39;&#34;</td></tr>
+        </tbody>
+      </table>
+      <h3>Examples</h3><pre>  openobserve-cli search histogram --stream default --since 6h --interval 5m</pre>
+    </section>
+    
+    <section class="cmd" id="openobserve-cli-search-run">
+      <h2>openobserve-cli search run</h2>
+      <p class="short">Run a SQL query and return matching rows</p>
+      <pre>openobserve-cli search run [flags]</pre>
+      <p class="long">Provide --stream to query a stream with an auto-built SELECT, optionally
+narrowed by --where; or provide a full --sql query. The time range is
+required (--since or --from/--to). JSON output returns a summary plus the
+hits; --format ndjson streams one hit per line for piping.</p>
+      <h3>Options</h3>
+      <table>
+        <thead><tr><th>Flag</th><th>Default</th><th>Description</th></tr></thead>
+        <tbody>
+        <tr><td><code>--from</code></td><td></td><td>range start: RFC3339, an epoch, 2006-01-02, or now-1h</td></tr>
+        <tr><td><code>--limit</code></td><td><code>0</code></td><td>max rows to return (default 100, max 10000)</td></tr>
+        <tr><td><code>--offset</code></td><td><code>0</code></td><td>row offset for pagination (maps to the search &#39;from&#39;)</td></tr>
+        <tr><td><code>--order</code></td><td><code>desc</code></td><td>_timestamp ordering for the auto-built query: desc or asc</td></tr>
+        <tr><td><code>--since</code></td><td></td><td>look back this far from now, e.g. 15m, 1h, 24h, 7d</td></tr>
+        <tr><td><code>--sql</code></td><td></td><td>full SQL query (overrides --stream/--where/--order)</td></tr>
+        <tr><td><code>--stream</code></td><td></td><td>stream to query (builds SELECT * FROM &#34;&lt;stream&gt;&#34;)</td></tr>
+        <tr><td><code>--to</code></td><td></td><td>range end (default now)</td></tr>
+        <tr><td><code>--where</code></td><td></td><td>WHERE clause to filter the auto-built query, e.g. &#34;level = &#39;ERROR&#39;&#34;</td></tr>
+        </tbody>
+      </table>
+      <h3>Examples</h3><pre><span class="c">  # last hour of errors from the &#39;default&#39; log stream</span>
+  openobserve-cli search run --stream default --where &#34;level = &#39;ERROR&#39;&#34; --since 1h --limit 20
+
+<span class="c">  # a full SQL query over an explicit window</span>
+  openobserve-cli search run --sql &#39;SELECT code, count(*) FROM &#34;default&#34; GROUP BY code&#39; --since 24h</pre>
+    </section>
+    
+    <section class="cmd" id="openobserve-cli-skill">
+      <h2>openobserve-cli skill<span class="group-tag">command group</span></h2>
+      <p class="short">Install the companion Skill for coding agents (Claude Code, Codex)</p>
+      <pre>openobserve-cli skill</pre>
+      
+      
+      
+    </section>
+    
+    <section class="cmd" id="openobserve-cli-skill-install">
+      <h2>openobserve-cli skill install</h2>
+      <p class="short">Deploy the embedded Skill into a coding agent&#39;s skills directory</p>
+      <pre>openobserve-cli skill install [flags]</pre>
+      <p class="long">Write the companion `openobserve` Skill — bundled inside this binary —
+into a coding agent&#39;s skills directory. With no flags it probes for
+installed agents (Claude Code, Codex) and installs into each one found.
+Re-run it after upgrading the CLI to refresh the Skill to the matching
+version.</p>
+      <h3>Options</h3>
+      <table>
+        <thead><tr><th>Flag</th><th>Default</th><th>Description</th></tr></thead>
+        <tbody>
+        <tr><td><code>--agent</code></td><td><code>[]</code></td><td>target agents instead of auto-detecting (claude-code, codex)</td></tr>
+        <tr><td><code>--dir</code></td><td></td><td>explicit skills base directory; installs into &lt;dir&gt;/openobserve</td></tr>
+        <tr><td><code>--project</code></td><td><code>false</code></td><td>install into the project (./.claude/skills, ./.agents/skills) instead of $HOME</td></tr>
+        </tbody>
+      </table>
+      
+    </section>
+    
+    <section class="cmd" id="openobserve-cli-skill-path">
+      <h2>openobserve-cli skill path</h2>
+      <p class="short">Print where the Skill would be installed, and whether it is</p>
+      <pre>openobserve-cli skill path [flags]</pre>
+      
+      <h3>Options</h3>
+      <table>
+        <thead><tr><th>Flag</th><th>Default</th><th>Description</th></tr></thead>
+        <tbody>
+        <tr><td><code>--agent</code></td><td><code>[]</code></td><td>limit to specific agents (claude-code, codex)</td></tr>
+        <tr><td><code>--dir</code></td><td></td><td>explicit skills base directory</td></tr>
+        <tr><td><code>--project</code></td><td><code>false</code></td><td>use the project skills directories instead of $HOME</td></tr>
+        </tbody>
+      </table>
+      
+    </section>
+    
+    <section class="cmd" id="openobserve-cli-skill-show">
+      <h2>openobserve-cli skill show</h2>
+      <p class="short">Print the embedded SKILL.md to stdout</p>
+      <pre>openobserve-cli skill show</pre>
+      
+      
+      
+    </section>
+    
+    <section class="cmd" id="openobserve-cli-skill-uninstall">
+      <h2>openobserve-cli skill uninstall</h2>
+      <p class="short">Remove the companion Skill from a coding agent&#39;s skills directory</p>
+      <pre>openobserve-cli skill uninstall [flags]</pre>
+      <p class="long">Delete a previously installed `openobserve` Skill. With no flags it
+probes for installed agents (Claude Code, Codex) and removes the Skill
+from each one found.</p>
+      <h3>Options</h3>
+      <table>
+        <thead><tr><th>Flag</th><th>Default</th><th>Description</th></tr></thead>
+        <tbody>
+        <tr><td><code>--agent</code></td><td><code>[]</code></td><td>target agents instead of auto-detecting (claude-code, codex)</td></tr>
+        <tr><td><code>--dir</code></td><td></td><td>explicit skills base directory; removes &lt;dir&gt;/openobserve</td></tr>
+        <tr><td><code>--project</code></td><td><code>false</code></td><td>remove from the project (./.claude/skills, ./.agents/skills) instead of $HOME</td></tr>
+        </tbody>
+      </table>
+      
+    </section>
+    
+    <section class="cmd" id="openobserve-cli-stream">
+      <h2>openobserve-cli stream<span class="group-tag">command group</span></h2>
+      <p class="short">Discover streams and inspect their schema</p>
+      <pre>openobserve-cli stream</pre>
+      <p class="long">Streams are the logs / metrics / traces collections you query with
+`search`. List them to find names, then inspect a stream&#39;s schema to
+learn which columns exist before writing SQL.</p>
+      
+      
+    </section>
+    
+    <section class="cmd" id="openobserve-cli-stream-get">
+      <h2>openobserve-cli stream get</h2>
+      <p class="short">Get one stream including schema, settings and stats</p>
+      <pre>openobserve-cli stream get &lt;name&gt; [flags]</pre>
+      
+      <h3>Options</h3>
+      <table>
+        <thead><tr><th>Flag</th><th>Default</th><th>Description</th></tr></thead>
+        <tbody>
+        <tr><td><code>--type</code></td><td></td><td>stream type hint: logs, metrics or traces</td></tr>
+        </tbody>
+      </table>
+      
+    </section>
+    
+    <section class="cmd" id="openobserve-cli-stream-list">
+      <h2>openobserve-cli stream list</h2>
+      <p class="short">List streams in the organization (the discovery map)</p>
+      <pre>openobserve-cli stream list [flags]</pre>
+      <p class="long">Lists streams with their type and storage stats. Schema is omitted by
+default to keep the output a compact map; add --schema for full fields,
+or use `stream schema &lt;name&gt;` for one stream.</p>
+      <h3>Options</h3>
+      <table>
+        <thead><tr><th>Flag</th><th>Default</th><th>Description</th></tr></thead>
+        <tbody>
+        <tr><td><code>--schema</code></td><td><code>false</code></td><td>include each stream&#39;s field schema</td></tr>
+        <tr><td><code>--type</code></td><td></td><td>filter by stream type: logs, metrics or traces</td></tr>
+        </tbody>
+      </table>
+      
+    </section>
+    
+    <section class="cmd" id="openobserve-cli-stream-schema">
+      <h2>openobserve-cli stream schema</h2>
+      <p class="short">Show just a stream&#39;s queryable columns and search settings</p>
+      <pre>openobserve-cli stream schema &lt;name&gt; [flags]</pre>
+      <p class="long">Returns the stream&#39;s field schema plus its full-text-search and
+partition settings — what you need to write a correct SQL query.</p>
+      <h3>Options</h3>
+      <table>
+        <thead><tr><th>Flag</th><th>Default</th><th>Description</th></tr></thead>
+        <tbody>
+        <tr><td><code>--type</code></td><td></td><td>stream type hint: logs, metrics or traces</td></tr>
+        </tbody>
+      </table>
+      
+    </section>
+    
+    <section class="cmd" id="openobserve-cli-stream-stats">
+      <h2>openobserve-cli stream stats</h2>
+      <p class="short">Show a stream&#39;s document count, time range and storage size</p>
+      <pre>openobserve-cli stream stats &lt;name&gt; [flags]</pre>
+      
+      <h3>Options</h3>
+      <table>
+        <thead><tr><th>Flag</th><th>Default</th><th>Description</th></tr></thead>
+        <tbody>
+        <tr><td><code>--type</code></td><td></td><td>stream type hint: logs, metrics or traces</td></tr>
+        </tbody>
+      </table>
+      
+    </section>
+    
+    <section class="cmd" id="openobserve-cli-version">
+      <h2>openobserve-cli version</h2>
+      <p class="short">Print version information</p>
+      <pre>openobserve-cli version</pre>
+      
+      
+      
+    </section>
+    
+  </main>
+</div>
+<footer class="footer">
+  <div class="wrap">
+    <span class="brand-foot">openobserve-cli — MIT License</span>
+    <span><a href="https://github.com/AngelMsger/openobserve-cli">github.com/AngelMsger/openobserve-cli</a></span>
+  </div>
+</footer>
+</body>
+</html>

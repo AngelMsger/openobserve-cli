@@ -1,6 +1,5 @@
 /bin/
 /build/npm/binary/
-/docs/cli/
 *.test
 .env
 .DS_Store
