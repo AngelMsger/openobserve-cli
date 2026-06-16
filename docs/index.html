@@ -1,0 +1,238 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>openobserve-cli — query OpenObserve from your terminal</title>
+<meta name="description" content="A command-line tool that lets coding agents query OpenObserve (O2): discover streams and run SQL searches over logs, metrics and traces, with structured JSON output. Self-hosted and Cloud.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<nav class="nav">
+  <div class="nav-inner">
+    <a class="brand" href="#top">openobserve-cli</a>
+    <div class="nav-links">
+      <a href="#features">Features</a>
+      <a href="#install">Install</a>
+      <a href="#quickstart">Quick start</a>
+      <a href="#commands">Commands</a>
+      <a class="is-cli" href="https://github.com/AngelMsger/openobserve-cli">GitHub</a>
+    </div>
+  </div>
+</nav>
+
+<header class="hero" id="top">
+  <div class="wrap">
+    <h1 class="reveal d1">openobserve-cli<span class="cursor"></span></h1>
+    <p class="tagline reveal d2">Query OpenObserve from your terminal — built for coding agents, designed for humans.</p>
+    <div class="pills reveal d3">
+      <span class="pill">Logs · Metrics · Traces</span>
+      <span class="pill">Self-hosted &amp; Cloud</span>
+      <span class="pill">Built for agents</span>
+    </div>
+    <div class="cta reveal d4">
+      <a class="btn btn-primary" href="#install">Get started</a>
+      <a class="btn btn-ghost" href="#quickstart">See a session →</a>
+      <a class="btn btn-ghost" href="https://github.com/AngelMsger/openobserve-cli">GitHub</a>
+    </div>
+    <div class="shot reveal d5">
+      <img src="image.png" alt="openobserve-cli in a terminal">
+    </div>
+  </div>
+</header>
+
+<section class="section" id="features">
+  <div class="wrap">
+    <div class="section-head">
+      <span class="eyebrow">Capabilities</span>
+      <h2>Read your observability data, the agent way</h2>
+      <p class="lead">Discover streams and search logs, metrics and traces — with output a coding agent can act on.</p>
+    </div>
+    <div class="grid grid-3">
+      <div class="card feat">
+        <div class="feat-ico"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-5-5"/></svg></div>
+        <h3>SQL search</h3>
+        <p>Run full SQL over any stream — <code>WHERE</code>, <code>GROUP BY</code>, aggregates — built from <code>--stream</code>/<code>--where</code> or your own <code>--sql</code>.</p>
+      </div>
+      <div class="card feat">
+        <div class="feat-ico"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V4"/><path d="M4 20h16"/><rect x="7" y="12" width="3" height="5"/><rect x="12" y="8" width="3" height="9"/><rect x="17" y="5" width="3" height="12"/></svg></div>
+        <h3>Map before terrain</h3>
+        <p><code>search histogram</code> shows volume per time bucket, so an agent sees the shape of the data before pulling raw rows.</p>
+      </div>
+      <div class="card feat">
+        <div class="feat-ico"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v6c0 1.7 3.6 3 8 3s8-1.3 8-3V5"/><path d="M4 11v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6"/></svg></div>
+        <h3>Stream discovery</h3>
+        <p>List streams and inspect a stream's schema and full-text-search keys — so your SQL only ever references real names.</p>
+      </div>
+      <div class="card feat">
+        <div class="feat-ico"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8"/><path d="M12 8v4l3 2"/></svg></div>
+        <h3>Human time ranges</h3>
+        <p>Pass <code>--since 1h</code> or <code>--from</code>/<code>--to</code> as RFC3339, a date, an epoch, or <code>now-30m</code> — the CLI converts to the microseconds the API needs.</p>
+      </div>
+      <div class="card feat">
+        <div class="feat-ico"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M8 8l-4 4 4 4"/><path d="M16 8l4 4-4 4"/><path d="M13 5l-2 14"/></svg></div>
+        <h3>Agent-first output</h3>
+        <p>JSON by default, with structured errors — categories, exit codes and recovery <code>next_steps</code> a coding agent can branch on.</p>
+      </div>
+      <div class="card feat">
+        <div class="feat-ico"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l8 4-8 4-8-4z"/><path d="M4 12l8 4 8-4"/><path d="M4 17l8 4 8-4"/></svg></div>
+        <h3>Multiple servers</h3>
+        <p>kubectl-style named contexts in one config file. Switch the current server, or override per command with <code>--use-context</code>.</p>
+      </div>
+      <div class="card feat">
+        <div class="feat-ico"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg></div>
+        <h3>Secure credentials</h3>
+        <p>Passwords and tokens live in the OS keychain, with a <code>0600</code> file fallback — never in the config file. Env vars for headless use.</p>
+      </div>
+      <div class="card feat">
+        <div class="feat-ico"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6z"/><path d="M9.5 12l1.8 1.8L15 10"/></svg></div>
+        <h3>SSO &amp; service accounts</h3>
+        <p>Works behind dex / Authentik / Okta SSO via a Service Account token, and gives RBAC-aware guidance when a 403 means a missing role.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section" id="install">
+  <div class="wrap">
+    <div class="section-head">
+      <span class="eyebrow">Install</span>
+      <h2>Up and running in a minute</h2>
+      <p class="lead">Install with npm, then finish setup in two steps — deploy the Skill, then turn on shell completion.</p>
+    </div>
+    <div class="term">
+      <div class="term-bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="term-title">install</span></div>
+<pre><span class="c"># recommended — fetches the prebuilt binary for your platform</span>
+npm install -g @angelmsger/openobserve-cli</pre>
+    </div>
+    <p style="margin-top:14px;color:var(--muted)">Other methods — <code>go install</code>, a source build, or a prebuilt binary from the
+      <a href="https://github.com/AngelMsger/openobserve-cli/releases">Releases page</a> — are in the
+      <a href="https://github.com/AngelMsger/openobserve-cli#installation">README</a>.</p>
+    <p class="lead" style="margin-top:30px">Then finish setup:</p>
+    <div class="grid grid-2" style="margin-top:14px">
+      <div class="card">
+        <h3>1 · Companion Skill</h3>
+        <p style="margin:6px 0 12px">An <code>openobserve</code> Skill is embedded in the binary. It detects your coding agent — Claude Code, Codex — and installs for each:</p>
+        <div class="term"><div class="term-bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div>
+<pre><span class="p">$</span> openobserve-cli skill install</pre></div>
+      </div>
+      <div class="card">
+        <h3>2 · Shell completion</h3>
+        <p style="margin:6px 0 12px">Completes subcommands and flag values. Load it once:</p>
+        <div class="term"><div class="term-bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div>
+<pre><span class="p">$</span> source &lt;(openobserve-cli completion bash)</pre></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section" id="quickstart">
+  <div class="wrap">
+    <div class="section-head">
+      <span class="eyebrow">Quick start</span>
+      <h2>Configure once, then read the data</h2>
+      <p class="lead">Set up a server, discover streams, then search — map first, then rows.</p>
+    </div>
+    <div class="term">
+      <div class="term-bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="term-title">a typical session</span></div>
+<pre><span class="c"># interactive setup, then verify connectivity</span>
+<span class="p">$</span> openobserve-cli config init --pretty
+<span class="p">$</span> openobserve-cli doctor
+
+<span class="c"># discover streams, then inspect one's columns</span>
+<span class="p">$</span> openobserve-cli stream list
+<span class="p">$</span> openobserve-cli stream schema default
+
+<span class="c"># see volume over time, then pull the rows behind a spike</span>
+<span class="p">$</span> openobserve-cli search histogram --stream default --since 6h --interval 5m
+<span class="p">$</span> openobserve-cli search run --stream default \
+    --where "level = 'ERROR'" --since 1h --limit 20</pre>
+    </div>
+  </div>
+</section>
+
+<section class="section" id="commands">
+  <div class="wrap">
+    <div class="section-head">
+      <span class="eyebrow">Commands</span>
+      <h2>The command surface</h2>
+      <p class="lead">Seven command groups, organised <code>&lt;noun&gt; &lt;verb&gt;</code>. Every flag and example lives in the README and the companion Skill.</p>
+    </div>
+    <div class="grid grid-3">
+      <a class="card cmd-group" href="https://github.com/AngelMsger/openobserve-cli#commands">
+        <span class="cg-name">org</span>
+        <p>List organizations and set the default one.</p>
+      </a>
+      <a class="card cmd-group" href="https://github.com/AngelMsger/openobserve-cli/blob/main/skills/openobserve/references/streams.md">
+        <span class="cg-name">stream</span>
+        <p>Discover streams; inspect schema, settings and stats.</p>
+      </a>
+      <a class="card cmd-group" href="https://github.com/AngelMsger/openobserve-cli/blob/main/skills/openobserve/references/searching.md">
+        <span class="cg-name">search</span>
+        <p>SQL <code>run</code> and time-bucketed <code>histogram</code> over any stream.</p>
+      </a>
+      <a class="card cmd-group" href="https://github.com/AngelMsger/openobserve-cli/blob/main/skills/openobserve/references/getting-started.md">
+        <span class="cg-name">auth</span>
+        <p>Log in, check identity and log out.</p>
+      </a>
+      <a class="card cmd-group" href="https://github.com/AngelMsger/openobserve-cli#configuration">
+        <span class="cg-name">config</span>
+        <p>Setup wizard, plus multi-server context management.</p>
+      </a>
+      <a class="card cmd-group" href="https://github.com/AngelMsger/openobserve-cli/blob/main/skills/openobserve/references/errors-and-exit-codes.md">
+        <span class="cg-name">doctor</span>
+        <p>Diagnose configuration, credentials and connectivity.</p>
+      </a>
+      <a class="card cmd-group" href="https://github.com/AngelMsger/openobserve-cli/tree/main/skills/openobserve">
+        <span class="cg-name">skill</span>
+        <p>Deploy the embedded companion Skill to your agents.</p>
+      </a>
+    </div>
+    <div class="cta" style="justify-content:flex-start;margin-top:26px">
+      <a class="btn btn-primary" href="https://github.com/AngelMsger/openobserve-cli#commands">See every command on GitHub →</a>
+    </div>
+  </div>
+</section>
+
+<section class="section" id="guides">
+  <div class="wrap">
+    <div class="section-head">
+      <span class="eyebrow">Guides</span>
+      <h2>Go deeper</h2>
+      <p class="lead">Longer-form documentation, rendered on GitHub.</p>
+    </div>
+    <div class="grid grid-3">
+      <a class="card" href="https://github.com/AngelMsger/openobserve-cli#readme">
+        <h3>README &amp; setup →</h3>
+        <p>Install methods, configuration precedence, the command table and exit codes.</p>
+      </a>
+      <a class="card" href="https://github.com/AngelMsger/openobserve-cli/blob/main/skills/openobserve/references/getting-started.md">
+        <h3>Auth &amp; SSO →</h3>
+        <p>Interactive and headless setup, and authenticating behind SSO with a Service Account.</p>
+      </a>
+      <a class="card" href="https://github.com/AngelMsger/openobserve-cli/blob/main/skills/openobserve/references/searching.md">
+        <h3>Searching →</h3>
+        <p>SQL, time ranges and the map-before-terrain workflow for reading logs.</p>
+      </a>
+      <a class="card" href="https://github.com/AngelMsger/openobserve-cli/tree/main/skills/openobserve">
+        <h3>Companion Skill →</h3>
+        <p>The <code>openobserve</code> Skill that teaches a coding agent the CLI.</p>
+      </a>
+    </div>
+  </div>
+</section>
+
+<footer class="footer">
+  <div class="wrap">
+    <span class="brand-foot">openobserve-cli — MIT License</span>
+    <span>Sister CLIs: <a href="https://AngelMsger.github.io/confluence-cli/">confluence-cli</a> · <a href="https://AngelMsger.github.io/bitbucket-cli/">bitbucket-cli</a></span>
+    <span><a href="https://github.com/AngelMsger/openobserve-cli">github.com/AngelMsger/openobserve-cli</a></span>
+  </div>
+</footer>
+
+</body>
+</html>

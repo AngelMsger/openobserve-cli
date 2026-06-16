@@ -3,3 +3,4 @@
 /docs/cli/
 *.test
 .env
+.DS_Store
