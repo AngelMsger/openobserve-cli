@@ -3,6 +3,19 @@
 This file orients coding agents (Claude Code and others) working in this
 repository. It is intentionally short.
 
+## Start here
+
+1. Read [`CONTRIBUTING.md`](CONTRIBUTING.md) — project layout, the build/test/
+   lint/docs commands, the coding conventions, and the commit/PR expectations
+   every change must follow.
+2. Then read, only as the task needs them, the docs under [`docs/`](docs/):
+   [`technical-design.md`](docs/technical-design.md) (architecture and the
+   `internal/` packages — read before changing core behavior),
+   [`installation.md`](docs/installation.md) (install / setup / distribution UX),
+   [`read-only-mode.md`](docs/read-only-mode.md) (the write-safety posture), and
+   [`releasing.md`](docs/releasing.md) (versioning, tagging, the release/CI
+   workflows — read before cutting a release or touching `.github/workflows/`).
+
 ## What this is
 
 `openobserve-cli` is an agent-facing CLI for OpenObserve (O2): discover streams

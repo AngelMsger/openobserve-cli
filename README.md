@@ -79,7 +79,9 @@ make install                                                                  # 
 ```
 
 Or download a prebuilt binary from the
-[Releases page](https://github.com/AngelMsger/openobserve-cli/releases).
+[Releases page](https://github.com/AngelMsger/openobserve-cli/releases). The full
+[installation guide](docs/installation.md) covers every method, shell completion
+and the companion Skill.
 
 </details>
 
@@ -206,9 +208,13 @@ make lint       # gofmt + go vet
 make docs       # regenerate the CLI reference under docs/cli/
 ```
 
-`AGENTS.md` orients contributors (and coding agents) to the package layout. The
-`docs/cli/` reference is generated from the cobra command tree by `cmd/gen-docs`,
-so it always matches `--help` — run `make docs` after changing a command or flag.
+[`CONTRIBUTING.md`](CONTRIBUTING.md) covers the conventions and commands;
+[`docs/technical-design.md`](docs/technical-design.md) the architecture, and
+[`docs/releasing.md`](docs/releasing.md) the release process. The `docs/cli/`
+reference is generated from the cobra command tree by `cmd/gen-docs`, so it
+always matches `--help` — run `make docs` after changing a command or flag, and
+commit the result (CI fails if it drifts). See [`CHANGELOG.md`](CHANGELOG.md) for
+the version history.
 
 ## Related
 
