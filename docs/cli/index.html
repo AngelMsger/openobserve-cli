@@ -181,18 +181,21 @@ OPENOBSERVE_PASSWORD or OPENOBSERVE_TOKEN instead.</p>
       <p class="long">Collects a server URL, organization and credentials, verifies them,
 then writes a named context plus the secret. With --pretty it runs an
 interactive TUI (requires a terminal); without it, a plain line-by-line
-wizard that also works over a pipe. For fully headless setup, set
+wizard that also works over a pipe. When a configuration already exists,
+it first asks whether to edit a context, add a new one, or replace it all
+(skip the question with --context &lt;name&gt;). For fully headless setup, set
 OPENOBSERVE_URL / OPENOBSERVE_ORG / OPENOBSERVE_EMAIL /
 OPENOBSERVE_PASSWORD (or OPENOBSERVE_TOKEN) instead.</p>
       <h3>Options</h3>
       <table>
         <thead><tr><th>Flag</th><th>Default</th><th>Description</th></tr></thead>
         <tbody>
-        <tr><td><code>--context</code></td><td><code>default</code></td><td>name for the context to create or update</td></tr>
+        <tr><td><code>--context</code></td><td><code>default</code></td><td>name for the context to create or update (skips the edit/add/replace prompt)</td></tr>
         </tbody>
       </table>
       <h3>Examples</h3><pre>  openobserve-cli config init --pretty   # interactive TUI (recommended)
-  openobserve-cli config init             # plain line-by-line wizard (scripts, non-TTY)</pre>
+  openobserve-cli config init             # plain line-by-line wizard (scripts, non-TTY)
+  openobserve-cli config init --context prod   # add/update a named context directly</pre>
     </section>
     
     <section class="cmd" id="openobserve-cli-config-show">

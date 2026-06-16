@@ -93,6 +93,20 @@ fi
 echo "ok   - missing-time-range exits 2"
 pass=$((pass + 1))
 
+# config init: a fresh setup, then a re-run that must announce the existing
+# config and ask edit/add/replace — here driving the "add" path to a 2nd context.
+CFG="$(mktemp -d)"
+printf '%s\ndefault\nbasic\nu@example.com\npw\n' "$URL" | "$BIN" --config "$CFG" config init >/dev/null 2>&1
+printf 'add\nprod\n%s\nteam-a\nbasic\nu@example.com\npw\n' "$URL" | "$BIN" --config "$CFG" config init >/dev/null 2>"$CFG/err"
+if grep -q "edit/add/replace" "$CFG/err" \
+   && "$BIN" --config "$CFG" config contexts 2>/dev/null | grep -q '"name": "prod"'; then
+  echo "ok   - config init asks edit/add/replace and adds a context"
+  pass=$((pass + 1))
+else
+  echo "FAIL - config init add-context flow"; cat "$CFG/err" | head -5; exit 1
+fi
+rm -rf "$CFG"
+
 # search tail: follows the stream as ndjson, then exits cleanly on SIGINT.
 # Invoke the binary directly (not via the run() function) so TAIL_PID is the
 # process itself — backgrounding a shell function would make TAIL_PID the

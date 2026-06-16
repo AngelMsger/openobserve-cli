@@ -28,6 +28,24 @@ func promptLine(label, def string) (string, error) {
 	return line, nil
 }
 
+// promptChoice asks for one of allowed (matched case-insensitively), re-prompting
+// until a valid value is entered; empty input returns def. The canonical value
+// from allowed is returned, so callers get back the as-listed spelling.
+func promptChoice(label string, allowed []string, def string) (string, error) {
+	for {
+		in, err := promptLine(label, def)
+		if err != nil {
+			return "", err
+		}
+		for _, a := range allowed {
+			if strings.EqualFold(strings.TrimSpace(in), a) {
+				return a, nil
+			}
+		}
+		fmt.Fprintf(os.Stderr, "  please choose one of: %s\n", strings.Join(allowed, ", "))
+	}
+}
+
 // promptSecret reads a secret from stdin. On an interactive terminal it reads
 // without echoing; without a TTY (a pipe / script) it falls back to a plain
 // line read so non-interactive setup still works — at the cost of the secret

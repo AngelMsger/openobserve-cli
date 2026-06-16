@@ -197,8 +197,10 @@ microsecond timestamps the search API requires.
 ### Multiple servers (contexts)
 
 A single config file can hold several OpenObserve servers as named *contexts*.
-Most users need only one and never see the concept. To work with more than one,
-run `config init --context prod`, then:
+Most users need only one and never see the concept. When a config already
+exists, re-running `config init` lists it and asks whether to **edit** a context,
+**add** a new one, or **replace** everything; pass `config init --context prod`
+to skip that prompt and target a context directly. Then:
 
 ```bash
 openobserve-cli config contexts                 # list contexts, current marked

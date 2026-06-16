@@ -1,10 +1,15 @@
 package app
 
 import (
+	"fmt"
+	"os"
+	"strings"
+
 	"github.com/angelmsger/openobserve-cli/internal/apiclient"
 	"github.com/angelmsger/openobserve-cli/internal/auth"
 	"github.com/angelmsger/openobserve-cli/internal/config"
 	cerrors "github.com/angelmsger/openobserve-cli/internal/errors"
+	"github.com/charmbracelet/huh"
 	"github.com/spf13/cobra"
 )
 
@@ -30,29 +35,51 @@ func newConfigInitCmd(s *appState) *cobra.Command {
 		Long: "Collects a server URL, organization and credentials, verifies them,\n" +
 			"then writes a named context plus the secret. With --pretty it runs an\n" +
 			"interactive TUI (requires a terminal); without it, a plain line-by-line\n" +
-			"wizard that also works over a pipe. For fully headless setup, set\n" +
+			"wizard that also works over a pipe. When a configuration already exists,\n" +
+			"it first asks whether to edit a context, add a new one, or replace it all\n" +
+			"(skip the question with --context <name>). For fully headless setup, set\n" +
 			"OPENOBSERVE_URL / OPENOBSERVE_ORG / OPENOBSERVE_EMAIL /\n" +
 			"OPENOBSERVE_PASSWORD (or OPENOBSERVE_TOKEN) instead.",
 		Example: "  openobserve-cli config init --pretty   # interactive TUI (recommended)\n" +
-			"  openobserve-cli config init             # plain line-by-line wizard (scripts, non-TTY)",
+			"  openobserve-cli config init             # plain line-by-line wizard (scripts, non-TTY)\n" +
+			"  openobserve-cli config init --context prod   # add/update a named context directly",
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			cur := s.cfg()
-			def := initValues{
-				baseURL: cur.BaseURL,
-				org:     cur.Org,
-				scheme:  cur.Auth.Scheme,
-				email:   cur.Auth.Username,
-			}
 			// --pretty drives the interactive TUI and requires a terminal;
-			// without it, plain line prompts that also work over a pipe.
+			// without it, plain line prompts that also work over a pipe. Gate
+			// first so the edit/add/replace question never tries to render a TUI
+			// without a terminal.
+			if s.gflags.pretty && !stdinIsTTY() {
+				return cerrors.New(cerrors.CategoryUsage, "PRETTY_NEEDS_TTY",
+					"--pretty requires an interactive terminal for `config init`").
+					WithHint("Drop --pretty or run from a terminal.")
+			}
+
+			file, _, err := config.ReadFile(s.cfgDir)
+			if err != nil {
+				return cerrors.Wrap(err, cerrors.CategoryConfig, "CONFIG_READ", "failed to read config")
+			}
+
+			// Decide which context to write, what to prefill, and whether to
+			// drop the others — asking edit / add / replace when a config already
+			// exists, mirroring confluence-cli / bitbucket-cli.
+			target, prefill, replaceAll, err := s.resolveInitTarget(cmd, file, ctxName)
+			if err != nil {
+				return err
+			}
+
+			def := initValues{}
+			if prefill != nil {
+				def = initValues{
+					baseURL: prefill.BaseURL,
+					org:     prefill.Org,
+					scheme:  prefill.Auth.Scheme,
+					email:   prefill.Auth.Username,
+				}
+			}
+
 			collect := runInitPrompts
 			if s.gflags.pretty {
-				if !stdinIsTTY() {
-					return cerrors.New(cerrors.CategoryUsage, "PRETTY_NEEDS_TTY",
-						"--pretty requires an interactive terminal for `config init`").
-						WithHint("Drop --pretty or run from a terminal.")
-				}
 				collect = runInitForm
 			}
 			vals, err := collect(def)
@@ -75,23 +102,22 @@ func newConfigInitCmd(s *appState) *cobra.Command {
 				return err
 			}
 
-			file, _, err := config.ReadFile(s.cfgDir)
-			if err != nil {
-				return cerrors.Wrap(err, cerrors.CategoryConfig, "CONFIG_READ", "failed to read config")
+			if replaceAll {
+				file.Contexts = nil
 			}
 			file.Upsert(config.NamedContext{
-				Name:    ctxName,
+				Name:    target,
 				BaseURL: normURL,
 				Org:     org,
 				Auth:    config.AuthConfig{Scheme: cred.Scheme, Username: cred.Username},
 			})
-			file.CurrentContext = ctxName
+			file.CurrentContext = target
 			if err := config.WriteFile(s.cfgDir, file); err != nil {
 				return cerrors.Wrap(err, cerrors.CategoryConfig, "CONFIG_WRITE", "failed to write config")
 			}
 			return s.emit(map[string]any{
 				"configured": true,
-				"context":    ctxName,
+				"context":    target,
 				"base_url":   normURL,
 				"org":        org,
 				"scheme":     cred.Scheme,
@@ -99,8 +125,135 @@ func newConfigInitCmd(s *appState) *cobra.Command {
 			})
 		},
 	}
-	cmd.Flags().StringVar(&ctxName, "context", config.DefaultContextName, "name for the context to create or update")
+	cmd.Flags().StringVar(&ctxName, "context", config.DefaultContextName,
+		"name for the context to create or update (skips the edit/add/replace prompt)")
 	return cmd
+}
+
+// resolveInitTarget decides which context `config init` will write: the target
+// name, the existing context to prefill the wizard from (nil = a fresh setup),
+// and whether to drop the other contexts (replace). With no existing config it
+// is a plain fresh setup into the default (or --context) name. With existing
+// config it asks edit / add / replace — unless --context was given explicitly,
+// which is a non-interactive shortcut targeting that name directly.
+func (s *appState) resolveInitTarget(cmd *cobra.Command, file config.File, ctxFlag string) (target string, prefill *config.NamedContext, replaceAll bool, err error) {
+	if cmd.Flags().Changed("context") {
+		if c, ok := file.Context(ctxFlag); ok {
+			return c.Name, &c, false, nil
+		}
+		return ctxFlag, nil, false, nil
+	}
+	if len(file.Contexts) == 0 {
+		return config.DefaultContextName, nil, false, nil
+	}
+
+	announceExisting(file)
+	action, err := s.askInitAction()
+	if err != nil {
+		return "", nil, false, err
+	}
+	switch action {
+	case "add":
+		name, nerr := s.promptNewContextName(file)
+		if nerr != nil {
+			return "", nil, false, nerr
+		}
+		return name, nil, false, nil
+	case "replace":
+		return config.DefaultContextName, nil, true, nil
+	default: // edit
+		name := file.CurrentContext
+		if name == "" {
+			name = file.Contexts[0].Name
+		}
+		if len(file.Contexts) > 1 {
+			name, err = s.selectContext(file)
+			if err != nil {
+				return "", nil, false, err
+			}
+		}
+		c, _ := file.Context(name)
+		return c.Name, &c, false, nil
+	}
+}
+
+// announceExisting prints the contexts already in the config file to stderr, so
+// the user sees what `config init` is about to edit, add to, or replace.
+func announceExisting(file config.File) {
+	fmt.Fprintln(os.Stderr, "Existing configuration:")
+	for _, c := range file.Contexts {
+		mark := "  "
+		if strings.EqualFold(c.Name, file.CurrentContext) {
+			mark = "* "
+		}
+		server := c.BaseURL
+		if server == "" {
+			server = "(no server)"
+		}
+		fmt.Fprintf(os.Stderr, "%s%s — %s\n", mark, c.Name, server)
+	}
+}
+
+// askInitAction asks whether to edit a context, add a new one, or replace the
+// configuration — a huh select under --pretty, a plain prompt otherwise.
+func (s *appState) askInitAction() (string, error) {
+	if s.gflags.pretty {
+		return formSelect("What would you like to do?", []huh.Option[string]{
+			huh.NewOption("Edit an existing context", "edit"),
+			huh.NewOption("Add a new context", "add"),
+			huh.NewOption("Replace the configuration", "replace"),
+		}, "edit")
+	}
+	return promptChoice("What would you like to do (edit/add/replace)",
+		[]string{"edit", "add", "replace"}, "edit")
+}
+
+// selectContext asks which existing context to edit (only reached when more than
+// one exists).
+func (s *appState) selectContext(file config.File) (string, error) {
+	if s.gflags.pretty {
+		opts := make([]huh.Option[string], 0, len(file.Contexts))
+		for _, c := range file.Contexts {
+			label := c.Name
+			if c.BaseURL != "" {
+				label += " — " + c.BaseURL
+			}
+			opts = append(opts, huh.NewOption(label, c.Name))
+		}
+		return formSelect("Edit which context", opts, file.CurrentContext)
+	}
+	return promptChoice("Edit which context", file.ContextNames(), file.CurrentContext)
+}
+
+// promptNewContextName asks for a new context name, rejecting names already in
+// use until a fresh one is given.
+func (s *appState) promptNewContextName(file config.File) (string, error) {
+	used := map[string]bool{}
+	for _, c := range file.Contexts {
+		used[strings.ToLower(c.Name)] = true
+	}
+	for {
+		var name string
+		var err error
+		if s.gflags.pretty {
+			name, err = formInput("New context name", "production")
+		} else {
+			name, err = promptLine("New context name", "")
+		}
+		if err != nil {
+			return "", err
+		}
+		name = strings.TrimSpace(name)
+		if name == "" {
+			fmt.Fprintln(os.Stderr, "  a context name is required")
+			continue
+		}
+		if used[strings.ToLower(name)] {
+			fmt.Fprintf(os.Stderr, "  context %q already exists; choose another name\n", name)
+			continue
+		}
+		return name, nil
+	}
 }
 
 func newConfigShowCmd(s *appState) *cobra.Command {

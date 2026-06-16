@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-06-16
+
+### Changed
+
+- **`config init` now handles an existing configuration like the sibling CLIs.**
+  When a config already exists it lists the contexts and asks whether to **edit**
+  one (prompts prefilled from it, other contexts kept), **add** a new one, or
+  **replace** everything — instead of silently overwriting the `default` context.
+  `config init --context <name>` remains a non-interactive shortcut that targets
+  a context directly and skips the prompt. Works in both the `--pretty` TUI and
+  the plain (pipe-friendly) wizard.
+
 ## [0.2.0] - 2026-06-16
 
 Completes the three pillars — metrics and traces become first-class — and adds
@@ -80,6 +92,7 @@ Initial release — a read-only, agent-facing CLI for OpenObserve (O2).
   release binaries and `make install`. A generated CLI reference
   (`docs/cli/`) and a GitHub Pages landing page.
 
-[Unreleased]: https://github.com/AngelMsger/openobserve-cli/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/AngelMsger/openobserve-cli/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/AngelMsger/openobserve-cli/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/AngelMsger/openobserve-cli/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/AngelMsger/openobserve-cli/releases/tag/v0.1.0

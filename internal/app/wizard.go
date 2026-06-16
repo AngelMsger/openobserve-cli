@@ -124,3 +124,39 @@ func required(s string) error {
 	}
 	return nil
 }
+
+// formSelect runs a single-select huh form (rendered to stderr, reading stdin),
+// used by `config init` to ask the edit/add/replace action or which context to
+// edit. It returns the selected option value.
+func formSelect(title string, options []huh.Option[string], def string) (string, error) {
+	val := def
+	form := huh.NewForm(
+		huh.NewGroup(
+			huh.NewSelect[string]().Title(title).Options(options...).Value(&val),
+		),
+	).WithInput(os.Stdin).WithOutput(os.Stderr)
+	if err := form.Run(); err != nil {
+		if errors.Is(err, huh.ErrUserAborted) {
+			return "", fmt.Errorf("setup cancelled")
+		}
+		return "", err
+	}
+	return val, nil
+}
+
+// formInput runs a single free-text huh input (e.g. a new context name).
+func formInput(title, placeholder string) (string, error) {
+	var val string
+	form := huh.NewForm(
+		huh.NewGroup(
+			huh.NewInput().Title(title).Placeholder(placeholder).Value(&val),
+		),
+	).WithInput(os.Stdin).WithOutput(os.Stderr)
+	if err := form.Run(); err != nil {
+		if errors.Is(err, huh.ErrUserAborted) {
+			return "", fmt.Errorf("setup cancelled")
+		}
+		return "", err
+	}
+	return val, nil
+}
