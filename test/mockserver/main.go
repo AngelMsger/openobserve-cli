@@ -24,10 +24,14 @@ func main() {
 		if !requireAuth(w, r) {
 			return
 		}
+		// Mirror a real self-hosted payload: many extra fields, and `plan` as a
+		// number (it is a string in other builds) — the client must tolerate it.
 		writeJSON(w, map[string]any{
 			"data": []map[string]any{
-				{"identifier": "default", "name": "Default"},
-				{"identifier": "team-a", "name": "Team A"},
+				{"id": 1, "identifier": "default", "name": "Default", "type": "default",
+					"plan": 0, "ingest_threshold": 9383939382, "search_threshold": 9383939382,
+					"UserObj": map[string]any{"first_name": "", "last_name": ""}},
+				{"id": 2, "identifier": "team-a", "name": "Team A", "type": "custom", "plan": 0},
 			},
 		})
 	})

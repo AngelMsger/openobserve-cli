@@ -44,6 +44,34 @@ func TestListOrgs(t *testing.T) {
 	}
 }
 
+// Regression: real self-hosted builds return an org object with many extra
+// fields and types that drift across versions (e.g. `plan` as a number, not a
+// string). Decoding must not fail, and Identifier must still be extracted.
+func TestListOrgsToleratesRichPayload(t *testing.T) {
+	client, _ := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`{"data":[{"id":1,"identifier":"default","name":"default",` +
+			`"user_email":"a@b.com","ingest_threshold":9383939382,"search_threshold":9383939382,` +
+			`"type":"default","plan":0,"UserObj":{"first_name":"","last_name":""}}]}`))
+	})
+	orgs, err := client.ListOrgs(context.Background())
+	if err != nil {
+		t.Fatalf("rich org payload should decode, got: %v", err)
+	}
+	if len(orgs) != 1 || orgs[0].Identifier != "default" || orgs[0].Name != "default" {
+		t.Errorf("unexpected orgs: %+v", orgs)
+	}
+	// Rendered output keeps only the curated keys, dropping noise like UserObj.
+	out, _ := json.Marshal(orgs[0])
+	var m map[string]any
+	_ = json.Unmarshal(out, &m)
+	if _, ok := m["UserObj"]; ok {
+		t.Errorf("curated output should drop UserObj: %s", out)
+	}
+	if m["identifier"] != "default" {
+		t.Errorf("curated output missing identifier: %s", out)
+	}
+}
+
 func TestListStreamsParams(t *testing.T) {
 	client, _ := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/api/default/streams" {

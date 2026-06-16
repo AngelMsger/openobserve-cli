@@ -1,13 +1,56 @@
 package apiclient
 
+import "encoding/json"
+
 // Org is one OpenObserve organization. Identifier is the value used in the
 // /api/{org}/… path; Name is the human label.
+//
+// The org object OpenObserve returns varies across versions and editions —
+// fields appear, disappear, and even change JSON type (e.g. `plan` is a string
+// in some builds and a number in others). To stay robust we decode the whole
+// object into a raw map (which can never fail on a type mismatch) and pull the
+// two fields we rely on out of it. Output is a lean, curated projection so an
+// agent isn't flooded with thresholds and user objects it doesn't need.
 type Org struct {
-	ID         int64  `json:"id,omitempty"`
-	Identifier string `json:"identifier"`
-	Name       string `json:"name,omitempty"`
-	Type       string `json:"type,omitempty"`
-	Plan       string `json:"plan,omitempty"`
+	Identifier string
+	Name       string
+	raw        map[string]any
+}
+
+// orgOutputKeys are the fields surfaced by `org list`, in a stable order. Values
+// pass through with whatever type the server used, so no type drift can break
+// rendering.
+var orgOutputKeys = []string{"identifier", "name", "type", "id"}
+
+// UnmarshalJSON decodes an org leniently: everything lands in a map, and the
+// fields used for path scoping and display are extracted from it.
+func (o *Org) UnmarshalJSON(b []byte) error {
+	var m map[string]any
+	if err := json.Unmarshal(b, &m); err != nil {
+		return err
+	}
+	o.raw = m
+	o.Identifier, _ = m["identifier"].(string)
+	o.Name, _ = m["name"].(string)
+	return nil
+}
+
+// MarshalJSON emits the curated subset of the raw object (falling back to the
+// extracted fields when the org was constructed without a raw map).
+func (o Org) MarshalJSON() ([]byte, error) {
+	out := map[string]any{}
+	for _, k := range orgOutputKeys {
+		if v, ok := o.raw[k]; ok {
+			out[k] = v
+		}
+	}
+	if len(out) == 0 {
+		out["identifier"] = o.Identifier
+		if o.Name != "" {
+			out["name"] = o.Name
+		}
+	}
+	return json.Marshal(out)
 }
 
 // SchemaField is one column of a stream's schema.

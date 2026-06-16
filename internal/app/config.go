@@ -5,7 +5,6 @@ import (
 	"github.com/angelmsger/openobserve-cli/internal/auth"
 	"github.com/angelmsger/openobserve-cli/internal/config"
 	cerrors "github.com/angelmsger/openobserve-cli/internal/errors"
-	"github.com/angelmsger/openobserve-cli/pkg/constants"
 	"github.com/spf13/cobra"
 )
 
@@ -42,46 +41,31 @@ func newConfigInitCmd(s *appState) *cobra.Command {
 					WithNextSteps("openobserve-cli auth status")
 			}
 			cur := s.cfg()
-			baseURL, err := promptLine("Server URL", firstNonEmpty(cur.BaseURL, constants.SelfHostedBaseURL))
+			def := initValues{
+				baseURL: cur.BaseURL,
+				org:     cur.Org,
+				scheme:  cur.Auth.Scheme,
+				email:   cur.Auth.Username,
+			}
+			// --pretty drives the interactive TUI; otherwise plain line prompts.
+			collect := runInitPrompts
+			if s.gflags.pretty {
+				collect = runInitForm
+			}
+			vals, err := collect(def)
 			if err != nil {
 				return err
 			}
-			normURL, err := apiclient.NormalizeBaseURL(baseURL)
-			if err != nil {
-				return err
-			}
-			org, err := promptLine("Organization", firstNonEmpty(cur.Org, constants.DefaultOrg))
-			if err != nil {
-				return err
-			}
-			scheme, err := promptLine("Auth scheme (basic/token)", firstNonEmpty(cur.Auth.Scheme, auth.SchemeBasic))
-			if err != nil {
-				return err
-			}
-			if scheme != auth.SchemeBasic && scheme != auth.SchemeToken {
+			if vals.scheme != auth.SchemeBasic && vals.scheme != auth.SchemeToken {
 				return cerrors.Newf(cerrors.CategoryUsage, "BAD_SCHEME",
-					"unknown auth scheme %q (want basic or token)", scheme)
+					"unknown auth scheme %q (want basic or token)", vals.scheme)
 			}
-			cred := auth.Credential{Scheme: scheme}
-			switch scheme {
-			case auth.SchemeBasic:
-				email, err := promptLine("Email", cur.Auth.Username)
-				if err != nil {
-					return err
-				}
-				cred.Username = email
-				pw, err := promptSecret("Password")
-				if err != nil {
-					return err
-				}
-				cred.Secret = pw
-			case auth.SchemeToken:
-				tok, err := promptSecret("Token")
-				if err != nil {
-					return err
-				}
-				cred.Secret = tok
+			normURL, err := apiclient.NormalizeBaseURL(vals.baseURL)
+			if err != nil {
+				return err
 			}
+			org := vals.org
+			cred := auth.Credential{Scheme: vals.scheme, Username: vals.email, Secret: vals.secret}
 
 			backend, err := verifyAndSave(s, normURL, org, cred)
 			if err != nil {
@@ -96,7 +80,7 @@ func newConfigInitCmd(s *appState) *cobra.Command {
 				Name:    ctxName,
 				BaseURL: normURL,
 				Org:     org,
-				Auth:    config.AuthConfig{Scheme: scheme, Username: cred.Username},
+				Auth:    config.AuthConfig{Scheme: cred.Scheme, Username: cred.Username},
 			})
 			file.CurrentContext = ctxName
 			if err := config.WriteFile(s.cfgDir, file); err != nil {
@@ -107,7 +91,7 @@ func newConfigInitCmd(s *appState) *cobra.Command {
 				"context":    ctxName,
 				"base_url":   normURL,
 				"org":        org,
-				"scheme":     scheme,
+				"scheme":     cred.Scheme,
 				"stored_in":  backend,
 			})
 		},
@@ -200,13 +184,4 @@ func newConfigUseContextCmd(s *appState) *cobra.Command {
 			return s.emit(map[string]any{"current_context": nc.Name})
 		},
 	}
-}
-
-func firstNonEmpty(vals ...string) string {
-	for _, v := range vals {
-		if v != "" {
-			return v
-		}
-	}
-	return ""
 }
