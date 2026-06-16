@@ -28,7 +28,7 @@ whether a retry could help (rate-limit / network / server) or not.
 | `usage`      | 2    | Bad flag/argument; check `--help`. Missing time range, bad `--order`, etc. |
 | `config`     | 3    | Not configured / no server URL → `config init` or set `OPENOBSERVE_URL`. |
 | `auth`       | 4    | Credentials rejected → `auth status`, re-run `config init`. |
-| `permission` | 5    | Authenticated but not allowed for this org/resource → `org list`. |
+| `permission` | 5    | Authenticated but not allowed (OpenObserve RBAC) → grant the credential a role; see below. |
 | `not_found`  | 6    | Unknown org / stream → `org list`, `stream list`. |
 | `rate_limit` | 7    | Too many requests; retryable. Narrow the time range / lower `--limit`. |
 | `network`    | 8    | Server unreachable; retryable → `doctor`, check `--base-url`. |
@@ -59,3 +59,11 @@ fi
 - **`STREAM_NOT_FOUND` (not_found/6)** — run `stream list`; names are
   case-sensitive.
 - **`HTTP_UNAUTHORIZED` (auth/4)** — wrong password/token → re-run `config init`.
+- **`HTTP_FORBIDDEN` (permission/5)** — the credential authenticates but has no
+  role for the resource. This is the classic **service account** case: under
+  OpenObserve RBAC (Enterprise/Cloud) a new user / service account is granted
+  nothing by default. `org list` works while `stream list` / `search` 403 for
+  exactly this reason. Fix in OpenObserve: **IAM → Roles**, grant a role the
+  **Streams** resource (List + Get, for the streams you'll query), then assign
+  the user / service account to that role (its **Roles** / **Service Accounts**
+  tab).

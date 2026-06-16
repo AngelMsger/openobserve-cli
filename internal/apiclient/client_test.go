@@ -5,8 +5,10 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
+	cerrors "github.com/angelmsger/openobserve-cli/internal/errors"
 	"github.com/angelmsger/openobserve-cli/internal/transport"
 )
 
@@ -153,5 +155,25 @@ func TestHTTPErrorClassification(t *testing.T) {
 	}
 	if got := err.Error(); got == "" {
 		t.Error("error message should be populated")
+	}
+}
+
+// A 403 (the classic "service account has no role" case) must carry RBAC-aware
+// guidance, not just a generic permission message.
+func TestForbiddenGivesRBACGuidance(t *testing.T) {
+	client, _ := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusForbidden)
+		_, _ = w.Write([]byte(`{"message":"Unauthorized Access"}`))
+	})
+	_, err := client.ListStreams(context.Background(), "default", "", false)
+	ce := cerrors.AsCLIError(err)
+	if ce == nil || ce.Code != "HTTP_FORBIDDEN" || ce.Category != cerrors.CategoryPermission {
+		t.Fatalf("expected HTTP_FORBIDDEN/permission, got %+v", ce)
+	}
+	joined := ce.Hint + " " + strings.Join(ce.NextSteps, " ")
+	for _, want := range []string{"IAM", "Roles", "service account"} {
+		if !strings.Contains(joined, want) {
+			t.Errorf("403 guidance should mention %q; got: %s", want, joined)
+		}
 	}
 }

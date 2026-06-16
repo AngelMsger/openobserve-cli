@@ -141,6 +141,19 @@ func (c *apiClient) httpError(resp *http.Response) error {
 	if detail := extractAPIMessage(snippet); detail != "" {
 		msg += ": " + detail
 	}
+	// A 403 on an org-scoped resource is almost always OpenObserve RBAC: the
+	// credential authenticates but its user / service account has not been
+	// granted a role for the resource. Point straight at the fix — a generic
+	// "lack permission" hint leaves an agent (and the user) stuck.
+	if resp.StatusCode == http.StatusForbidden {
+		return cerrors.New(cat, "HTTP_FORBIDDEN", msg).
+			WithHTTPStatus(resp.StatusCode).
+			WithHint("Authenticated, but this credential lacks permission for this resource. "+
+				"Under OpenObserve RBAC (Enterprise/Cloud) a new user or service account is granted nothing by default.").
+			WithNextSteps(
+				"In OpenObserve open IAM → Roles: grant a role the Streams resource (List + Get), then assign your user / service account to that role (its Roles or Service Accounts tab).",
+				"Confirm the organization is correct: openobserve-cli org list")
+	}
 	return cerrors.New(cat, "HTTP_"+statusSlug(resp.StatusCode), msg).
 		WithHTTPStatus(resp.StatusCode)
 }
