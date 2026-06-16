@@ -111,3 +111,36 @@ type SearchResponse struct {
 	Total    int64            `json:"total"`
 	Hits     []map[string]any `json:"hits"`
 }
+
+// PromQLResponse is the Prometheus-compatible reply from OpenObserve's PromQL
+// endpoints (/api/{org}/prometheus/api/v1/query{,_range}). The envelope is
+// stable but `data` is kept raw: its shape depends on the result type
+// (matrix / vector / scalar / string), so decoding it eagerly would couple the
+// client to a shape it doesn't need to understand. On a query error the API
+// usually replies with a non-2xx status (handled by the client's httpError);
+// the Status/Error fields cover the rarer 200-with-error case.
+type PromQLResponse struct {
+	Status    string          `json:"status"`
+	Data      json.RawMessage `json:"data,omitempty"`
+	ErrorType string          `json:"errorType,omitempty"`
+	Error     string          `json:"error,omitempty"`
+}
+
+// TraceSummary is one trace returned by GET /api/{org}/{stream}/traces/latest.
+// Fields are kept loose (raw maps / slices) because the trace payload carries
+// OpenTelemetry-derived attributes that vary by instrumentation.
+type TraceSummary struct {
+	TraceID     string           `json:"trace_id"`
+	Duration    json.RawMessage  `json:"duration,omitempty"`
+	StartTime   int64            `json:"start_time,omitempty"`
+	EndTime     int64            `json:"end_time,omitempty"`
+	FirstEvent  map[string]any   `json:"first_event,omitempty"`
+	ServiceName []map[string]any `json:"service_name,omitempty"`
+	Spans       json.RawMessage  `json:"spans,omitempty"`
+}
+
+// TraceSearchResponse is the reply from the latest-traces endpoint.
+type TraceSearchResponse struct {
+	Total int64          `json:"total"`
+	Hits  []TraceSummary `json:"hits"`
+}

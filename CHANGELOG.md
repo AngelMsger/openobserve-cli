@@ -7,6 +7,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-06-16
+
+Completes the three pillars — metrics and traces become first-class — and adds
+the highest-value query ergonomics. Still read-only.
+
+### Added
+
+- **Metrics (PromQL).** `metrics query` evaluates a PromQL expression at an
+  instant; `metrics query-range` evaluates it across a window at `--step`
+  resolution. Times are converted to the seconds the Prometheus-compatible API
+  expects (PromQL uses seconds, not the microseconds `_search` needs). A bad
+  expression returns a structured `PROMQL_ERROR` pointing at
+  `stream list --type metrics`. Metrics are no longer queried awkwardly as SQL.
+- **Traces (first-class).** `trace search` lists recent traces (trace_id,
+  duration, services) — the map for finding a slow or erroring request; `trace
+  get <trace_id>` reassembles every span into a parent/child waterfall with each
+  span's offset from the trace start. JSON returns a nested tree; `--format
+  ndjson` streams the spans flat. Parent linkage and span fields are read
+  defensively, so orphaned spans surface as roots rather than disappearing.
+- **Live tail.** `search tail` follows a stream like `tail -f`, polling on
+  `--interval` and printing new rows as ndjson until interrupted; `--since`
+  backfills a window first.
+- **Large / awkward inputs.** `--sql` (and `metrics --query`, `trace --filter`)
+  accept `@file` / `@-` to read from a file or stdin. `search run --all` pages
+  through every matching row as ndjson, bounded by `--max` (truncation is
+  announced on stderr — never silent).
+- **Runtime update notice.** After a successful command, a one-line
+  `{"_notice":{"update":…}}` is emitted on stderr when a newer release is
+  available (24h cached; bounded; never fails the command). Silence it with
+  `OPENOBSERVE_CLI_NO_UPDATE_NOTIFIER`; `doctor` also reports update status and
+  takes `--no-update-check`.
+
 ## [0.1.0] - 2026-06-16
 
 Initial release — a read-only, agent-facing CLI for OpenObserve (O2).
@@ -48,5 +80,6 @@ Initial release — a read-only, agent-facing CLI for OpenObserve (O2).
   release binaries and `make install`. A generated CLI reference
   (`docs/cli/`) and a GitHub Pages landing page.
 
-[Unreleased]: https://github.com/AngelMsger/openobserve-cli/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/AngelMsger/openobserve-cli/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/AngelMsger/openobserve-cli/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/AngelMsger/openobserve-cli/releases/tag/v0.1.0

@@ -10,11 +10,12 @@
 
 `openobserve-cli` lets coding agents (Claude Code and others) — and humans —
 explore an [OpenObserve](https://openobserve.ai) (O2) backend from the command
-line: discover streams, inspect their schema, and run SQL searches and
-time-bucketed histograms over logs, metrics and traces. It works with both
-**self-hosted** OpenObserve and **OpenObserve Cloud**, returns agent-friendly
-JSON with structured errors, and ships a companion Skill that teaches an agent
-how to use it.
+line across all three pillars: discover streams and schema, run SQL searches,
+histograms and a live `tail -f` over **logs**, query **metrics** with PromQL
+(instant and range), and reassemble a distributed **trace** into a span
+waterfall. It works with both **self-hosted** OpenObserve and **OpenObserve
+Cloud**, returns agent-friendly JSON with structured errors, and ships a
+companion Skill that teaches an agent how to use it.
 
 📖 **Documentation site:** <https://angelmsger.github.io/openobserve-cli/>
 
@@ -31,10 +32,16 @@ $ openobserve-cli search run --stream default --where "level = 'ERROR'" --since 
 
 ## Features
 
-- **Logs, metrics & traces** — one `search` surface over every stream type, with
-  full SQL (`WHERE`, `GROUP BY`, aggregates) via OpenObserve's query engine.
-- **Map before terrain** — `search histogram` shows volume per time bucket so an
-  agent sees the *shape* of the data before pulling raw rows with `search run`.
+- **All three pillars, each with the right tool** — **logs** via full SQL
+  (`search run`/`histogram`/`tail`), **metrics** via PromQL (`metrics query` /
+  `query-range`), **traces** via a dedicated span model (`trace search` lists
+  recent traces; `trace get` rebuilds one into a parent/child waterfall).
+- **Map before terrain** — `search histogram` shows volume per time bucket, and
+  `trace search` surfaces recent traces, so an agent sees the *shape* before
+  pulling raw rows or a full span tree.
+- **Built for large and live data** — `search tail` follows a stream as ndjson
+  like `tail -f`; `--sql @file` / `@-` reads long queries from a file or stdin;
+  `search run --all` pages through every matching row (bounded by `--max`).
 - **The CLI owns the footguns** — human time ranges (`--since 1h`, `--from`/`--to`,
   RFC3339, epochs, `now-30m`) are converted to the microsecond timestamps the API
   needs; stream and column names come from discovery commands, never guesses.
@@ -53,10 +60,10 @@ $ openobserve-cli search run --stream default --where "level = 'ERROR'" --since 
 - **Companion Skill** — an `openobserve` Skill, embedded in the binary, that
   guides coding agents (Claude Code, Codex) through the CLI.
 
-> **Scope (v0.1):** read-only — organizations, streams (discovery + schema) and
-> SQL search / histogram. Dashboards, alerts, functions/pipelines, users and
-> ingestion are planned; the write-safety gates (`--dry-run`, `--yes`,
-> session read-only) are already wired for them.
+> **Scope (v0.2):** read-only — organizations, streams (discovery + schema), SQL
+> search / histogram / tail, PromQL metrics, and trace search / get. Dashboards,
+> alerts, functions/pipelines, users and ingestion are planned; the write-safety
+> gates (`--dry-run`, `--yes`, session read-only) are already wired for them.
 
 ## Installation
 
@@ -118,9 +125,17 @@ openobserve-cli org list              # discover organizations
 openobserve-cli stream list           # discover streams (the map)
 openobserve-cli stream schema default # queryable columns + search settings
 
-# volume over time, then the rows behind a spike
+# logs: volume over time, then the rows behind a spike
 openobserve-cli search histogram --stream default --since 6h --interval 5m
 openobserve-cli search run --stream default --where "level = 'ERROR'" --since 1h --limit 20
+
+# metrics: error rate over the last hour, one point per minute (PromQL)
+openobserve-cli metrics query-range \
+  --query 'sum(rate(http_requests_total{status=~"5.."}[5m]))' --since 1h --step 1m
+
+# traces: find a recent trace, then open its span waterfall
+openobserve-cli trace search --stream default --since 1h --limit 20
+openobserve-cli trace get <trace_id> --stream default --since 1h
 ```
 
 ## Configuration
@@ -159,8 +174,11 @@ for the full walkthrough.
 | `stream list` | list streams with type and storage stats (the discovery map) |
 | `stream schema` | a stream's queryable columns and full-text-search settings |
 | `stream get` / `stream stats` | full stream detail; document count, time range, size |
-| `search run` | run a SQL query (auto-built from `--stream`/`--where`, or a full `--sql`) |
+| `search run` | run a SQL query (auto-built from `--stream`/`--where`, or a full `--sql`; `@file`/`@-`; `--all` to page everything) |
 | `search histogram` | time-bucketed counts — volume over time before pulling rows |
+| `search tail` | follow a stream live, printing new rows as ndjson (Ctrl-C to stop) |
+| `metrics query` / `query-range` | evaluate a PromQL expression at an instant, or across a window at `--step` |
+| `trace search` / `trace get` | list recent traces; reassemble one trace into a span waterfall |
 | `auth login` / `status` / `logout` | store credentials, check identity, sign out |
 | `config init` / `show` / `contexts` / `use-context` | setup, inspect, manage servers |
 | `doctor` | check configuration, credentials and connectivity |

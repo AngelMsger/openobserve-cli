@@ -55,13 +55,18 @@
     <div class="grid grid-3">
       <div class="card feat">
         <div class="feat-ico"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-5-5"/></svg></div>
-        <h3>SQL search</h3>
-        <p>Run full SQL over any stream — <code>WHERE</code>, <code>GROUP BY</code>, aggregates — built from <code>--stream</code>/<code>--where</code> or your own <code>--sql</code>.</p>
+        <h3>Logs: SQL &amp; live tail</h3>
+        <p>Run full SQL over any stream — <code>WHERE</code>, <code>GROUP BY</code>, aggregates — built from <code>--stream</code>/<code>--where</code> or your own <code>--sql</code>; or <code>search tail</code> to follow it live.</p>
+      </div>
+      <div class="card feat">
+        <div class="feat-ico"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l3 8 4-16 3 8h4"/></svg></div>
+        <h3>Metrics &amp; traces</h3>
+        <p>Query <strong>metrics</strong> with PromQL — <code>metrics query</code> / <code>query-range</code> — and reassemble a <strong>trace</strong> into a span waterfall with <code>trace get</code>.</p>
       </div>
       <div class="card feat">
         <div class="feat-ico"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V4"/><path d="M4 20h16"/><rect x="7" y="12" width="3" height="5"/><rect x="12" y="8" width="3" height="9"/><rect x="17" y="5" width="3" height="12"/></svg></div>
         <h3>Map before terrain</h3>
-        <p><code>search histogram</code> shows volume per time bucket, so an agent sees the shape of the data before pulling raw rows.</p>
+        <p><code>search histogram</code> shows volume per time bucket, and <code>trace search</code> surfaces recent traces, so an agent sees the shape before pulling raw rows.</p>
       </div>
       <div class="card feat">
         <div class="feat-ico"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v6c0 1.7 3.6 3 8 3s8-1.3 8-3V5"/><path d="M4 11v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6"/></svg></div>
@@ -150,7 +155,11 @@ npm install -g @angelmsger/openobserve-cli</pre>
 <span class="c"># see volume over time, then pull the rows behind a spike</span>
 <span class="p">$</span> openobserve-cli search histogram --stream default --since 6h --interval 5m
 <span class="p">$</span> openobserve-cli search run --stream default \
-    --where "level = 'ERROR'" --since 1h --limit 20</pre>
+    --where "level = 'ERROR'" --since 1h --limit 20
+
+<span class="c"># metrics with PromQL, and a trace's span waterfall</span>
+<span class="p">$</span> openobserve-cli metrics query-range --query 'sum(rate(http_requests_total[5m]))' --since 1h --step 1m
+<span class="p">$</span> openobserve-cli trace get &lt;trace_id&gt; --stream default --since 1h</pre>
     </div>
   </div>
 </section>
@@ -160,7 +169,7 @@ npm install -g @angelmsger/openobserve-cli</pre>
     <div class="section-head">
       <span class="eyebrow">Commands</span>
       <h2>The command surface</h2>
-      <p class="lead">Seven command groups, organised <code>&lt;noun&gt; &lt;verb&gt;</code>. Every flag and example lives in the README and the companion Skill.</p>
+      <p class="lead">Nine command groups, organised <code>&lt;noun&gt; &lt;verb&gt;</code>. Every flag and example lives in the README and the companion Skill.</p>
     </div>
     <div class="grid grid-3">
       <a class="card cmd-group" href="cli/#openobserve-cli-org">
@@ -173,7 +182,15 @@ npm install -g @angelmsger/openobserve-cli</pre>
       </a>
       <a class="card cmd-group" href="cli/#openobserve-cli-search">
         <span class="cg-name">search</span>
-        <p>SQL <code>run</code> and time-bucketed <code>histogram</code> over any stream.</p>
+        <p>SQL <code>run</code>, <code>histogram</code> and live <code>tail</code> over any stream.</p>
+      </a>
+      <a class="card cmd-group" href="cli/#openobserve-cli-metrics">
+        <span class="cg-name">metrics</span>
+        <p>PromQL <code>query</code> and <code>query-range</code> over metrics.</p>
+      </a>
+      <a class="card cmd-group" href="cli/#openobserve-cli-trace">
+        <span class="cg-name">trace</span>
+        <p><code>search</code> recent traces; <code>get</code> a trace's span waterfall.</p>
       </a>
       <a class="card cmd-group" href="cli/#openobserve-cli-auth">
         <span class="cg-name">auth</span>

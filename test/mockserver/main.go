@@ -75,10 +75,76 @@ func main() {
 			})
 			return
 		}
+		// A trace_id lookup (from `trace get`) returns a small span tree.
+		if strings.Contains(req.Query.SQL, "trace_id") {
+			writeJSON(w, map[string]any{
+				"took": 4, "total": 3, "scan_size": 0.2,
+				"hits": []map[string]any{
+					{"_timestamp": 1700000000000000, "trace_id": "abc123", "span_id": "a",
+						"service_name": "web", "operation_name": "GET /", "span_status": "OK",
+						"start_time": 1700000000000000, "end_time": 1700000000500000, "duration": 500000},
+					{"_timestamp": 1700000000100000, "trace_id": "abc123", "span_id": "b",
+						"reference_parent_span_id": "a", "service_name": "api", "operation_name": "query",
+						"span_status": "OK", "start_time": 1700000000100000, "end_time": 1700000000300000, "duration": 200000},
+					{"_timestamp": 1700000000150000, "trace_id": "abc123", "span_id": "c",
+						"reference_parent_span_id": "b", "service_name": "db", "operation_name": "SELECT",
+						"span_status": "OK", "start_time": 1700000000150000, "end_time": 1700000000250000, "duration": 100000},
+				},
+			})
+			return
+		}
 		writeJSON(w, map[string]any{
 			"took": 5, "total": 1, "scan_size": 1.5,
 			"hits": []map[string]any{
 				{"_timestamp": 1700000000000000, "level": "ERROR", "log": "boom"},
+			},
+		})
+	})
+
+	// PromQL instant + range (Prometheus-compatible envelope).
+	mux.HandleFunc("/api/default/prometheus/api/v1/query", func(w http.ResponseWriter, r *http.Request) {
+		if !requireAuth(w, r) {
+			return
+		}
+		writeJSON(w, map[string]any{
+			"status": "success",
+			"data": map[string]any{
+				"resultType": "vector",
+				"result": []map[string]any{
+					{"metric": map[string]any{"__name__": "up", "service": "web"}, "value": []any{1700000000, "1"}},
+				},
+			},
+		})
+	})
+	mux.HandleFunc("/api/default/prometheus/api/v1/query_range", func(w http.ResponseWriter, r *http.Request) {
+		if !requireAuth(w, r) {
+			return
+		}
+		writeJSON(w, map[string]any{
+			"status": "success",
+			"data": map[string]any{
+				"resultType": "matrix",
+				"result": []map[string]any{
+					{"metric": map[string]any{"__name__": "up", "service": "web"},
+						"values": []any{[]any{1700000000, "1"}, []any{1700000060, "1"}}},
+				},
+			},
+		})
+	})
+
+	// Latest traces for a trace stream.
+	mux.HandleFunc("/api/default/apptraces/traces/latest", func(w http.ResponseWriter, r *http.Request) {
+		if !requireAuth(w, r) {
+			return
+		}
+		writeJSON(w, map[string]any{
+			"total": 1,
+			"hits": []map[string]any{
+				{"trace_id": "abc123", "duration": 500000,
+					"start_time": 1700000000000000, "end_time": 1700000000500000,
+					"first_event":  map[string]any{"operation_name": "GET /", "service_name": "web", "span_status": "OK"},
+					"service_name": []map[string]any{{"service_name": "web", "count": 1}, {"service_name": "api", "count": 1}},
+					"spans":        []int{3, 0}},
 			},
 		})
 	})

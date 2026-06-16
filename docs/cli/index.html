@@ -42,6 +42,12 @@
       <a href="#openobserve-cli-doctor">openobserve-cli doctor</a>
       </div>
     <div class="side-group">
+      <div class="side-title">metrics</div>
+      <a href="#openobserve-cli-metrics">openobserve-cli metrics</a>
+      <a href="#openobserve-cli-metrics-query">openobserve-cli metrics query</a>
+      <a href="#openobserve-cli-metrics-query-range">openobserve-cli metrics query-range</a>
+      </div>
+    <div class="side-group">
       <div class="side-title">org</div>
       <a href="#openobserve-cli-org">openobserve-cli org</a>
       <a href="#openobserve-cli-org-list">openobserve-cli org list</a>
@@ -52,6 +58,7 @@
       <a href="#openobserve-cli-search">openobserve-cli search</a>
       <a href="#openobserve-cli-search-histogram">openobserve-cli search histogram</a>
       <a href="#openobserve-cli-search-run">openobserve-cli search run</a>
+      <a href="#openobserve-cli-search-tail">openobserve-cli search tail</a>
       </div>
     <div class="side-group">
       <div class="side-title">skill</div>
@@ -68,6 +75,12 @@
       <a href="#openobserve-cli-stream-list">openobserve-cli stream list</a>
       <a href="#openobserve-cli-stream-schema">openobserve-cli stream schema</a>
       <a href="#openobserve-cli-stream-stats">openobserve-cli stream stats</a>
+      </div>
+    <div class="side-group">
+      <div class="side-title">trace</div>
+      <a href="#openobserve-cli-trace">openobserve-cli trace</a>
+      <a href="#openobserve-cli-trace-get">openobserve-cli trace get</a>
+      <a href="#openobserve-cli-trace-search">openobserve-cli trace search</a>
       </div>
     <div class="side-group">
       <div class="side-title">version</div>
@@ -203,12 +216,78 @@ OPENOBSERVE_PASSWORD (or OPENOBSERVE_TOKEN) instead.</p>
     <section class="cmd" id="openobserve-cli-doctor">
       <h2>openobserve-cli doctor</h2>
       <p class="short">Check configuration, credentials and connectivity</p>
-      <pre>openobserve-cli doctor</pre>
+      <pre>openobserve-cli doctor [flags]</pre>
       <p class="long">Runs a quick health check: is a server configured, are credentials
 present, and can the server be reached and authenticated. Each check
-reports ok/failed so an agent can self-diagnose environment problems.</p>
+reports ok/failed so an agent can self-diagnose environment problems.
+It also reports whether a newer openobserve-cli release is available.</p>
+      <h3>Options</h3>
+      <table>
+        <thead><tr><th>Flag</th><th>Default</th><th>Description</th></tr></thead>
+        <tbody>
+        <tr><td><code>--no-update-check</code></td><td><code>false</code></td><td>skip the check for a newer openobserve-cli release</td></tr>
+        </tbody>
+      </table>
+      <h3>Examples</h3><pre>  openobserve-cli doctor
+  openobserve-cli doctor --no-update-check</pre>
+    </section>
+    
+    <section class="cmd" id="openobserve-cli-metrics">
+      <h2>openobserve-cli metrics<span class="group-tag">command group</span></h2>
+      <p class="short">Query metrics with PromQL (instant and range)</p>
+      <pre>openobserve-cli metrics</pre>
+      <p class="long">Metrics in OpenObserve are queried with PromQL, not SQL. `metrics query`
+evaluates an expression at a single instant; `metrics query-range` evaluates
+it across a time window at a step resolution (the shape you graph). Discover
+the metric names you can use with `stream list --type metrics`.</p>
       
       
+    </section>
+    
+    <section class="cmd" id="openobserve-cli-metrics-query">
+      <h2>openobserve-cli metrics query</h2>
+      <p class="short">Evaluate a PromQL expression at a single instant</p>
+      <pre>openobserve-cli metrics query [flags]</pre>
+      <p class="long">Runs an instant PromQL query. The result is a vector (one value per
+series) at the evaluation time, which defaults to now. Pass --query @file
+or --query @- to read a long expression from a file or stdin.</p>
+      <h3>Options</h3>
+      <table>
+        <thead><tr><th>Flag</th><th>Default</th><th>Description</th></tr></thead>
+        <tbody>
+        <tr><td><code>--query</code></td><td></td><td>PromQL expression (or @file / @- for stdin)</td></tr>
+        <tr><td><code>--time</code></td><td></td><td>evaluation instant: RFC3339, an epoch, or now-1h (default now)</td></tr>
+        </tbody>
+      </table>
+      <h3>Examples</h3><pre><span class="c">  # current request rate per service</span>
+  openobserve-cli metrics query --query &#39;sum by (service)(rate(http_requests_total[5m]))&#39;
+
+<span class="c">  # evaluate at a past instant</span>
+  openobserve-cli metrics query --query &#39;up&#39; --time 2024-01-02T15:04:05Z</pre>
+    </section>
+    
+    <section class="cmd" id="openobserve-cli-metrics-query-range">
+      <h2>openobserve-cli metrics query-range</h2>
+      <p class="short">Evaluate a PromQL expression across a time window</p>
+      <pre>openobserve-cli metrics query-range [flags]</pre>
+      <p class="long">Runs a range PromQL query: the expression is evaluated at every --step
+between the start and end of the time range, yielding a matrix (a series of
+timestamped values per series) — the data behind a graph. The time range is
+required (--since or --from/--to).</p>
+      <h3>Options</h3>
+      <table>
+        <thead><tr><th>Flag</th><th>Default</th><th>Description</th></tr></thead>
+        <tbody>
+        <tr><td><code>--from</code></td><td></td><td>range start: RFC3339, an epoch, 2006-01-02, or now-1h</td></tr>
+        <tr><td><code>--query</code></td><td></td><td>PromQL expression (or @file / @- for stdin)</td></tr>
+        <tr><td><code>--since</code></td><td></td><td>look back this far from now, e.g. 15m, 1h, 24h, 7d</td></tr>
+        <tr><td><code>--step</code></td><td></td><td>evaluation step / resolution, e.g. 30s, 1m, 5m (required)</td></tr>
+        <tr><td><code>--to</code></td><td></td><td>range end (default now)</td></tr>
+        </tbody>
+      </table>
+      <h3>Examples</h3><pre><span class="c">  # error rate over the last hour at 1-minute resolution</span>
+  openobserve-cli metrics query-range \
+    --query &#39;sum(rate(http_requests_total{status=~&#34;5..&#34;}[5m]))&#39; --since 1h --step 1m</pre>
     </section>
     
     <section class="cmd" id="openobserve-cli-org">
@@ -246,9 +325,9 @@ default so later commands need no --org.</p>
       <pre>openobserve-cli search</pre>
       <p class="long">Search is the heart of the CLI. `search run` returns matching rows;
 `search histogram` returns time-bucketed counts so you can see volume
-and shape before pulling raw rows. Time ranges are given in human form
-(--since 1h, or --from/--to); the CLI converts them to the microsecond
-epochs OpenObserve needs.</p>
+and shape before pulling raw rows; `search tail` follows a stream live.
+Time ranges are given in human form (--since 1h, or --from/--to); the CLI
+converts them to the microsecond epochs OpenObserve needs.</p>
       
       
     </section>
@@ -280,15 +359,19 @@ deciding which window to pull raw rows from with `search run`.</p>
       <p class="short">Run a SQL query and return matching rows</p>
       <pre>openobserve-cli search run [flags]</pre>
       <p class="long">Provide --stream to query a stream with an auto-built SELECT, optionally
-narrowed by --where; or provide a full --sql query. The time range is
+narrowed by --where; or provide a full --sql query (use --sql @file or
+--sql @- to read a long query from a file or stdin). The time range is
 required (--since or --from/--to). JSON output returns a summary plus the
-hits; --format ndjson streams one hit per line for piping.</p>
+hits; --format ndjson streams one hit per line for piping. Use --all to
+page through every matching row as ndjson (bound it with --max).</p>
       <h3>Options</h3>
       <table>
         <thead><tr><th>Flag</th><th>Default</th><th>Description</th></tr></thead>
         <tbody>
+        <tr><td><code>--all</code></td><td><code>false</code></td><td>page through every matching row, streamed as ndjson</td></tr>
         <tr><td><code>--from</code></td><td></td><td>range start: RFC3339, an epoch, 2006-01-02, or now-1h</td></tr>
-        <tr><td><code>--limit</code></td><td><code>0</code></td><td>max rows to return (default 100, max 10000)</td></tr>
+        <tr><td><code>--limit</code></td><td><code>0</code></td><td>max rows to return (default 100, max 10000); with --all, the page size</td></tr>
+        <tr><td><code>--max</code></td><td><code>0</code></td><td>with --all, stop after this many rows (0 = no cap); a cap is reported on stderr</td></tr>
         <tr><td><code>--offset</code></td><td><code>0</code></td><td>row offset for pagination (maps to the search &#39;from&#39;)</td></tr>
         <tr><td><code>--order</code></td><td><code>desc</code></td><td>_timestamp ordering for the auto-built query: desc or asc</td></tr>
         <tr><td><code>--since</code></td><td></td><td>look back this far from now, e.g. 15m, 1h, 24h, 7d</td></tr>
@@ -301,8 +384,35 @@ hits; --format ndjson streams one hit per line for piping.</p>
       <h3>Examples</h3><pre><span class="c">  # last hour of errors from the &#39;default&#39; log stream</span>
   openobserve-cli search run --stream default --where &#34;level = &#39;ERROR&#39;&#34; --since 1h --limit 20
 
-<span class="c">  # a full SQL query over an explicit window</span>
-  openobserve-cli search run --sql &#39;SELECT code, count(*) FROM &#34;default&#34; GROUP BY code&#39; --since 24h</pre>
+<span class="c">  # a full SQL query read from a file, over an explicit window</span>
+  openobserve-cli search run --sql @query.sql --since 24h
+
+<span class="c">  # page through every matching row (streamed as ndjson)</span>
+  openobserve-cli search run --stream default --since 24h --all --max 50000</pre>
+    </section>
+    
+    <section class="cmd" id="openobserve-cli-search-tail">
+      <h2>openobserve-cli search tail</h2>
+      <p class="short">Follow a stream live, printing new rows as they arrive</p>
+      <pre>openobserve-cli search tail [flags]</pre>
+      <p class="long">Polls the stream on an interval and prints newly-arrived rows as ndjson,
+like `tail -f` for logs. It runs until interrupted (Ctrl-C). Use --since to
+backfill a window first; otherwise only rows arriving after start are shown.</p>
+      <h3>Options</h3>
+      <table>
+        <thead><tr><th>Flag</th><th>Default</th><th>Description</th></tr></thead>
+        <tbody>
+        <tr><td><code>--interval</code></td><td><code>2s</code></td><td>poll interval, e.g. 2s, 5s, 1m</td></tr>
+        <tr><td><code>--since</code></td><td></td><td>backfill this window before following, e.g. 5m</td></tr>
+        <tr><td><code>--stream</code></td><td></td><td>stream to follow (required)</td></tr>
+        <tr><td><code>--where</code></td><td></td><td>WHERE clause to filter, e.g. &#34;level = &#39;ERROR&#39;&#34;</td></tr>
+        </tbody>
+      </table>
+      <h3>Examples</h3><pre><span class="c">  # follow errors in the &#39;app&#39; stream</span>
+  openobserve-cli search tail --stream app --where &#34;level = &#39;ERROR&#39;&#34;
+
+<span class="c">  # backfill the last 5 minutes, then follow</span>
+  openobserve-cli search tail --stream app --since 5m --interval 3s</pre>
     </section>
     
     <section class="cmd" id="openobserve-cli-skill">
@@ -453,6 +563,68 @@ partition settings — what you need to write a correct SQL query.</p>
         </tbody>
       </table>
       
+    </section>
+    
+    <section class="cmd" id="openobserve-cli-trace">
+      <h2>openobserve-cli trace<span class="group-tag">command group</span></h2>
+      <p class="short">Search distributed traces and inspect a single trace</p>
+      <pre>openobserve-cli trace</pre>
+      <p class="long">Traces are first-class in OpenObserve. `trace search` lists recent traces
+(newest first) with their duration and the services involved — the map for
+finding a slow or erroring request. `trace get &lt;trace_id&gt;` then reassembles
+every span of one trace into a parent/child waterfall. Discover trace stream
+names with `stream list --type traces`.</p>
+      
+      
+    </section>
+    
+    <section class="cmd" id="openobserve-cli-trace-get">
+      <h2>openobserve-cli trace get</h2>
+      <p class="short">Reassemble one trace into a span waterfall</p>
+      <pre>openobserve-cli trace get &lt;trace_id&gt; [flags]</pre>
+      <p class="long">Fetches every span of a trace and assembles them into a parent/child tree,
+with each span&#39;s offset from the trace start so you can read it as a
+waterfall. JSON returns a nested tree; --format ndjson streams the spans
+flat, one per line. The time range must contain the trace.</p>
+      <h3>Options</h3>
+      <table>
+        <thead><tr><th>Flag</th><th>Default</th><th>Description</th></tr></thead>
+        <tbody>
+        <tr><td><code>--from</code></td><td></td><td>range start: RFC3339, an epoch, 2006-01-02, or now-1h</td></tr>
+        <tr><td><code>--since</code></td><td></td><td>look back this far from now, e.g. 15m, 1h, 24h, 7d</td></tr>
+        <tr><td><code>--stream</code></td><td></td><td>trace stream the trace lives in (required)</td></tr>
+        <tr><td><code>--to</code></td><td></td><td>range end (default now)</td></tr>
+        </tbody>
+      </table>
+      <h3>Examples</h3><pre>  openobserve-cli trace get 7be29a... --stream default --since 1h</pre>
+    </section>
+    
+    <section class="cmd" id="openobserve-cli-trace-search">
+      <h2>openobserve-cli trace search</h2>
+      <p class="short">List recent traces in a trace stream</p>
+      <pre>openobserve-cli trace search [flags]</pre>
+      <p class="long">Returns recent traces newest-first, each with its trace_id, duration and the
+services that participated — enough to pick which trace to inspect with
+`trace get`. Narrow the set with --filter (e.g. &#34;duration &gt; 1000000&#34; for
+traces slower than 1s). The time range is required.</p>
+      <h3>Options</h3>
+      <table>
+        <thead><tr><th>Flag</th><th>Default</th><th>Description</th></tr></thead>
+        <tbody>
+        <tr><td><code>--filter</code></td><td></td><td>predicate scoping which traces match (or @file / @-)</td></tr>
+        <tr><td><code>--from</code></td><td></td><td>range start: RFC3339, an epoch, 2006-01-02, or now-1h</td></tr>
+        <tr><td><code>--limit</code></td><td><code>0</code></td><td>max traces to return (default 50)</td></tr>
+        <tr><td><code>--offset</code></td><td><code>0</code></td><td>trace offset for pagination (maps to &#39;from&#39;)</td></tr>
+        <tr><td><code>--since</code></td><td></td><td>look back this far from now, e.g. 15m, 1h, 24h, 7d</td></tr>
+        <tr><td><code>--stream</code></td><td></td><td>trace stream to search (required)</td></tr>
+        <tr><td><code>--to</code></td><td></td><td>range end (default now)</td></tr>
+        </tbody>
+      </table>
+      <h3>Examples</h3><pre><span class="c">  # slowest-first triage is done client-side; here, last hour of traces</span>
+  openobserve-cli trace search --stream default --since 1h --limit 20
+
+<span class="c">  # only traces with an errored span</span>
+  openobserve-cli trace search --stream default --since 1h --filter &#34;span_status = &#39;ERROR&#39;&#34;</pre>
     </section>
     
     <section class="cmd" id="openobserve-cli-version">

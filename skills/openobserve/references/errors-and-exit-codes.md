@@ -58,6 +58,12 @@ fi
 - **`BAD_TIME_RANGE` (usage/2)** — pass `--since 1h` or `--from`/`--to`.
 - **`STREAM_NOT_FOUND` (not_found/6)** — run `stream list`; names are
   case-sensitive.
+- **`PROMQL_ERROR` (usage/2)** — a `metrics query` expression was rejected
+  (typo'd metric name or bad PromQL). Discover names with
+  `stream list --type metrics`; remember metrics are PromQL, not SQL.
+- **`TRACE_NOT_FOUND` (not_found/6)** — `trace get` found no spans for that
+  `trace_id` in the window; widen `--since` or confirm the id/stream with
+  `trace search --stream <name>`.
 - **`HTTP_UNAUTHORIZED` (auth/4)** — wrong password/token → re-run `config init`.
 - **`HTTP_FORBIDDEN` (permission/5)** — the credential authenticates but has no
   role for the resource. This is the classic **service account** case: under

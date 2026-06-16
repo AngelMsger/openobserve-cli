@@ -42,11 +42,16 @@ command's `PersistentPreRunE` and captured by every subcommand:
 - `emit()` / `emitList()` render results; `org()`, `timeout()`, `readOnly()` are
   convenience accessors.
 
-Each noun lives in its own file (`org.go`, `stream.go`, `search.go`, `auth.go`,
-`config.go`, `doctor.go`, `skill.go`), organised `<noun> <verb>`. `search.go`
-owns the SQL-building helpers and is the heart of the CLI: it converts human time
-ranges to microseconds (via `timeutil`) and builds `SELECT` / `histogram`
-queries so the API client only ever receives a ready query.
+Each noun lives in its own file (`org.go`, `stream.go`, `search.go`, `metrics.go`,
+`trace.go`, `auth.go`, `config.go`, `doctor.go`, `skill.go`), organised
+`<noun> <verb>`. `search.go` owns the SQL-building helpers and is the heart of the
+logs path: it converts human time ranges to microseconds (via `timeutil`) and
+builds `SELECT` / `histogram` queries so the API client only ever receives a ready
+query; it also hosts `search tail` (poll-and-stream) and `--all` paging.
+`metrics.go` queries the Prometheus-compatible PromQL endpoints (times in
+**seconds**, not microseconds — `metrics.go` owns that conversion); `trace.go`
+lists traces and reassembles a trace's spans into a parent/child waterfall.
+`notify.go` emits the post-run update notice (`internal/update`).
 
 ## API client (`internal/apiclient`)
 

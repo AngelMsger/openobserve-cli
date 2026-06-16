@@ -29,6 +29,14 @@ is published at <https://angelmsger.github.io/openobserve-cli/cli/>.
 | --- | --- |
 | [`openobserve-cli doctor`](https://angelmsger.github.io/openobserve-cli/cli/#openobserve-cli-doctor) | Check configuration, credentials and connectivity |
 
+## metrics
+
+| Command | Description |
+| --- | --- |
+| [`openobserve-cli metrics`](https://angelmsger.github.io/openobserve-cli/cli/#openobserve-cli-metrics) | Query metrics with PromQL (instant and range) |
+| [`openobserve-cli metrics query`](https://angelmsger.github.io/openobserve-cli/cli/#openobserve-cli-metrics-query) | Evaluate a PromQL expression at a single instant |
+| [`openobserve-cli metrics query-range`](https://angelmsger.github.io/openobserve-cli/cli/#openobserve-cli-metrics-query-range) | Evaluate a PromQL expression across a time window |
+
 ## org
 
 | Command | Description |
@@ -44,6 +52,7 @@ is published at <https://angelmsger.github.io/openobserve-cli/cli/>.
 | [`openobserve-cli search`](https://angelmsger.github.io/openobserve-cli/cli/#openobserve-cli-search) | Run SQL searches over logs, metrics and traces |
 | [`openobserve-cli search histogram`](https://angelmsger.github.io/openobserve-cli/cli/#openobserve-cli-search-histogram) | Return time-bucketed counts (the volume map before raw rows) |
 | [`openobserve-cli search run`](https://angelmsger.github.io/openobserve-cli/cli/#openobserve-cli-search-run) | Run a SQL query and return matching rows |
+| [`openobserve-cli search tail`](https://angelmsger.github.io/openobserve-cli/cli/#openobserve-cli-search-tail) | Follow a stream live, printing new rows as they arrive |
 
 ## skill
 
@@ -64,6 +73,14 @@ is published at <https://angelmsger.github.io/openobserve-cli/cli/>.
 | [`openobserve-cli stream list`](https://angelmsger.github.io/openobserve-cli/cli/#openobserve-cli-stream-list) | List streams in the organization (the discovery map) |
 | [`openobserve-cli stream schema`](https://angelmsger.github.io/openobserve-cli/cli/#openobserve-cli-stream-schema) | Show just a stream's queryable columns and search settings |
 | [`openobserve-cli stream stats`](https://angelmsger.github.io/openobserve-cli/cli/#openobserve-cli-stream-stats) | Show a stream's document count, time range and storage size |
+
+## trace
+
+| Command | Description |
+| --- | --- |
+| [`openobserve-cli trace`](https://angelmsger.github.io/openobserve-cli/cli/#openobserve-cli-trace) | Search distributed traces and inspect a single trace |
+| [`openobserve-cli trace get`](https://angelmsger.github.io/openobserve-cli/cli/#openobserve-cli-trace-get) | Reassemble one trace into a span waterfall |
+| [`openobserve-cli trace search`](https://angelmsger.github.io/openobserve-cli/cli/#openobserve-cli-trace-search) | List recent traces in a trace stream |
 
 ## version
 

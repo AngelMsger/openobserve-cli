@@ -163,6 +163,19 @@ func (s *appState) emitList(items any, info pageInfo) error {
 	})
 }
 
+// emitStream writes items as ndjson (one record per line) regardless of the
+// configured format. It backs the streaming commands — `search run --all` and
+// `search tail` — where a {items,...} envelope or a single buffered JSON blob
+// would defeat the point of streaming a large or unbounded result.
+func (s *appState) emitStream(items any) error {
+	return output.EmitList(items, "", false, output.Options{
+		Format: output.FormatNDJSON,
+		Fields: s.fieldList(),
+		Writer: os.Stdout,
+		Pretty: s.gflags.pretty,
+	})
+}
+
 // fieldList splits the --fields flag into dot paths.
 func (s *appState) fieldList() []string {
 	if s.gflags.fields == "" {

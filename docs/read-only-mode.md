@@ -4,11 +4,12 @@ Read-only mode is a session-level safety switch that blocks every mutating
 client method **before any HTTP request is sent**. It gives you a "let an agent
 explore freely without risk" posture.
 
-## v0.1 status
+## Current status
 
-`openobserve-cli` v0.1 is **entirely read-only** — it has no write commands, so
-read-only mode is trivially satisfied today. The machinery is wired end-to-end
-now so that the write commands planned after v0.1 (dashboards, alerts,
+`openobserve-cli` is **entirely read-only** today (through v0.2: logs search /
+histogram / tail, PromQL metrics, and trace search / get) — it has no write
+commands, so read-only mode is trivially satisfied. The machinery is wired
+end-to-end now so that the planned write commands (dashboards, alerts,
 functions / pipelines, users, ingestion) plug into it without rework. This page
 documents how it works and how it will gate those writes.
 
@@ -33,7 +34,7 @@ Three layers, in precedence order:
 When the posture is read-only, the API client is wrapped by
 `apiclient.NewReadOnly` before any command runs (`internal/apiclient/readonly.go`).
 The wrapper embeds the real client, so every **read** passes straight through.
-Each **write** method (added with the post-v0.1 write commands) overrides the
+Each **write** method (added with the planned write commands) overrides the
 embedded one to return a structured error instead of issuing a request:
 
 ```json

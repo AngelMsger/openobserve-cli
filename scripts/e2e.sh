@@ -62,7 +62,24 @@ check "stream schema"   'full_text_search_keys' -- run stream schema app
 check "search run"      '"hits"'         -- run search run --stream app --since 1h --limit 5
 check "search ndjson"   '"level":"ERROR"' -- run --format ndjson search run --stream app --since 1h
 check "histogram"       '"buckets"'      -- run search histogram --stream app --since 1h --interval 5m
-check "doctor healthy"  '"healthy": true' -- run doctor
+
+# --sql @file: read a query from a file rather than the command line.
+echo 'SELECT * FROM "app"' >"$TMP/q.sql"
+check "search --sql @file" '"hits"'      -- run search run --sql "@$TMP/q.sql" --since 1h
+
+# search run --all streams every matching row as ndjson.
+check "search --all"    '"level":"ERROR"' -- run search run --stream app --since 1h --all
+
+# Metrics (PromQL).
+check "metrics query"      '"result_type"' -- run metrics query --query up
+check "metrics query-range" '"matrix"'     -- run metrics query-range --query up --since 1h --step 1m
+
+# Traces.
+check "trace search"    '"abc123"'       -- run trace search --stream apptraces --since 1h
+check "trace get tree"  '"children"'     -- run trace get abc123 --stream apptraces --since 1h
+check "trace get count" '"span_count"'   -- run trace get abc123 --stream apptraces --since 1h
+
+check "doctor healthy"  '"healthy": true' -- run doctor --no-update-check
 
 # Exit-code contract: missing stream -> not_found (6).
 set +e
@@ -75,6 +92,22 @@ if [[ "$code" -ne 2 ]]; then
 fi
 echo "ok   - missing-time-range exits 2"
 pass=$((pass + 1))
+
+# search tail: follows the stream as ndjson, then exits cleanly on SIGINT.
+# Invoke the binary directly (not via the run() function) so TAIL_PID is the
+# process itself — backgrounding a shell function would make TAIL_PID the
+# subshell and SIGINT would not reach the binary.
+"$BIN" --config "$TMP" --format ndjson search tail --stream app --since 1h --interval 1s >"$TMP/tail.out" 2>/dev/null &
+TAIL_PID=$!
+sleep 2
+kill -INT "$TAIL_PID" 2>/dev/null || true
+wait "$TAIL_PID" 2>/dev/null || true
+if grep -q '"log":"boom"' "$TMP/tail.out"; then
+  echo "ok   - search tail streams ndjson and stops on interrupt"
+  pass=$((pass + 1))
+else
+  echo "FAIL - search tail produced no rows"; cat "$TMP/tail.out" | head -5; exit 1
+fi
 
 echo ""
 echo "e2e: $pass checks passed"

@@ -37,6 +37,15 @@ type Client interface {
 
 	// Search runs a SQL query against org and returns matching hits.
 	Search(ctx context.Context, org string, req SearchRequest) (*SearchResponse, error)
+
+	// QueryMetricsInstant runs an instant PromQL query at a point in time.
+	QueryMetricsInstant(ctx context.Context, org, promql string, timeSec float64) (*PromQLResponse, error)
+	// QueryMetricsRange runs a PromQL query over a [start,end] window at step
+	// resolution. start/end are Unix seconds; step is a Prometheus duration.
+	QueryMetricsRange(ctx context.Context, org, promql string, startSec, endSec float64, step string) (*PromQLResponse, error)
+
+	// LatestTraces returns recent traces in a trace stream, newest first.
+	LatestTraces(ctx context.Context, org, stream string, startMicros, endMicros int64, from, size int, filter string) (*TraceSearchResponse, error)
 }
 
 // apiClient is the single Client implementation.

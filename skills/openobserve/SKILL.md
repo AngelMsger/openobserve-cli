@@ -1,7 +1,7 @@
 ---
 name: openobserve
-version: 0.1.0
-description: "Query an OpenObserve (O2) observability backend from the command line: discover logs/metrics/traces streams, inspect a stream's schema, and run SQL searches and time-bucketed histograms over them, with agent-friendly JSON output and structured errors. Use this skill when the user mentions OpenObserve or O2, gives an OpenObserve URL, or asks to search / query / grep logs, traces or metrics; to find why a service is erroring, slow or crashing; to look at error rates, log volume or recent events over a time window; to list or inspect streams or their fields; or to check what data a stream holds. Covers self-hosted (localhost:5080) and Cloud. Set up with `openobserve-cli config init`, or OPENOBSERVE_URL / OPENOBSERVE_ORG / OPENOBSERVE_EMAIL / OPENOBSERVE_PASSWORD (or OPENOBSERVE_TOKEN) env vars. It is read-only: it cannot create dashboards, alerts, functions/pipelines or users yet."
+version: 0.2.0
+description: "Query an OpenObserve (O2) backend from the command line across logs, metrics and traces: discover streams and schema, run SQL searches and histograms over logs, follow a stream live (tail -f), query metrics with PromQL (instant and range), and rebuild a trace into a span waterfall — with agent-friendly JSON and structured errors. Use this skill when the user mentions OpenObserve or O2, gives an OpenObserve URL, or asks to search / query / grep / tail logs; to query metrics or write PromQL (rate, p99, error rate); to inspect a trace, span or request latency; to find why a service is erroring, slow or crashing; to look at error rates, log volume or recent events; or to list or inspect streams or their fields. Covers self-hosted (localhost:5080) and Cloud. Set up with `openobserve-cli config init`, or OPENOBSERVE_URL / OPENOBSERVE_ORG / OPENOBSERVE_EMAIL / OPENOBSERVE_PASSWORD (or OPENOBSERVE_TOKEN) env vars. It is read-only: it cannot create dashboards, alerts, functions/pipelines or users yet."
 metadata:
   requires:
     bins: ["openobserve-cli"]
@@ -10,9 +10,10 @@ metadata:
 
 # openobserve
 
-`openobserve-cli` queries an OpenObserve (O2) backend for you. Output is JSON by
+`openobserve-cli` queries an OpenObserve (O2) backend for you across all three
+pillars — logs (SQL), metrics (PromQL) and traces (span trees). Output is JSON by
 default; errors are JSON on stderr with a `category`, a `hint` and `next_steps`.
-Everything in v0.1 is read-only.
+Everything is read-only.
 
 ## Golden rule — discover before you query
 
@@ -38,6 +39,19 @@ microsecond timestamp**. Don't. The CLI gives you discovery commands for each:
   `search histogram --stream <name> --since <window> --interval <bucket>` to see
   the shape over time (the *map*), then pull the interesting window with
   `search run` (the *terrain*). See [searching.md](references/searching.md).
+- User asks to **follow / tail logs live** → `search tail --stream <name>`
+  (optionally `--where ...`, `--since 5m` to backfill); it streams new rows as
+  ndjson until interrupted.
+- User asks about **metrics / a PromQL expression / rate / error rate / p99** →
+  metrics are PromQL, not SQL. `stream list --type metrics` to find the metric
+  names, then `metrics query --query '<promql>'` (instant) or
+  `metrics query-range --query '<promql>' --since 1h --step 1m` (over time). See
+  [metrics-and-traces.md](references/metrics-and-traces.md).
+- User asks to **inspect a trace / why a request is slow / a span** → traces are
+  first-class. `stream list --type traces` to find the trace stream, then
+  `trace search --stream <name> --since 1h` to find the trace, then
+  `trace get <trace_id> --stream <name> --since 1h` for the span waterfall. See
+  [metrics-and-traces.md](references/metrics-and-traces.md).
 - User asks **what streams / fields exist** → `stream list`, then
   `stream schema <name>`. See [streams.md](references/streams.md).
 - A query needs a column you're unsure of → `stream schema <name>` first.
@@ -53,18 +67,28 @@ microsecond timestamp**. Don't. The CLI gives you discovery commands for each:
 - **Keep `--limit` small** (default 100). Pull a histogram first; only fetch the
   rows you actually need.
 - **Reference real names only.** If you didn't get a stream or column from
-  `stream list` / `stream schema`, don't put it in SQL.
+  `stream list` / `stream schema`, don't put it in SQL. The same holds for metric
+  names (`stream list --type metrics`) and trace streams (`--type traces`).
+- **Metrics are PromQL, not SQL.** Use `metrics query` / `query-range` with a
+  PromQL expression; don't try to `search run` a metrics stream.
 - Prefer `--format ndjson` when piping hits into `jq`/`grep`; it streams one row
-  per line.
+  per line. For very large result sets, `search run --all` pages through every
+  matching row as ndjson (bound it with `--max`).
 
 ## Commands
 
 ```
 openobserve-cli org list                       # discover organizations
-openobserve-cli stream list [--type logs]      # discover streams (the map)
+openobserve-cli stream list [--type logs|metrics|traces]   # discover streams (the map)
 openobserve-cli stream schema <name>           # queryable columns + settings
 openobserve-cli search run --stream <name> --since 1h --where "level='ERROR'" --limit 20
+openobserve-cli search run --sql @query.sql --since 24h    # read a long query from a file (@- = stdin)
 openobserve-cli search histogram --stream <name> --since 6h --interval 5m
+openobserve-cli search tail --stream <name> --where "level='ERROR'"   # follow live (Ctrl-C to stop)
+openobserve-cli metrics query --query 'sum by (service)(rate(http_requests_total[5m]))'
+openobserve-cli metrics query-range --query 'up' --since 1h --step 1m
+openobserve-cli trace search --stream <name> --since 1h    # recent traces (trace_id, duration, services)
+openobserve-cli trace get <trace_id> --stream <name> --since 1h    # span waterfall
 openobserve-cli auth status                    # who am I / can I reach the server
 openobserve-cli doctor                         # diagnose config / creds / connectivity
 ```

@@ -59,6 +59,12 @@ func newRootCmd() *cobra.Command {
 			output.SetErrorPretty(state.gflags.pretty)
 			return state.load()
 		},
+		// After a command succeeds, surface a one-line update notice on stderr
+		// when a newer release is available (cached 24h; never fails the command).
+		PersistentPostRunE: func(cmd *cobra.Command, _ []string) error {
+			maybeNotifyUpdate(state, cmd)
+			return nil
+		},
 	}
 
 	pf := root.PersistentFlags()
@@ -86,6 +92,8 @@ func newRootCmd() *cobra.Command {
 		newOrgCmd(state),
 		newStreamCmd(state),
 		newSearchCmd(state),
+		newMetricsCmd(state),
+		newTraceCmd(state),
 		newAuthCmd(state),
 		newConfigCmd(state),
 		newDoctorCmd(state),
