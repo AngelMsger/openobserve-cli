@@ -3,6 +3,7 @@
 [![npm](https://img.shields.io/npm/v/@angelmsger/openobserve-cli.svg)](https://www.npmjs.com/package/@angelmsger/openobserve-cli)
 [![Go version](https://img.shields.io/github/go-mod/go-version/AngelMsger/openobserve-cli.svg)](go.mod)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Docs](https://img.shields.io/badge/docs-online-success.svg)](https://AngelMsger.github.io/openobserve-cli/)
 [![OpenObserve](https://img.shields.io/badge/OpenObserve-logs%20%C2%B7%20metrics%20%C2%B7%20traces-2b6cb0.svg)](https://openobserve.ai)
 
 > Query OpenObserve from your terminal — built for coding agents.
@@ -14,6 +15,10 @@ time-bucketed histograms over logs, metrics and traces. It works with both
 **self-hosted** OpenObserve and **OpenObserve Cloud**, returns agent-friendly
 JSON with structured errors, and ships a companion Skill that teaches an agent
 how to use it.
+
+📖 **Documentation site:** <https://AngelMsger.github.io/openobserve-cli/>
+
+![openobserve-cli — query OpenObserve from your terminal](docs/image.png)
 
 ```console
 $ openobserve-cli search run --stream default --where "level = 'ERROR'" --since 1h --limit 3
