@@ -238,11 +238,14 @@ the version history.
 
 ## Related
 
-From the same author, same agent-first design:
-**[confluence-cli](https://github.com/AngelMsger/confluence-cli)** (Confluence as
-a knowledge base) and
-**[bitbucket-cli](https://github.com/AngelMsger/bitbucket-cli)** (Bitbucket pull
-requests and code review).
+Part of a family of agent-facing CLIs — one skeleton, one set of conventions, all
+built for coding agents. Browse the full set at
+**[github.com/AngelMsger](https://github.com/AngelMsger)**:
+
+- **[confluence-cli](https://github.com/AngelMsger/confluence-cli)** — Confluence as a knowledge base
+- **[bitbucket-cli](https://github.com/AngelMsger/bitbucket-cli)** — Bitbucket pull requests & code review
+- **openobserve-cli** — OpenObserve logs, metrics & traces *(this project)*
+- **[jenkins-cli](https://github.com/AngelMsger/jenkins-cli)** — inspect Jenkins jobs & builds
 
 ## License
 
