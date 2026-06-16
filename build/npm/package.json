@@ -1,0 +1,45 @@
+{
+  "name": "@angelmsger/openobserve-cli",
+  "version": "0.1.0",
+  "description": "Query OpenObserve (O2) from the command line for coding agents: discover streams and run SQL searches over logs, metrics and traces with structured JSON output.",
+  "keywords": [
+    "openobserve",
+    "o2",
+    "observability",
+    "logs",
+    "cli",
+    "agent",
+    "claude",
+    "sql"
+  ],
+  "homepage": "https://github.com/AngelMsger/openobserve-cli",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/AngelMsger/openobserve-cli.git"
+  },
+  "license": "MIT",
+  "bin": {
+    "openobserve-cli": "bin/openobserve-cli.js"
+  },
+  "main": "install.js",
+  "scripts": {
+    "postinstall": "node install.js"
+  },
+  "files": [
+    "bin/",
+    "install.js",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "os": [
+    "darwin",
+    "linux",
+    "win32"
+  ],
+  "cpu": [
+    "x64",
+    "arm64"
+  ]
+}
