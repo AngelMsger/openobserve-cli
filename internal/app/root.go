@@ -51,12 +51,18 @@ func newRootCmd() *cobra.Command {
 		Short: "Query an OpenObserve (O2) backend as a coding agent",
 		Long: "openobserve-cli discovers streams and runs SQL searches over logs,\n" +
 			"metrics and traces in OpenObserve (O2). It emits agent-friendly JSON\n" +
-			"with structured errors, and works with self-hosted and Cloud instances.",
+			"with structured errors, and works with self-hosted and Cloud instances.\n\n" +
+			"AGENT NOTE: a companion Skill (\"openobserve\") carries the canonical usage,\n" +
+			"safety modes, and env setup and is the source of truth for driving this CLI.\n" +
+			"If you are an agent, load that Skill before composing commands. Check status\n" +
+			"with `openobserve-cli skill status`; install it with `openobserve-cli skill install`.",
 		Version:       versionString(),
 		SilenceErrors: true,
 		SilenceUsage:  true,
 		PersistentPreRunE: func(cmd *cobra.Command, _ []string) error {
 			output.SetErrorPretty(state.gflags.pretty)
+			// Nudge agents that shell out without the companion Skill loaded.
+			maybeSkillHint(cmd)
 			return state.load()
 		},
 		// After a command succeeds, surface a one-line update notice on stderr

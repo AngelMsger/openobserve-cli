@@ -95,6 +95,13 @@ openobserve-cli doctor                         # diagnose config / creds / conne
 
 ## Agent-facing conventions
 
+- **Skill handshake — set `OPENOBSERVE_CLI_SKILL=1`.** Once you have loaded this
+  Skill, export `OPENOBSERVE_CLI_SKILL=1` in the environment you run the CLI
+  from. When the variable is absent the CLI assumes you may be inferring commands
+  blindly and prints a one-line `{"_notice":{"skill":{…}}}` discovery hint on
+  **stderr** (non-interactive sessions only). Setting it silences the hint;
+  `openobserve-cli skill status` reports whether it is set. (To suppress the hint
+  without loading the Skill, use `OPENOBSERVE_CLI_NO_SKILL_HINT=1`.)
 - stdout is data only; diagnostics and errors go to stderr.
 - Exit codes are stable and categorized (0 ok, 2 usage, 3 config, 4 auth, …);
   see [errors-and-exit-codes.md](references/errors-and-exit-codes.md).

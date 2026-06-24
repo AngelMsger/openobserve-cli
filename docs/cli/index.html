@@ -66,6 +66,7 @@
       <a href="#openobserve-cli-skill-install">openobserve-cli skill install</a>
       <a href="#openobserve-cli-skill-path">openobserve-cli skill path</a>
       <a href="#openobserve-cli-skill-show">openobserve-cli skill show</a>
+      <a href="#openobserve-cli-skill-status">openobserve-cli skill status</a>
       <a href="#openobserve-cli-skill-uninstall">openobserve-cli skill uninstall</a>
       </div>
     <div class="side-group">
@@ -93,7 +94,12 @@
     <h1>CLI reference</h1>
     <p class="lead">openobserve-cli discovers streams and runs SQL searches over logs,
 metrics and traces in OpenObserve (O2). It emits agent-friendly JSON
-with structured errors, and works with self-hosted and Cloud instances.</p>
+with structured errors, and works with self-hosted and Cloud instances.
+
+AGENT NOTE: a companion Skill (&#34;openobserve&#34;) carries the canonical usage,
+safety modes, and env setup and is the source of truth for driving this CLI.
+If you are an agent, load that Skill before composing commands. Check status
+with `openobserve-cli skill status`; install it with `openobserve-cli skill install`.</p>
     <p class="lead">Generated from the command tree, so it always matches <code>--help</code>.</p>
 
     <section class="cmd">
@@ -471,6 +477,21 @@ version.</p>
       <pre>openobserve-cli skill show</pre>
       
       
+      
+    </section>
+    
+    <section class="cmd" id="openobserve-cli-skill-status">
+      <h2>openobserve-cli skill status</h2>
+      <p class="short">Report whether the companion Skill is loaded and installed</p>
+      <pre>openobserve-cli skill status [flags]</pre>
+      
+      <h3>Options</h3>
+      <table>
+        <thead><tr><th>Flag</th><th>Default</th><th>Description</th></tr></thead>
+        <tbody>
+        <tr><td><code>--project</code></td><td><code>false</code></td><td>check the project skills dirs (./.claude/skills, ./.agents/skills) instead of $HOME</td></tr>
+        </tbody>
+      </table>
       
     </section>
     
