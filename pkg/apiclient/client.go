@@ -1,6 +1,13 @@
 // Package apiclient is the OpenObserve API surface used by the CLI. It builds
 // org-scoped requests, decodes normalized models, and converts non-2xx
 // responses into structured *errors.CLIError values.
+//
+// This package backs the openobserve-cli command layer and is also importable as a
+// standalone client library (e.g. by a GUI); see the repository README. Its
+// exported surface — the Client interface, the normalized models, and the
+// read-only / dry-run semantics — is a contract the CLI and its companion
+// Skill depend on. Extend it additively and keep existing shapes and behavior
+// stable; do not reshape the public API to suit a single local call site.
 package apiclient
 
 import (
@@ -13,8 +20,8 @@ import (
 	"net/url"
 	"strings"
 
-	cerrors "github.com/angelmsger/openobserve-cli/internal/errors"
-	"github.com/angelmsger/openobserve-cli/internal/transport"
+	cerrors "github.com/angelmsger/openobserve-cli/pkg/errors"
+	"github.com/angelmsger/openobserve-cli/pkg/transport"
 )
 
 // Client is the OpenObserve API surface used by the CLI.

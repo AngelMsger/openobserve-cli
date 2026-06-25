@@ -5,10 +5,10 @@ import (
 	"os"
 	"strings"
 
-	"github.com/angelmsger/openobserve-cli/internal/apiclient"
 	"github.com/angelmsger/openobserve-cli/internal/auth"
 	"github.com/angelmsger/openobserve-cli/internal/config"
-	cerrors "github.com/angelmsger/openobserve-cli/internal/errors"
+	"github.com/angelmsger/openobserve-cli/pkg/apiclient"
+	cerrors "github.com/angelmsger/openobserve-cli/pkg/errors"
 	"github.com/charmbracelet/huh"
 	"github.com/spf13/cobra"
 )

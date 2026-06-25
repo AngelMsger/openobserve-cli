@@ -9,12 +9,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/angelmsger/openobserve-cli/internal/apiclient"
 	"github.com/angelmsger/openobserve-cli/internal/auth"
 	"github.com/angelmsger/openobserve-cli/internal/config"
-	cerrors "github.com/angelmsger/openobserve-cli/internal/errors"
 	"github.com/angelmsger/openobserve-cli/internal/output"
-	"github.com/angelmsger/openobserve-cli/internal/transport"
+	"github.com/angelmsger/openobserve-cli/pkg/apiclient"
+	cerrors "github.com/angelmsger/openobserve-cli/pkg/errors"
+	"github.com/angelmsger/openobserve-cli/pkg/transport"
 )
 
 // globalFlags holds the persistent flags shared by every command.

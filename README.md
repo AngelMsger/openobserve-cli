@@ -218,6 +218,56 @@ stable exit codes: `0` success, `2` usage, `3` config, `4` auth, `5` permission,
 Each error carries `next_steps` naming the command to run next, and `retryable`
 to guide back-off.
 
+## Use as a Go library
+
+The HTTP client that powers the CLI is published as a standalone Go package, so a
+GUI or other tool can query OpenObserve directly — same normalized models and
+structured errors, without shelling out to the binary.
+
+```go
+import (
+	"context"
+	"encoding/base64"
+	"net/http"
+	"os"
+
+	api "github.com/angelmsger/openobserve-cli/pkg/apiclient"
+	cerr "github.com/angelmsger/openobserve-cli/pkg/errors"
+	"github.com/angelmsger/openobserve-cli/pkg/transport"
+)
+
+// Authentication is a transport.Decorator you supply — it sets the
+// Authorization header on every request. OpenObserve uses HTTP Basic
+// (email + password); a pre-generated token works too.
+func basic(email, password string) transport.Decorator {
+	header := "Basic " + base64.StdEncoding.EncodeToString([]byte(email+":"+password))
+	return func(r *http.Request) { r.Header.Set("Authorization", header) }
+}
+
+ctx := context.Background()
+client, err := api.Build(api.BuildParams{
+	BaseURL:       "https://o2.example.com:5080",
+	Org:           "default",
+	AuthDecorator: basic(os.Getenv("OPENOBSERVE_EMAIL"), os.Getenv("OPENOBSERVE_PASSWORD")),
+})
+if err != nil { /* see error handling below */ }
+
+streams, err := client.ListStreams(ctx, "default", "logs", true) // include schema
+```
+
+Errors are `*errors.CLIError` with a stable `Category` and `Code`, so callers branch
+on failure kinds instead of parsing strings:
+
+```go
+if ce := cerr.AsCLIError(err); ce != nil {
+    // ce.Category, ce.Code, ce.Hint, ce.NextSteps, ce.HTTPStatus, ce.Retryable
+}
+```
+
+> These `pkg/...` packages primarily back this CLI and its companion Skill; their
+> exported surface is treated as a stable contract. Read the package doc comment
+> (`go doc ./pkg/apiclient`) before changing it.
+
 ## Development
 
 ```bash

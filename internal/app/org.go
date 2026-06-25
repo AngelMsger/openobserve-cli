@@ -2,7 +2,7 @@ package app
 
 import (
 	"github.com/angelmsger/openobserve-cli/internal/config"
-	cerrors "github.com/angelmsger/openobserve-cli/internal/errors"
+	cerrors "github.com/angelmsger/openobserve-cli/pkg/errors"
 	"github.com/spf13/cobra"
 )
 

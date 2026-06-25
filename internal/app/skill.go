@@ -8,8 +8,8 @@ import (
 	"strings"
 
 	openobservecli "github.com/angelmsger/openobserve-cli"
-	cerrors "github.com/angelmsger/openobserve-cli/internal/errors"
 	"github.com/angelmsger/openobserve-cli/pkg/constants"
+	cerrors "github.com/angelmsger/openobserve-cli/pkg/errors"
 	"github.com/spf13/cobra"
 )
 

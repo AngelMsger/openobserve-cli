@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/angelmsger/openobserve-cli/internal/transport"
+	"github.com/angelmsger/openobserve-cli/pkg/transport"
 )
 
 // Header returns the Authorization header value for the credential.

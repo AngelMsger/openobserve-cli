@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	cerrors "github.com/angelmsger/openobserve-cli/internal/errors"
-	"github.com/angelmsger/openobserve-cli/internal/transport"
+	cerrors "github.com/angelmsger/openobserve-cli/pkg/errors"
+	"github.com/angelmsger/openobserve-cli/pkg/transport"
 )
 
 // newTestClient wires a Client to an httptest server, recording the last seen

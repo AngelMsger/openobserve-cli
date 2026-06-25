@@ -5,7 +5,7 @@ import (
 	"net/url"
 	"strings"
 
-	cerrors "github.com/angelmsger/openobserve-cli/internal/errors"
+	cerrors "github.com/angelmsger/openobserve-cli/pkg/errors"
 )
 
 // streamListEnvelope is the shape of GET /api/{org}/streams.

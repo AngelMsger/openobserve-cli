@@ -5,7 +5,7 @@ import (
 	"os"
 	"strings"
 
-	cerrors "github.com/angelmsger/openobserve-cli/internal/errors"
+	cerrors "github.com/angelmsger/openobserve-cli/pkg/errors"
 )
 
 // readInlineOrFile resolves a flag value that may reference a file. A long SQL

@@ -5,8 +5,8 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/angelmsger/openobserve-cli/internal/apiclient"
 	"github.com/angelmsger/openobserve-cli/internal/update"
+	"github.com/angelmsger/openobserve-cli/pkg/apiclient"
 	"github.com/angelmsger/openobserve-cli/pkg/constants"
 	"github.com/spf13/cobra"
 )

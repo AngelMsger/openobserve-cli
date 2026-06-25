@@ -5,8 +5,8 @@ import (
 	"strings"
 	"time"
 
-	cerrors "github.com/angelmsger/openobserve-cli/internal/errors"
-	"github.com/angelmsger/openobserve-cli/internal/transport"
+	cerrors "github.com/angelmsger/openobserve-cli/pkg/errors"
+	"github.com/angelmsger/openobserve-cli/pkg/transport"
 )
 
 // BuildParams configures Build.
