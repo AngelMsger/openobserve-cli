@@ -89,9 +89,16 @@ openobserve-cli metrics query --query 'sum by (service)(rate(http_requests_total
 openobserve-cli metrics query-range --query 'up' --since 1h --step 1m
 openobserve-cli trace search --stream <name> --since 1h    # recent traces (trace_id, duration, services)
 openobserve-cli trace get <trace_id> --stream <name> --since 1h    # span waterfall
+openobserve-cli config init|show               # configuration
+openobserve-cli config contexts|use-context <name>   # list / switch named server contexts
 openobserve-cli auth status                    # who am I / can I reach the server
 openobserve-cli doctor                         # diagnose config / creds / connectivity
+openobserve-cli skill status|install|path|show|uninstall   # manage the companion Skill
 ```
+
+`--format` accepts `json` (default), `table` (human-readable), or `ndjson` (one
+row per line, for piping). A per-invocation `--use-context <name>` overrides the
+current context.
 
 ## Agent-facing conventions
 
@@ -102,6 +109,12 @@ openobserve-cli doctor                         # diagnose config / creds / conne
   **stderr** (non-interactive sessions only). Setting it silences the hint;
   `openobserve-cli skill status` reports whether it is set. (To suppress the hint
   without loading the Skill, use `OPENOBSERVE_CLI_NO_SKILL_HINT=1`.)
+- **Update notices on stderr.** When a newer release exists, commands print a
+  one-line `{"_notice":{"update":{…}}}` to **stderr** (never stdout) — on failed
+  commands too, not just successful ones. It carries the latest version and an
+  `npm install -g @angelmsger/openobserve-cli@latest` hint. Silence it with
+  `OPENOBSERVE_CLI_NO_UPDATE_NOTIFIER=1`, or skip the check per-run with
+  `doctor --no-update-check`.
 - stdout is data only; diagnostics and errors go to stderr.
 - Exit codes are stable and categorized (0 ok, 2 usage, 3 config, 4 auth, …);
   see [errors-and-exit-codes.md](references/errors-and-exit-codes.md).

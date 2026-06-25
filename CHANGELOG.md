@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.4] - 2026-06-25
+
+### Fixed
+
+- **The companion Skill drifted out of sync with the CLI.** The agent-facing
+  Skill (`skills/openobserve/`) — read by coding agents instead of `--help` —
+  did not document the `{"_notice":{"update":{…}}}` stderr notice (only the
+  `skill` one), so agents met an unexplained notice; nor did it list the `skill`
+  command group, `config contexts` / `use-context`, the `--format table` output,
+  or `--use-context`. All are now documented, and an AGENTS.md rule requires the
+  Skill to be updated in lockstep with the CLI. (Skill content only — no behavior
+  change.)
+
 ## [0.2.3] - 2026-06-24
 
 ### Fixed
@@ -117,7 +130,8 @@ Initial release — a read-only, agent-facing CLI for OpenObserve (O2).
   release binaries and `make install`. A generated CLI reference
   (`docs/cli/`) and a GitHub Pages landing page.
 
-[Unreleased]: https://github.com/AngelMsger/openobserve-cli/compare/v0.2.3...HEAD
+[Unreleased]: https://github.com/AngelMsger/openobserve-cli/compare/v0.2.4...HEAD
+[0.2.4]: https://github.com/AngelMsger/openobserve-cli/compare/v0.2.3...v0.2.4
 [0.2.3]: https://github.com/AngelMsger/openobserve-cli/compare/v0.2.2...v0.2.3
 [0.2.2]: https://github.com/AngelMsger/openobserve-cli/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/AngelMsger/openobserve-cli/compare/v0.2.0...v0.2.1

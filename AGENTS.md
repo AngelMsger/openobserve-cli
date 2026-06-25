@@ -55,3 +55,11 @@ add `--dry-run` (emit the would-be request plan), require `--yes` for destructiv
 ops, route through `apiclient.NewReadOnly` (override the new method to return
 `READONLY_BLOCKED`), and keep the `{items,next,has_more}` + structured-error
 contract.
+
+**Keep the companion Skill in sync — it is the agent-facing source of truth.**
+Any new command, subcommand, flag, or alias must be reflected in the embedded
+Skill ([`skills/openobserve/`](skills/openobserve/): the `SKILL.md` `## Commands`
+list and the relevant `references/` file) **in the same commit**. Agents read the
+Skill instead of `--help`, so a capability it omits effectively does not exist
+for them; a flag whose help text points at another command must have that command
+listed in the Skill, and no Skill claim may contradict the code.
