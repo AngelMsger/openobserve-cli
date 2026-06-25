@@ -32,7 +32,7 @@ Three layers, in precedence order:
 ## How it works
 
 When the posture is read-only, the API client is wrapped by
-`apiclient.NewReadOnly` before any command runs (`internal/apiclient/readonly.go`).
+`apiclient.NewReadOnly` before any command runs (`pkg/apiclient/readonly.go`).
 The wrapper embeds the real client, so every **read** passes straight through.
 Each **write** method (added with the planned write commands) overrides the
 embedded one to return a structured error instead of issuing a request:

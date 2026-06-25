@@ -3,14 +3,14 @@
 `openobserve-cli` is a Go + [Cobra](https://github.com/spf13/cobra) CLI for
 OpenObserve (O2), built to the agent-facing conventions it shares with its
 sibling projects (`confluence-cli`, `bitbucket-cli`). This document describes the
-architecture and the `internal/` package layout.
+architecture and the `internal/` and `pkg/` package layout.
 
 ## Overview
 
 A command flows through four layers:
 
 ```
-cmd/openobserve-cli  →  internal/app  →  internal/apiclient  →  internal/transport
+cmd/openobserve-cli  →  internal/app  →  pkg/apiclient  →  pkg/transport
    (process entry)       (cobra tree,      (OpenObserve API       (retrying HTTP,
                           appState,         surface + models)       auth decorator)
                           rendering)
@@ -19,8 +19,8 @@ cmd/openobserve-cli  →  internal/app  →  internal/apiclient  →  internal/t
 - `cmd/openobserve-cli/main.go` is a three-line entry point: `os.Exit(app.Execute())`.
 - `internal/app` builds the cobra command tree, resolves configuration and
   credentials, calls the API client, and renders the result.
-- `internal/apiclient` is the typed OpenObserve API surface.
-- `internal/transport` is a flavor-agnostic retrying HTTP client.
+- `pkg/apiclient` is the typed OpenObserve API surface.
+- `pkg/transport` is a flavor-agnostic retrying HTTP client.
 
 Cross-cutting packages — `errors`, `output`, `config`, `auth`, `timeutil`,
 `cliflags`, `constants` — are used across the layers.
@@ -53,7 +53,7 @@ query; it also hosts `search tail` (poll-and-stream) and `--all` paging.
 lists traces and reassembles a trace's spans into a parent/child waterfall.
 `notify.go` emits the post-run update notice (`internal/update`).
 
-## API client (`internal/apiclient`)
+## API client (`pkg/apiclient`)
 
 `Client` is an interface (`client.go`); `apiClient` is the single
 implementation. Methods are org-scoped (`/api/{org}/…`); `models.go` defines the
@@ -74,14 +74,14 @@ The search request carries `start_time`/`end_time` as **microseconds**; this is
 the single most error-prone part of the API, so `timeutil` owns the conversion
 and the CLI never asks an agent to compute epochs.
 
-## Transport (`internal/transport`)
+## Transport (`pkg/transport`)
 
 A thin `Client` that applies request decorators (auth, user-agent) and retries
 transient failures. Retries are limited to idempotent methods (GET/HEAD); a
 `Retry-After` header on 429/503 takes precedence over linear backoff. `Doer` is
 an interface so tests inject fakes.
 
-## Error model (`internal/errors`)
+## Error model (`pkg/errors`)
 
 Every failure is a `*CLIError` with `Category`, a stable `Code`, `Message`,
 `Hint`, `NextSteps`, `Retryable` and `HTTPStatus`. The category drives two
@@ -116,7 +116,7 @@ secret from the keychain when not supplied via flags/env. The `Store` prefers th
 OS keychain (`go-keyring`) and falls back to a `0600` JSON file. A credential
 becomes a `transport.Decorator` that authenticates every request.
 
-## Time (`internal/timeutil`)
+## Time (`pkg/timeutil`)
 
 `Range.Resolve` turns `--since` / `--from` / `--to` into start/end microsecond
 timestamps, accepting durations (`15m`, `1h`, `7d`), `now±duration`, RFC3339,

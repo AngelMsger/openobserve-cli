@@ -10,7 +10,7 @@ repository. It is intentionally short.
    every change must follow.
 2. Then read, only as the task needs them, the docs under [`docs/`](docs/):
    [`technical-design.md`](docs/technical-design.md) (architecture and the
-   `internal/` packages — read before changing core behavior),
+   `internal/` and `pkg/` packages — read before changing core behavior),
    [`installation.md`](docs/installation.md) (install / setup / distribution UX),
    [`read-only-mode.md`](docs/read-only-mode.md) (the write-safety posture), and
    [`releasing.md`](docs/releasing.md) (versioning, tagging, the release/CI
@@ -27,11 +27,11 @@ mirrors the architecture of the sibling `confluence-cli` / `bitbucket-cli`.
 - `cmd/openobserve-cli` — entry point; `cmd/gen-docs` — CLI reference generator.
 - `internal/app` — one file per noun (org, stream, search, auth, config, doctor,
   skill); `root.go` assembles the tree; `context.go` holds the shared `appState`.
-- `internal/apiclient` — the OpenObserve HTTP surface and models.
-- `internal/errors` — the `CLIError` model + exit-code map (0–11).
+- `pkg/apiclient` — the OpenObserve HTTP surface and models.
+- `pkg/errors` — the `CLIError` model + exit-code map (0–11).
 - `internal/output` — JSON / table / ndjson rendering, `{items,next,has_more}`.
 - `internal/config`, `internal/auth` — layered config + keychain credentials.
-- `internal/timeutil` — human time ranges → microsecond epochs (the search API).
+- `pkg/timeutil` — human time ranges → microsecond epochs (the search API).
 - `skills/openobserve` — the companion Skill, embedded into the binary.
 
 ## Ground rules
