@@ -1,73 +1,25 @@
-// Package auth models OpenObserve credentials, resolves them from configuration
-// or secure storage, and applies them to outgoing HTTP requests.
+// Package auth resolves OpenObserve credentials from configuration or secure
+// storage. The pure credential model (header construction, validation, account
+// keying) lives in the public pkg/auth; this package keeps the
+// config/keychain-coupled resolution and re-exports the moved symbols so
+// existing callers keep working unchanged.
 package auth
 
 import (
-	"net/url"
-	"strings"
-
-	cerrors "github.com/angelmsger/openobserve-cli/pkg/errors"
+	pkgauth "github.com/angelmsger/openobserve-cli/pkg/auth"
 )
 
-// Scheme identifies an authentication scheme.
+// Credential is re-exported from pkg/auth. Its methods (Header, Decorator,
+// Validate, Redacted) come with the aliased type.
+type Credential = pkgauth.Credential
+
+// Auth scheme identifiers, re-exported from pkg/auth.
 const (
-	// SchemeBasic is HTTP Basic auth: email (username) + password.
-	SchemeBasic = "basic"
-	// SchemeToken is a pre-generated credential sent verbatim in the
-	// Authorization header (the base64 portion of a Basic token, or a full
-	// "Basic …" / "Bearer …" value).
-	SchemeToken = "token"
+	SchemeBasic = pkgauth.SchemeBasic
+	SchemeToken = pkgauth.SchemeToken
 )
 
-// Credential is a fully resolved credential ready to authenticate requests.
-type Credential struct {
-	Scheme   string
-	Username string // basic only (the account email)
-	Secret   string // password (basic) or token value (token)
-}
-
-// Validate reports whether the credential is internally consistent.
-func (c Credential) Validate() error {
-	switch c.Scheme {
-	case SchemeToken:
-		if c.Secret == "" {
-			return cerrors.New(cerrors.CategoryConfig, "AUTH_NO_TOKEN",
-				"no token configured")
-		}
-	case SchemeBasic:
-		if c.Username == "" || c.Secret == "" {
-			return cerrors.New(cerrors.CategoryConfig, "AUTH_NO_BASIC",
-				"basic auth requires both an email and a password")
-		}
-	default:
-		return cerrors.Newf(cerrors.CategoryConfig, "AUTH_BAD_SCHEME",
-			"unknown auth scheme %q (want basic or token)", c.Scheme)
-	}
-	return nil
-}
-
-// Redacted returns a copy safe for logging: the secret is masked.
-func (c Credential) Redacted() Credential {
-	c.Secret = maskSecret(c.Secret)
-	return c
-}
-
-func maskSecret(s string) string {
-	if s == "" {
-		return ""
-	}
-	if len(s) <= 4 {
-		return "****"
-	}
-	return strings.Repeat("*", len(s)-4) + s[len(s)-4:]
-}
-
-// AccountKey derives the keychain account identifier for a base URL and scheme.
-// It is stable across runs so credentials can be located later.
+// AccountKey is re-exported from pkg/auth.
 func AccountKey(baseURL, scheme string) string {
-	host := baseURL
-	if u, err := url.Parse(baseURL); err == nil && u.Host != "" {
-		host = u.Host
-	}
-	return host + ":" + scheme
+	return pkgauth.AccountKey(baseURL, scheme)
 }
