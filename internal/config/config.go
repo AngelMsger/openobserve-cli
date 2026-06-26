@@ -28,14 +28,8 @@ const (
 // DefaultContextName is the name given to an unnamed context.
 const DefaultContextName = "default"
 
-// NamedContext is one named OpenObserve server profile inside the config file.
-// Runtime defaults are shared across contexts and live in File.Defaults.
-type NamedContext struct {
-	Name    string
-	BaseURL string
-	Org     string
-	Auth    AuthConfig
-}
+// NamedContext, AuthConfig, and Defaults are defined (and re-exported) via
+// type aliases in file.go from pkg/config.
 
 // Config holds the resolved, non-secret configuration.
 type Config struct {
@@ -43,23 +37,6 @@ type Config struct {
 	Org      string     `yaml:"org"`
 	Auth     AuthConfig `yaml:"auth"`
 	Defaults Defaults   `yaml:"defaults"`
-}
-
-// AuthConfig holds non-secret auth settings.
-type AuthConfig struct {
-	Scheme   string `yaml:"scheme"`
-	Username string `yaml:"username,omitempty"`
-}
-
-// Defaults holds tunable runtime defaults.
-type Defaults struct {
-	Format     string        `yaml:"format"`
-	Timeout    time.Duration `yaml:"timeout"`
-	MaxRetries int           `yaml:"max_retries"`
-	// ReadOnly blocks every mutating client method. Settable from the config
-	// file, from OPENOBSERVE_CLI_READ_ONLY, or temporarily overridden via
-	// --allow-writes.
-	ReadOnly bool `yaml:"read_only,omitempty"`
 }
 
 // Secrets holds credentials observed in non-file layers. Empty fields mean the

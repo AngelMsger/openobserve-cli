@@ -9,6 +9,13 @@ import (
 	cerrors "github.com/angelmsger/openobserve-cli/pkg/errors"
 )
 
+// put inserts val into m at key only when val is non-empty.
+func put(m map[string]string, key, val string) {
+	if val != "" {
+		m[key] = val
+	}
+}
+
 // FlagValues carries the global CLI flags that override configuration. Empty
 // fields are ignored (not treated as overrides).
 type FlagValues struct {
