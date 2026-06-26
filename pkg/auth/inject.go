@@ -13,7 +13,7 @@ import (
 // OpenObserve authenticates API requests with HTTP Basic auth. For the basic
 // scheme we encode email:password; for the token scheme the user supplies a
 // pre-generated credential — either the already-base64-encoded basic token, or
-// a full "Basic …" / "Bearer …" header value, which we pass through verbatim.
+// a full "Basic ..." / "Bearer ..." header value, which we pass through verbatim.
 func (c Credential) Header() string {
 	switch c.Scheme {
 	case SchemeBasic:

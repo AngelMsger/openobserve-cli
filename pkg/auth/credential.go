@@ -16,7 +16,7 @@ const (
 	SchemeBasic = "basic"
 	// SchemeToken is a pre-generated credential sent verbatim in the
 	// Authorization header (the base64 portion of a Basic token, or a full
-	// "Basic …" / "Bearer …" value).
+	// "Basic ..." / "Bearer ..." value).
 	SchemeToken = "token"
 )
 
