@@ -33,12 +33,14 @@ internal/app          one file per noun (org, stream, search, auth, config,
 pkg/apiclient         the OpenObserve HTTP surface and models
 pkg/transport         retrying HTTP client with request decorators
 pkg/errors            the CLIError model and exit-code map (0–11)
-internal/output       JSON / table / ndjson rendering, {items,next,has_more}
-internal/config       layered configuration + named contexts
-internal/auth         credential model + OS keychain storage
-pkg/timeutil          human time ranges → microsecond epochs
-internal/cliflags     argv normalization (LLM slip correction)
+pkg/auth              credential model: header construction, validation, keying
+pkg/config            on-disk YAML config model (named contexts) + file IO
 pkg/constants         app name, defaults, build-time version vars
+internal/output       JSON / table / ndjson rendering, {items,next,has_more}
+internal/config       layered loader (flags/env/file) over pkg/config
+internal/auth         credential resolution + OS keychain over pkg/auth
+internal/timeutil     human time ranges → microsecond epochs
+internal/cliflags     argv normalization (LLM slip correction)
 skills/openobserve    the companion Skill, embedded into the binary
 ```
 

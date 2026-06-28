@@ -255,6 +255,18 @@ if err != nil { /* see error handling below */ }
 streams, err := client.ListStreams(ctx, "default", "logs", true) // include schema
 ```
 
+The example hand-rolls the decorator to keep dependencies minimal, but two more
+packages save you the work when you want the CLI's own behavior:
+
+- **`pkg/auth`** — the `Credential` model. It builds the same `Authorization`
+  header (basic and token schemes, including pre-encoded / `Bearer` pass-through),
+  validates itself, and exposes `Credential.Decorator()` to drop straight into
+  `BuildParams.AuthDecorator`.
+- **`pkg/config`** — the on-disk config-file model (named contexts +
+  `current_context` + shared defaults, with file IO). Import it to read or write
+  the *same* `config.yaml` the CLI uses, so a GUI and the CLI share one config.
+  Secrets are never stored there; they live in the OS keychain.
+
 Errors are `*errors.CLIError` with a stable `Category` and `Code`, so callers branch
 on failure kinds instead of parsing strings:
 

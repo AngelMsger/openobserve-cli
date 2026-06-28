@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **The credential and config-file models are now importable too.** Following
+  the API-client move in 0.3.0, the pure credential model moved to `pkg/auth`
+  (`Credential`, header construction, validation, account keying, and the
+  `transport.Decorator` it becomes) and the on-disk YAML config-file model moved
+  to `pkg/config` (the file schema with named contexts, file IO, and context
+  helpers). An external consumer — e.g. the o3 desktop GUI — can now build
+  authenticated requests and read/write the same config file without
+  reimplementing either. The CLI-only layered loader (flags/env/file) and the
+  keychain/secret resolution stay in `internal/config` and `internal/auth`,
+  which re-export the moved symbols so all existing call sites compile unchanged.
+  No CLI behavior change — a package-path move plus documentation.
+
 ## [0.3.0] - 2026-06-25
 
 ### Added

@@ -98,25 +98,32 @@ results to dot-path keys before rendering (filtering happens before it reaches a
 agent's context). `--pretty` enables ANSI-colored JSON on a TTY (and is silently
 downgraded to plain JSON off a TTY, so `--pretty | jq` still works).
 
-## Configuration (`internal/config`)
+## Configuration (`pkg/config` + `internal/config`)
 
-Layered resolution, highest precedence first: **flags → env (`OPENOBSERVE_*`) →
-`.env` → YAML config file → built-in defaults**. Each field's provenance is
+The on-disk YAML model — the file schema (named contexts + `current_context` +
+shared defaults), file IO, and context helpers — lives in the public
+**`pkg/config`** so external consumers (e.g. the o3 desktop GUI) read and write
+the same file. The CLI-only **layered loader** stays in `internal/config`:
+resolution runs highest precedence first — **flags → env (`OPENOBSERVE_*`) →
+`.env` → YAML config file → built-in defaults** — and each field's provenance is
 tracked so `config show` can report where a value came from. Secrets
-(passwords, tokens) are never written to the YAML file. The file supports
-multiple kubectl-style named **contexts** with a `current_context`; `--use-context`
-and `OPENOBSERVE_CONTEXT` override per invocation.
+(passwords, tokens) are never written to the YAML file. Contexts are
+kubectl-style; `--use-context` and `OPENOBSERVE_CONTEXT` override per invocation.
 
-## Auth (`internal/auth`)
+## Auth (`pkg/auth` + `internal/auth`)
 
-Two schemes: `basic` (email + password → `Authorization: Basic base64(email:pw)`)
-and `token` (a pre-generated credential sent verbatim, or wrapped as `Basic`).
-`Resolve` produces a validated `Credential` from config + secrets, loading the
-secret from the keychain when not supplied via flags/env. The `Store` prefers the
-OS keychain (`go-keyring`) and falls back to a `0600` JSON file. A credential
-becomes a `transport.Decorator` that authenticates every request.
+The pure, dependency-light credential model lives in the public **`pkg/auth`**:
+`Credential` with header construction, validation, account keying, and the
+`transport.Decorator` it becomes. Two schemes: `basic` (email + password →
+`Authorization: Basic base64(email:pw)`) and `token` (a pre-generated credential
+sent verbatim, or wrapped as `Basic`). The config/keychain-coupled resolution
+stays in `internal/auth`: `Resolve` produces a validated `Credential` from
+config + secrets, loading the secret from the keychain when not supplied via
+flags/env; the `Store` prefers the OS keychain (`go-keyring`) and falls back to a
+`0600` JSON file. `internal/auth` re-exports the moved symbols so existing
+callers compile unchanged.
 
-## Time (`pkg/timeutil`)
+## Time (`internal/timeutil`)
 
 `Range.Resolve` turns `--since` / `--from` / `--to` into start/end microsecond
 timestamps, accepting durations (`15m`, `1h`, `7d`), `now±duration`, RFC3339,

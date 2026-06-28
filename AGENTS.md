@@ -29,10 +29,30 @@ mirrors the architecture of the sibling `confluence-cli` / `bitbucket-cli`.
   skill); `root.go` assembles the tree; `context.go` holds the shared `appState`.
 - `pkg/apiclient` — the OpenObserve HTTP surface and models.
 - `pkg/errors` — the `CLIError` model + exit-code map (0–11).
+- `pkg/auth`, `pkg/config` — the public credential model and on-disk YAML
+  config model, shared with external consumers (see the rule below).
 - `internal/output` — JSON / table / ndjson rendering, `{items,next,has_more}`.
-- `internal/config`, `internal/auth` — layered config + keychain credentials.
-- `pkg/timeutil` — human time ranges → microsecond epochs (the search API).
+- `internal/config`, `internal/auth` — CLI-only layered loader + keychain
+  resolution, built over `pkg/config` / `pkg/auth` (which they re-export).
+- `internal/timeutil` — human time ranges → microsecond epochs (the search API).
 - `skills/openobserve` — the companion Skill, embedded into the binary.
+
+## `pkg/` is a public library — the family reference for GUI reuse
+
+Everything under `pkg/` is an importable Go library with a **stable exported
+contract**, not just CLI internals. The o3 desktop (OpenObserve desktop) imports
+it directly, so `openobserve-cli` is the family's reference for how a sibling CLI
+(`bitbucket-cli` / `confluence-cli` / `jenkins-cli`) exposes itself to a GUI:
+
+- `pkg/apiclient` (the `Client` interface, `Build` factory, normalized models),
+  `pkg/transport`, `pkg/errors`, `pkg/constants` mirror the siblings exactly.
+- `pkg/auth` (credential model → `transport.Decorator`) and `pkg/config` (the
+  config-file model + IO) are **additions** the GUI needs. They hold the pure,
+  dependency-light core; the CLI-only loader/keychain wiring stays in `internal/`
+  and re-exports the moved symbols so call sites never change. When a sibling
+  grows a GUI, replicate this split here — do not invent a different shape.
+- Extend the `pkg/` surface **additively**; keep existing shapes and behavior
+  stable. Read the package doc comment (`go doc ./pkg/<name>`) before changing it.
 
 ## Ground rules
 
