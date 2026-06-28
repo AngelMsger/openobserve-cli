@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **An unknown subcommand of a command group no longer looks like success.** A
+  typo such as `config use-contexts` (for `config use-context`) printed the group
+  help to stdout and exited `0`, so an agent or script read it as a successful
+  no-op. Cobra flags unknown commands only at the root; a nested non-runnable
+  group instead falls through to help-and-exit-0. Every group (`config`, `org`,
+  `search`, `metrics`, `trace`, `auth`, `stream`, `skill`) now returns a
+  structured `UNKNOWN_COMMAND` usage error on stderr with exit code 2 and a
+  "Did you mean" suggestion; a bare group invocation still prints help.
+
 ### Changed
 
 - **The credential and config-file models are now importable too.** Following
