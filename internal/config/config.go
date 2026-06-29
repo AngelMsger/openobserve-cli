@@ -28,6 +28,18 @@ const (
 // DefaultContextName is the name given to an unnamed context.
 const DefaultContextName = "default"
 
+// Context selection sources, reported on Resolved.ContextSource. The first two
+// are explicit (the caller named a context for this invocation); the rest are
+// implicit (the CLI fell back to a stored or sole context).
+const (
+	ContextSourceFlag    = "flag"            // --use-context
+	ContextSourceEnv     = "env"             // OPENOBSERVE_CONTEXT
+	ContextSourceCurrent = "current_context" // the file's current_context
+	ContextSourceSingle  = "single"          // the sole defined context
+	ContextSourceDefault = "default-name"    // a context literally named "default"
+	ContextSourceNone    = "none"            // nothing selected (no/empty config)
+)
+
 // NamedContext, AuthConfig, and Defaults are defined (and re-exported) via
 // type aliases in file.go from pkg/config.
 
@@ -57,8 +69,21 @@ type Resolved struct {
 	// ActiveContext is the name of the context whose fields were applied.
 	// Empty when no config file (or no contexts) exists — pure-env usage.
 	ActiveContext string
+	// ContextSource records which precedence rule chose ActiveContext (one of
+	// the ContextSource* constants), so callers can tell an explicit choice
+	// (flag/env) from an implicit fallback (current_context, sole, default).
+	ContextSource string
 	// ContextNames lists every context defined in the file, in file order.
 	ContextNames []string
+}
+
+// ContextSelectedExplicitly reports whether the active context was chosen for
+// this invocation (via --use-context or OPENOBSERVE_CONTEXT) rather than fallen
+// back to from the file's current_context, the sole context, or a "default"
+// context. It is the signal used to decide whether to nudge an agent that may
+// not realise which of several contexts it is hitting.
+func (r *Resolved) ContextSelectedExplicitly() bool {
+	return r.ContextSource == ContextSourceFlag || r.ContextSource == ContextSourceEnv
 }
 
 // Field keys used for layer maps and provenance tracking.

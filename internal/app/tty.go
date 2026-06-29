@@ -12,3 +12,9 @@ import (
 func stdinIsTTY() bool {
 	return term.IsTerminal(int(os.Stdin.Fd()))
 }
+
+// stderrIsTTY reports whether standard error is an interactive terminal. Used to
+// keep agent-only nudges (skill / multi-context hints) off a human's screen.
+func stderrIsTTY() bool {
+	return term.IsTerminal(int(os.Stderr.Fd()))
+}
