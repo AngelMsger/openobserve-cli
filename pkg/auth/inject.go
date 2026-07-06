@@ -36,7 +36,23 @@ func hasAuthPrefix(s string) bool {
 }
 
 // Decorator returns a transport.Decorator that authenticates every request.
+//
+// The basic and token schemes set an Authorization header. The session scheme
+// replays a browser-captured session: it sets the Cookie header (the primary
+// authenticator) and, when the envelope carries one, an Authorization fallback
+// for instances whose REST API expects the header the web SPA sends.
 func (c Credential) Decorator() transport.Decorator {
+	if c.Scheme == SchemeSession {
+		s := DecodeSession(c.Secret)
+		return func(req *http.Request) {
+			if s.Cookies != "" {
+				req.Header.Set("Cookie", s.Cookies)
+			}
+			if s.Authorization != "" {
+				req.Header.Set("Authorization", s.Authorization)
+			}
+		}
+	}
 	header := c.Header()
 	return func(req *http.Request) {
 		if header != "" {

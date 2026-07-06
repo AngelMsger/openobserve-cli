@@ -57,6 +57,8 @@ func TestValidate(t *testing.T) {
 		{"basic missing secret", Credential{Scheme: SchemeBasic, Username: "u"}, true},
 		{"token ok", Credential{Scheme: SchemeToken, Secret: "t"}, false},
 		{"token missing secret", Credential{Scheme: SchemeToken}, true},
+		{"session ok", Credential{Scheme: SchemeSession, Secret: "sid=abc"}, false},
+		{"session missing secret", Credential{Scheme: SchemeSession}, true},
 		{"unknown scheme", Credential{Scheme: "x", Secret: "t"}, true},
 	}
 	for _, tt := range tests {
@@ -76,6 +78,37 @@ func TestDecoratorSetsAuthorization(t *testing.T) {
 	if got := req.Header.Get("Authorization"); got != "Bearer tok" {
 		t.Fatalf("Authorization = %q, want %q", got, "Bearer tok")
 	}
+}
+
+func TestDecoratorSetsCookie(t *testing.T) {
+	// Bare cookie string: only the Cookie header is set.
+	t.Run("cookies only", func(t *testing.T) {
+		cred := Credential{Scheme: SchemeSession, Secret: "sid=abc; auth_ext=xyz"}
+		req, _ := http.NewRequest(http.MethodGet, "http://x", nil)
+		cred.Decorator()(req)
+		if got := req.Header.Get("Cookie"); got != "sid=abc; auth_ext=xyz" {
+			t.Fatalf("Cookie = %q, want %q", got, "sid=abc; auth_ext=xyz")
+		}
+		if got := req.Header.Get("Authorization"); got != "" {
+			t.Fatalf("Authorization = %q, want empty", got)
+		}
+	})
+	// JSON envelope carrying an Authorization fallback: both headers are set.
+	t.Run("envelope with authorization fallback", func(t *testing.T) {
+		blob, err := EncodeSession(Session{Cookies: "sid=abc", Authorization: "Bearer tok"})
+		if err != nil {
+			t.Fatalf("EncodeSession: %v", err)
+		}
+		cred := Credential{Scheme: SchemeSession, Secret: blob}
+		req, _ := http.NewRequest(http.MethodGet, "http://x", nil)
+		cred.Decorator()(req)
+		if got := req.Header.Get("Cookie"); got != "sid=abc" {
+			t.Fatalf("Cookie = %q, want %q", got, "sid=abc")
+		}
+		if got := req.Header.Get("Authorization"); got != "Bearer tok" {
+			t.Fatalf("Authorization = %q, want %q", got, "Bearer tok")
+		}
+	})
 }
 
 func TestAccountKey(t *testing.T) {

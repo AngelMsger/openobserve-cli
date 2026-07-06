@@ -18,6 +18,11 @@ const (
 	// Authorization header (the base64 portion of a Basic token, or a full
 	// "Basic ..." / "Bearer ..." value).
 	SchemeToken = "token"
+	// SchemeSession is a browser-captured session: the Secret is a session
+	// envelope (see session.go) carrying the instance cookies replayed on every
+	// request, plus an optional Authorization fallback. Established via o3's
+	// browser sign-in; no service account required.
+	SchemeSession = "session"
 )
 
 // Credential is a fully resolved credential ready to authenticate requests.
@@ -40,9 +45,14 @@ func (c Credential) Validate() error {
 			return cerrors.New(cerrors.CategoryConfig, "AUTH_NO_BASIC",
 				"basic auth requires both an email and a password")
 		}
+	case SchemeSession:
+		if c.Secret == "" {
+			return cerrors.New(cerrors.CategoryConfig, "AUTH_NO_SESSION",
+				"no captured session; sign in through the browser first")
+		}
 	default:
 		return cerrors.Newf(cerrors.CategoryConfig, "AUTH_BAD_SCHEME",
-			"unknown auth scheme %q (want basic or token)", c.Scheme)
+			"unknown auth scheme %q (want basic, token or session)", c.Scheme)
 	}
 	return nil
 }
