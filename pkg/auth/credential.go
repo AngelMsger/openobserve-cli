@@ -29,7 +29,7 @@ const (
 type Credential struct {
 	Scheme   string
 	Username string // basic only (the account email)
-	Secret   string // password (basic) or token value (token)
+	Secret   string // password (basic), token value (token), or session envelope/cookies (session)
 }
 
 // Validate reports whether the credential is internally consistent.
@@ -46,9 +46,9 @@ func (c Credential) Validate() error {
 				"basic auth requires both an email and a password")
 		}
 	case SchemeSession:
-		if c.Secret == "" {
-			return cerrors.New(cerrors.CategoryConfig, "AUTH_NO_SESSION",
-				"no captured session; sign in through the browser first")
+		if _, err := ParseSession(c.Secret); err != nil {
+			return cerrors.Wrap(err, cerrors.CategoryConfig, "AUTH_BAD_SESSION",
+				"captured browser session is invalid; sign in through the browser again")
 		}
 	default:
 		return cerrors.Newf(cerrors.CategoryConfig, "AUTH_BAD_SCHEME",

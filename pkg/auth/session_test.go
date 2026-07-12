@@ -36,9 +36,20 @@ func TestDecodeSessionBareCookieString(t *testing.T) {
 }
 
 func TestDecodeSessionMalformedEnvelope(t *testing.T) {
-	// A leading '{' that fails to parse falls back to raw-cookie handling.
+	// A malformed envelope must never be replayed as a Cookie header.
 	got := DecodeSession("{not json")
-	if got.Cookies != "{not json" {
-		t.Fatalf("Cookies = %q, want raw fallback", got.Cookies)
+	if got != (Session{}) {
+		t.Fatalf("DecodeSession() = %+v, want empty session", got)
+	}
+	if _, err := ParseSession("{not json"); err == nil {
+		t.Fatal("ParseSession() error = nil, want malformed envelope error")
+	}
+}
+
+func TestParseSessionRequiresCookies(t *testing.T) {
+	for _, secret := range []string{"", "{}", `{"authorization":"Bearer tok"}`} {
+		if _, err := ParseSession(secret); err == nil {
+			t.Fatalf("ParseSession(%q) error = nil, want missing-cookie error", secret)
+		}
 	}
 }

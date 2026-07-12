@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/angelmsger/openobserve-cli/internal/config"
+	cerrors "github.com/angelmsger/openobserve-cli/pkg/errors"
 	"github.com/spf13/cobra"
 )
 
@@ -65,4 +66,42 @@ func TestResolveInitTarget_ExplicitContextSkipsPrompt(t *testing.T) {
 			t.Fatalf("expected prefill from the stored context, got %+v", prefill)
 		}
 	})
+}
+
+func TestBrowserManagedSessionError(t *testing.T) {
+	err := browserManagedSessionError("prod")
+	ce := cerrors.AsCLIError(err)
+	if ce.Code != "SESSION_BROWSER_MANAGED" {
+		t.Fatalf("code = %q, want SESSION_BROWSER_MANAGED", ce.Code)
+	}
+	if len(ce.NextSteps) == 0 {
+		t.Fatal("expected actionable next steps")
+	}
+}
+
+func TestConfigInitRejectsBrowserManagedSessionBeforePrompting(t *testing.T) {
+	dir := t.TempDir()
+	file := config.File{
+		CurrentContext: "prod",
+		Contexts: []config.NamedContext{{
+			Name:    "prod",
+			BaseURL: "https://o2.example.com",
+			Org:     "default",
+			Auth:    config.AuthConfig{Scheme: "session"},
+		}},
+	}
+	if err := config.WriteFile(dir, file); err != nil {
+		t.Fatal(err)
+	}
+
+	cmd := NewRootCmd()
+	cmd.SetArgs([]string{"--config", dir, "config", "init", "--context", "prod"})
+	err := cmd.Execute()
+	if err == nil {
+		t.Fatal("config init error = nil, want browser-managed session error")
+	}
+	ce := cerrors.AsCLIError(err)
+	if ce.Code != "SESSION_BROWSER_MANAGED" {
+		t.Fatalf("code = %q, want SESSION_BROWSER_MANAGED", ce.Code)
+	}
 }

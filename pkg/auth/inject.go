@@ -43,8 +43,11 @@ func hasAuthPrefix(s string) bool {
 // for instances whose REST API expects the header the web SPA sends.
 func (c Credential) Decorator() transport.Decorator {
 	if c.Scheme == SchemeSession {
-		s := DecodeSession(c.Secret)
+		s, err := ParseSession(c.Secret)
 		return func(req *http.Request) {
+			if err != nil {
+				return
+			}
 			if s.Cookies != "" {
 				req.Header.Set("Cookie", s.Cookies)
 			}

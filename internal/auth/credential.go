@@ -15,8 +15,9 @@ type Credential = pkgauth.Credential
 
 // Auth scheme identifiers, re-exported from pkg/auth.
 const (
-	SchemeBasic = pkgauth.SchemeBasic
-	SchemeToken = pkgauth.SchemeToken
+	SchemeBasic   = pkgauth.SchemeBasic
+	SchemeToken   = pkgauth.SchemeToken
+	SchemeSession = pkgauth.SchemeSession
 )
 
 // AccountKey is re-exported from pkg/auth.

@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **The public auth package now supports browser-captured sessions shared with
+  o3.** A `session` credential replays captured cookies and an optional
+  Authorization fallback, allowing the CLI and desktop GUI to use the same
+  context and keychain entry without requiring a service account.
+
+### Fixed
+
+- **Invalid captured sessions can no longer pass validation and produce an
+  anonymous request.** Empty, malformed, cookie-less, and header-injection
+  session values now fail with `AUTH_BAD_SESSION`; request decoration also fails
+  closed if validation was skipped by a library caller.
+- **CLI credential flows now explain that browser sessions are managed by o3.**
+  Editing such a context with `config init` or running `auth login` returns the
+  actionable `SESSION_BROWSER_MANAGED` error instead of falling through to the
+  basic/token wizard and failing with `BAD_SCHEME`.
+
 ## [0.5.0] - 2026-06-29
 
 ### Added
@@ -184,7 +202,8 @@ Initial release — a read-only, agent-facing CLI for OpenObserve (O2).
   release binaries and `make install`. A generated CLI reference
   (`docs/cli/`) and a GitHub Pages landing page.
 
-[Unreleased]: https://github.com/AngelMsger/openobserve-cli/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/AngelMsger/openobserve-cli/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/AngelMsger/openobserve-cli/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/AngelMsger/openobserve-cli/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/AngelMsger/openobserve-cli/compare/v0.2.4...v0.3.0
 [0.2.4]: https://github.com/AngelMsger/openobserve-cli/compare/v0.2.3...v0.2.4

@@ -3,6 +3,7 @@
 `openobserve-cli` talks to either a self-hosted OpenObserve (default
 `http://localhost:5080`) or OpenObserve Cloud (`https://api.openobserve.ai`).
 Authentication is HTTP Basic — email + password — or a pre-generated token.
+Contexts created by the o3 desktop can instead carry a browser-captured session.
 
 ## Interactive setup (humans, on a terminal)
 
@@ -44,14 +45,26 @@ export OPENOBSERVE_TOKEN='cm9vdEBleGFtcGxlLmNvbTpDb21wbGV4cGFzcw=='
 `OPENOBSERVE_TOKEN` is the base64 portion of a Basic credential; a full
 `Basic …` / `Bearer …` value is also accepted and passed through verbatim.
 
+## Browser-captured sessions (o3 desktop)
+
+The o3 desktop can sign in through an instance's own browser login page and
+store a `session` context in the same config and keychain used by this CLI. The
+CLI can use that context normally, including `auth status`, `doctor`, and all
+read commands. Select it with `--use-context <name>` or `config use-context`.
+
+Browser sessions cannot be created or refreshed by `config init` or `auth
+login`; sign in through o3 again when one expires or needs to change. A malformed
+or cookie-less captured session is rejected as `AUTH_BAD_SESSION` instead of
+being sent as an unauthenticated request.
+
 ## SSO / OAuth (dex, Authentik, Okta, Azure…): use a Service Account
 
-When OpenObserve logs users in through an external identity provider (dex,
-Authentik, Okta, Azure AD, …), those users have **no local password**, so they
-cannot authenticate the CLI directly — every OpenObserve API call, including this
-CLI's, uses HTTP Basic auth, not the browser OAuth flow. The supported path for
-programmatic / CLI / agent access alongside SSO is a **Service Account**: a
-non-human account that holds a long-lived token and cannot log into the UI.
+For headless and long-running access, users authenticated through an external
+identity provider (dex, Authentik, Okta, Azure AD, …) have **no local password**,
+and a captured browser session is not a durable agent credential. The supported
+path for programmatic / CLI / agent access alongside SSO is a **Service
+Account**: a non-human account that holds a long-lived token and cannot log into
+the UI.
 
 1. In OpenObserve, an admin goes to **IAM → Service Accounts → Add Service
    Account**, enters an email + name, and saves. A **token** is generated (shown

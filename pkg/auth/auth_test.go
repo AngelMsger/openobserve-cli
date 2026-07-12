@@ -59,6 +59,10 @@ func TestValidate(t *testing.T) {
 		{"token missing secret", Credential{Scheme: SchemeToken}, true},
 		{"session ok", Credential{Scheme: SchemeSession, Secret: "sid=abc"}, false},
 		{"session missing secret", Credential{Scheme: SchemeSession}, true},
+		{"session empty envelope", Credential{Scheme: SchemeSession, Secret: "{}"}, true},
+		{"session metadata only", Credential{Scheme: SchemeSession, Secret: `{"email":"ops@example.com"}`}, true},
+		{"session malformed envelope", Credential{Scheme: SchemeSession, Secret: "{not json"}, true},
+		{"session header injection", Credential{Scheme: SchemeSession, Secret: "sid=abc\r\nX-Bad: yes"}, true},
 		{"unknown scheme", Credential{Scheme: "x", Secret: "t"}, true},
 	}
 	for _, tt := range tests {
@@ -107,6 +111,17 @@ func TestDecoratorSetsCookie(t *testing.T) {
 		}
 		if got := req.Header.Get("Authorization"); got != "Bearer tok" {
 			t.Fatalf("Authorization = %q, want %q", got, "Bearer tok")
+		}
+	})
+	t.Run("invalid session sets no headers", func(t *testing.T) {
+		cred := Credential{Scheme: SchemeSession, Secret: "{}"}
+		req, _ := http.NewRequest(http.MethodGet, "http://x", nil)
+		cred.Decorator()(req)
+		if got := req.Header.Get("Cookie"); got != "" {
+			t.Fatalf("Cookie = %q, want empty", got)
+		}
+		if got := req.Header.Get("Authorization"); got != "" {
+			t.Fatalf("Authorization = %q, want empty", got)
 		}
 	})
 }

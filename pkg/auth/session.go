@@ -2,6 +2,7 @@ package auth
 
 import (
 	"encoding/json"
+	"fmt"
 	"strings"
 	"time"
 )
@@ -29,17 +30,37 @@ func EncodeSession(s Session) (string, error) {
 	return string(b), nil
 }
 
-// DecodeSession parses a SchemeSession Secret. It accepts either the JSON
-// envelope produced by EncodeSession or a bare "k1=v1; k2=v2" cookie string (a
-// leading '{' selects JSON), so the simplest capture — cookies only — needs no
-// envelope. An unparseable envelope falls back to treating the input as cookies.
-func DecodeSession(secret string) Session {
+// ParseSession parses and validates a SchemeSession Secret. It accepts either
+// the JSON envelope produced by EncodeSession or a bare "k1=v1; k2=v2" cookie
+// string. A captured session must contain cookies; Authorization is only an
+// optional fallback for instances whose API expects the header sent by the SPA.
+func ParseSession(secret string) (Session, error) {
 	trimmed := strings.TrimSpace(secret)
-	if strings.HasPrefix(trimmed, "{") {
-		var s Session
-		if err := json.Unmarshal([]byte(trimmed), &s); err == nil {
-			return s
-		}
+	if trimmed == "" {
+		return Session{}, fmt.Errorf("session is empty")
 	}
-	return Session{Cookies: secret}
+
+	var s Session
+	if strings.HasPrefix(trimmed, "{") {
+		if err := json.Unmarshal([]byte(trimmed), &s); err != nil {
+			return Session{}, fmt.Errorf("decode session envelope: %w", err)
+		}
+	} else {
+		s.Cookies = trimmed
+	}
+
+	if strings.TrimSpace(s.Cookies) == "" {
+		return Session{}, fmt.Errorf("session has no cookies")
+	}
+	if strings.ContainsAny(s.Cookies, "\r\n") || strings.ContainsAny(s.Authorization, "\r\n") {
+		return Session{}, fmt.Errorf("session contains an invalid header value")
+	}
+	return s, nil
+}
+
+// DecodeSession parses a SchemeSession Secret. Invalid input produces an empty
+// Session; callers that need the parse error should use ParseSession.
+func DecodeSession(secret string) Session {
+	s, _ := ParseSession(secret)
+	return s
 }

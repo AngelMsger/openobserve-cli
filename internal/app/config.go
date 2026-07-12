@@ -67,6 +67,9 @@ func newConfigInitCmd(s *appState) *cobra.Command {
 			if err != nil {
 				return err
 			}
+			if prefill != nil && prefill.Auth.Scheme == auth.SchemeSession {
+				return browserManagedSessionError(target)
+			}
 
 			def := initValues{}
 			if prefill != nil {
@@ -128,6 +131,13 @@ func newConfigInitCmd(s *appState) *cobra.Command {
 	cmd.Flags().StringVar(&ctxName, "context", config.DefaultContextName,
 		"name for the context to create or update (skips the edit/add/replace prompt)")
 	return cmd
+}
+
+func browserManagedSessionError(contextName string) error {
+	return cerrors.Newf(cerrors.CategoryUsage, "SESSION_BROWSER_MANAGED",
+		"context %q uses a browser-captured session whose credentials are managed by o3", contextName).
+		WithHint("Browser sessions are managed by o3. Sign in there again to update this context.").
+		WithNextSteps("openobserve-cli auth status", "openobserve-cli config contexts")
 }
 
 // resolveInitTarget decides which context `config init` will write: the target

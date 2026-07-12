@@ -66,6 +66,8 @@ func newAuthLoginCmd(s *appState) *cobra.Command {
 					return err
 				}
 				cred.Secret = tok
+			case auth.SchemeSession:
+				return browserManagedSessionError(s.resolved.ActiveContext)
 			}
 			backend, err := verifyAndSave(s, cfg.BaseURL, s.org(), cred)
 			if err != nil {

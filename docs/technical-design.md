@@ -114,14 +114,15 @@ kubectl-style; `--use-context` and `OPENOBSERVE_CONTEXT` override per invocation
 
 The pure, dependency-light credential model lives in the public **`pkg/auth`**:
 `Credential` with header construction, validation, account keying, and the
-`transport.Decorator` it becomes. Two schemes: `basic` (email + password →
-`Authorization: Basic base64(email:pw)`) and `token` (a pre-generated credential
-sent verbatim, or wrapped as `Basic`). The config/keychain-coupled resolution
-stays in `internal/auth`: `Resolve` produces a validated `Credential` from
-config + secrets, loading the secret from the keychain when not supplied via
-flags/env; the `Store` prefers the OS keychain (`go-keyring`) and falls back to a
-`0600` JSON file. `internal/auth` re-exports the moved symbols so existing
-callers compile unchanged.
+`transport.Decorator` it becomes. Three schemes are supported: `basic` (email +
+password → `Authorization: Basic base64(email:pw)`), `token` (a pre-generated
+credential sent verbatim, or wrapped as `Basic`), and `session` (browser-captured
+cookies with an optional Authorization fallback, established and managed by
+o3). The config/keychain-coupled resolution stays in `internal/auth`: `Resolve`
+produces a validated `Credential` from config + secrets, loading the secret from
+the keychain when not supplied via flags/env; the `Store` prefers the OS keychain
+(`go-keyring`) and falls back to a `0600` JSON file. `internal/auth` re-exports
+the moved symbols so existing callers compile unchanged.
 
 ## Time (`internal/timeutil`)
 
