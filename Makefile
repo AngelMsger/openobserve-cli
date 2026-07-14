@@ -57,4 +57,4 @@ install-skill: build
 	./bin/$(BINARY) skill install --dir $(SKILL_DIR)
 
 clean:
-	rm -rf bin
+	rm -rf bin dist

@@ -22,6 +22,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   longer steer sandboxed agents toward re-running `config init`. Browser-session
   recovery keeps o3 as the only refresh path after a host retry confirms the
   session is genuinely missing.
+- Local cross-build artifacts under `dist/` are now ignored and removed by
+  `make clean`, keeping release preparation from dirtying the worktree.
 
 ## [0.6.0] - 2026-07-12
 
