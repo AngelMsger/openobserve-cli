@@ -84,11 +84,16 @@ an interface so tests inject fakes.
 ## Error model (`pkg/errors`)
 
 Every failure is a `*CLIError` with `Category`, a stable `Code`, `Message`,
-`Hint`, `NextSteps`, `Retryable` and `HTTPStatus`. The category drives two
+`Hint`, `NextSteps`, `Retryable`, `HTTPStatus` and an optional structured
+`Recovery`. The category drives two
 deterministic mappings: the **exit code** (`codes.go`, 0–11) and the **default
 guidance** (`hints.go`). `FromHTTPStatus` classifies HTTP statuses. The JSON
 `Payload` is what's written to stderr. This is the "errors as navigation"
-contract — every failure tells an agent the next command to run.
+contract — every failure tells an agent the next command to run. `Recovery`
+describes an environment change, such as retrying the same command in host
+scope; it is deliberately separate from `Retryable`, which means a retry in the
+current environment may work. `doctor` exposes the same distinction through
+per-check `status` and optional `recovery_scope`.
 
 ## Output (`internal/output`)
 
@@ -122,7 +127,11 @@ o3). The config/keychain-coupled resolution stays in `internal/auth`: `Resolve`
 produces a validated `Credential` from config + secrets, loading the secret from
 the keychain when not supplied via flags/env; the `Store` prefers the OS keychain
 (`go-keyring`) and falls back to a `0600` JSON file. `internal/auth` re-exports
-the moved symbols so existing callers compile unchanged.
+the moved symbols so existing callers compile unchanged. Store access errors are
+preserved rather than collapsed into "missing":
+`CREDENTIAL_STORE_INACCESSIBLE` and `CREDENTIAL_NOT_VISIBLE_OR_MISSING` carry a
+host-scope recovery instruction so an Agent host can retry before asking the
+user to reconfigure credentials.
 
 ## Time (`internal/timeutil`)
 

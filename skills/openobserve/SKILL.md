@@ -1,6 +1,6 @@
 ---
 name: openobserve
-version: 0.3.0
+version: 0.3.1
 description: "Query an OpenObserve (O2) backend from the command line across logs, metrics and traces: discover streams and schema, run SQL searches and histograms over logs, follow a stream live (tail -f), query metrics with PromQL (instant and range), and rebuild a trace into a span waterfall — with agent-friendly JSON and structured errors. Use this skill when the user mentions OpenObserve or O2, gives an OpenObserve URL, or asks to search / query / grep / tail logs; to query metrics or write PromQL (rate, p99, error rate); to inspect a trace, span or request latency; to find why a service is erroring, slow or crashing; to look at error rates, log volume or recent events; or to list or inspect streams or their fields. Covers self-hosted (localhost:5080) and Cloud. Set up with `openobserve-cli config init`, or OPENOBSERVE_URL / OPENOBSERVE_ORG / OPENOBSERVE_EMAIL / OPENOBSERVE_PASSWORD (or OPENOBSERVE_TOKEN) env vars. It is read-only: it cannot create dashboards, alerts, functions/pipelines or users yet."
 metadata:
   requires:
@@ -58,6 +58,16 @@ microsecond timestamp**. Don't. The CLI gives you discovery commands for each:
 - Anything fails → read the error's `next_steps`; they name the exact command to
   run next. See [errors-and-exit-codes.md](references/errors-and-exit-codes.md).
 - Nothing configured yet / auth fails → [getting-started.md](references/getting-started.md).
+
+## Configuration & credentials (agents)
+
+Assume an already-configured user wants you to reuse their host config and OS
+keychain. If an error is `CREDENTIAL_STORE_INACCESSIBLE` or
+`CREDENTIAL_NOT_VISIBLE_OR_MISSING`, or has `recovery.scope=host`, request host
+access and retry the same command once. Do not run `config init` / `auth login`
+inside the sandbox; only ask the user to configure credentials when the host
+retry also reports them missing. Browser-session contexts must be refreshed in
+o3, never through the CLI. See [getting-started.md](references/getting-started.md).
 
 ## Guardrails
 

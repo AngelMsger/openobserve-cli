@@ -17,7 +17,8 @@ Every failure is JSON on **stderr** (stdout stays clean), shaped:
 ```
 
 Read `next_steps` first — it names the command to run next. `retryable` tells you
-whether a retry could help (rate-limit / network / server) or not.
+whether a retry in the same environment could help (rate-limit / network /
+server) or not. Environment changes use the optional `recovery` object instead.
 
 ## Category → exit code
 
@@ -26,7 +27,7 @@ whether a retry could help (rate-limit / network / server) or not.
 | (success)    | 0    | — |
 | `internal`   | 1    | Unexpected bug; retry with `--verbose`. |
 | `usage`      | 2    | Bad flag/argument; check `--help`. Missing time range, bad `--order`, etc. |
-| `config`     | 3    | Not configured / no server URL → `config init` or set `OPENOBSERVE_URL`. |
+| `config`     | 3    | Config/credential resolution failed; inspect `code` and `recovery` before reconfiguring. |
 | `auth`       | 4    | Credentials rejected → `auth status`, re-run `config init`. |
 | `permission` | 5    | Authenticated but not allowed (OpenObserve RBAC) → grant the credential a role; see below. |
 | `not_found`  | 6    | Unknown org / stream → `org list`, `stream list`. |
@@ -50,6 +51,11 @@ fi
 
 ## Common cases
 
+- **`CREDENTIAL_STORE_INACCESSIBLE` / `CREDENTIAL_NOT_VISIBLE_OR_MISSING`
+  (config/3)** — when `recovery.scope` is `host`, request host access and retry
+  the same invocation once. Repeating it in the same sandbox will not help.
+  Only configure credentials when the host retry also reports them missing; for
+  a browser session, sign in through o3 rather than running `config init`.
 - **`NO_BASE_URL` (config/3)** — no server configured. Run `config init` or set
   `OPENOBSERVE_URL`.
 - **`AUTH_LOGIN_NEEDS_TTY` (auth/4)** — `auth login`/`config init` need a
