@@ -288,8 +288,7 @@ const htmlTemplate = `<!doctype html>
 <footer class="footer">
   <div class="wrap">
     <span class="brand-foot">openobserve-cli — MIT License</span>
-    <span>Developer: <a href="https://angelmsger.github.io/">AngelMsger</a></span>
-    <span><a href="` + repoURL + `">github.com/AngelMsger/openobserve-cli</a></span>
+    <span>Developer: <a href="https://angelmsger.github.io/">AngelMsger</a> · <a href="` + repoURL + `">GitHub</a></span>
   </div>
 </footer>
 </body>
