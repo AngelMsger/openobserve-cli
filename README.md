@@ -310,6 +310,7 @@ built for coding agents. Browse the full set at
 - **[bitbucket-cli](https://github.com/AngelMsger/bitbucket-cli)** — Bitbucket pull requests & code review
 - **openobserve-cli** — OpenObserve logs, metrics & traces *(this project)*
 - **[jenkins-cli](https://github.com/AngelMsger/jenkins-cli)** — inspect Jenkins jobs & builds
+- **[jira-cli](https://github.com/AngelMsger/jira-cli)** — Jira issues & workflow transitions
 
 ## License
 
