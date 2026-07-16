@@ -1,6 +1,6 @@
 {
   "name": "@angelmsger/openobserve-cli",
-  "version": "0.7.0",
+  "version": "0.8.0",
   "description": "Query OpenObserve (O2) from the command line for coding agents: SQL search and live tail over logs, PromQL over metrics, and span-tree inspection of traces, with structured JSON output.",
   "keywords": [
     "openobserve",
