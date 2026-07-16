@@ -142,8 +142,9 @@ openobserve-cli trace get <trace_id> --stream default --since 1h
 
 Settings resolve in precedence order (highest first): CLI flags → environment
 variables (`OPENOBSERVE_*`) → `.env` → `~/.angelmsger/openobserve/config.yaml` →
-defaults. Secrets are stored in the OS keychain (with a `0600` file fallback) and
-never written to the config file.
+defaults. Secrets are stored in the OS keychain. If Windows Credential Manager
+is unavailable, the fallback is encrypted with per-user DPAPI; macOS/Linux
+retain the `0600` fallback. Secrets are never written to the config file.
 
 For headless / CI / agent use, configure entirely from the environment:
 

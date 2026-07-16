@@ -15,7 +15,8 @@ openobserve-cli config init             # plain line-by-line wizard (works over 
 Prompts for the server URL, organization, auth scheme and credentials, verifies
 them against the server, then writes a context to
 `~/.angelmsger/openobserve/config.yaml` and stores the secret in the OS keychain
-(falling back to a `0600` file when no keychain is available). When a config
+(falling back to per-user DPAPI on Windows or a `0600` file on macOS/Linux).
+When a config
 already exists, re-running it lists the contexts and asks whether to **edit** one
 (prefilled), **add** a new one, or **replace** everything; `config init --context
 prod` skips that prompt and targets the named context directly.

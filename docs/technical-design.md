@@ -126,7 +126,8 @@ cookies with an optional Authorization fallback, established and managed by
 o3). The config/keychain-coupled resolution stays in `internal/auth`: `Resolve`
 produces a validated `Credential` from config + secrets, loading the secret from
 the keychain when not supplied via flags/env; the `Store` prefers the OS keychain
-(`go-keyring`) and falls back to a `0600` JSON file. `internal/auth` re-exports
+(`go-keyring`) and falls back to a per-user DPAPI-encrypted file on Windows or
+a `0600` JSON file on macOS/Linux. `internal/auth` re-exports
 the moved symbols so existing callers compile unchanged. Store access errors are
 preserved rather than collapsed into "missing":
 `CREDENTIAL_STORE_INACCESSIBLE` and `CREDENTIAL_NOT_VISIBLE_OR_MISSING` carry a
