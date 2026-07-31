@@ -18,13 +18,15 @@ func (f failingKeyring) Delete(string, string) error        { return f.err }
 
 func TestResolveBrowserSessionFromSharedStore(t *testing.T) {
 	dir := t.TempDir()
-	store := NewStore(dir)
+	// A refusing keychain routes Save to the file fallback — the same path a
+	// host with no usable keychain takes.
+	store := NewStoreWithBackend(dir, failingKeyring{errors.New("no keychain here")})
 	baseURL := "https://session-resolve-test.invalid"
 	blob, err := pkgauth.EncodeSession(pkgauth.Session{Cookies: "sid=abc"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := store.fileSave(AccountKey(baseURL, SchemeSession), blob); err != nil {
+	if _, err := store.Save(AccountKey(baseURL, SchemeSession), blob); err != nil {
 		t.Fatal(err)
 	}
 
@@ -42,9 +44,9 @@ func TestResolveBrowserSessionFromSharedStore(t *testing.T) {
 
 func TestResolveRejectsInvalidStoredBrowserSession(t *testing.T) {
 	dir := t.TempDir()
-	store := NewStore(dir)
+	store := NewStoreWithBackend(dir, failingKeyring{errors.New("no keychain here")})
 	baseURL := "https://invalid-session-resolve-test.invalid"
-	if err := store.fileSave(AccountKey(baseURL, SchemeSession), "{}"); err != nil {
+	if _, err := store.Save(AccountKey(baseURL, SchemeSession), "{}"); err != nil {
 		t.Fatal(err)
 	}
 
@@ -60,7 +62,7 @@ func TestResolveRejectsInvalidStoredBrowserSession(t *testing.T) {
 func TestStoreDistinguishesInaccessibleFromMissing(t *testing.T) {
 	t.Parallel()
 	accessErr := errors.New("keychain interaction is not allowed")
-	s := newStoreWithKeyring(t.TempDir(), failingKeyring{err: accessErr})
+	s := NewStoreWithBackend(t.TempDir(), failingKeyring{err: accessErr})
 	_, err := s.Load("acct")
 	var storeErr *StoreAccessError
 	if !errors.As(err, &storeErr) || storeErr.Backend != BackendKeychain {
@@ -73,8 +75,8 @@ func TestStoreDistinguishesInaccessibleFromMissing(t *testing.T) {
 
 func TestStoreUsesFileWhenKeychainIsInaccessible(t *testing.T) {
 	t.Parallel()
-	s := newStoreWithKeyring(t.TempDir(), failingKeyring{err: errors.New("locked")})
-	if err := s.fileSave("acct", "fallback-secret"); err != nil {
+	s := NewStoreWithBackend(t.TempDir(), failingKeyring{err: errors.New("locked")})
+	if _, err := s.Save("acct", "fallback-secret"); err != nil {
 		t.Fatal(err)
 	}
 	got, err := s.Load("acct")
@@ -99,7 +101,7 @@ func TestResolveCredentialRecovery(t *testing.T) {
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			s := newStoreWithKeyring(t.TempDir(), failingKeyring{err: tc.err})
+			s := NewStoreWithBackend(t.TempDir(), failingKeyring{err: tc.err})
 			_, err := Resolve(cfg, config.Secrets{}, s)
 			ce := cerrors.AsCLIError(err)
 			if ce == nil || ce.Code != tc.code {

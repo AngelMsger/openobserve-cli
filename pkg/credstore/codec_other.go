@@ -1,6 +1,6 @@
 //go:build !windows
 
-package auth
+package credstore
 
 func encodeCredentialFile(plain []byte) ([]byte, error) {
 	return append([]byte(nil), plain...), nil
