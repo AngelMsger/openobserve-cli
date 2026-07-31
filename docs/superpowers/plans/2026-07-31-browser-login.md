@@ -13,7 +13,7 @@
 ## Global Constraints
 
 - The CLI builds with `CGO_ENABLED=0` (`Makefile:22`). Every new package in this repo must be pure Go. No cgo, ever.
-- `pkg/webauth` itself must import nothing outside the standard library and `pkg/auth`. The WebSocket dependency belongs to `pkg/webauth/cdp` only. This is the `pkg/` rule in `AGENTS.md:49`.
+- `pkg/webauth` must import nothing outside the standard library, `pkg/auth`, `pkg/apiclient` and `pkg/errors` — all of which are themselves stdlib-only. It must NOT import `pkg/config` (which pulls `yaml.v3`) and must NOT import the WebSocket library; that belongs to `pkg/webauth/cdp` alone. This is the `pkg/` rule in `AGENTS.md:49`.
 - Extend the `pkg/` surface **additively**. Do not change existing exported shapes in `pkg/auth`, `pkg/config`, `pkg/apiclient` or `pkg/credstore`.
 - stdout is data only. Errors, notices and `--verbose` output go to stderr.
 - All errors use `cerrors` (`github.com/angelmsger/openobserve-cli/pkg/errors`) with a `Category`, a stable `CODE`, and populated `WithNextSteps(...)`.
@@ -153,8 +153,8 @@ Expected: PASS. `TestSerializeCookies`, `TestHostMatches`, `TestFilterForHost`, 
 
 - [ ] **Step 5: Verify the dependency rule holds**
 
-Run: `go list -deps ./pkg/webauth | grep -v '^\(internal/\)\?[a-z]*\(/[a-z]*\)*$' | grep angelmsger`
-Expected: exactly one line, `github.com/angelmsger/openobserve-cli/pkg/auth` (plus `pkg/errors` and `pkg/transport`, which `pkg/auth` itself pulls). Nothing else.
+Run: `go list -deps ./pkg/webauth | grep -v '^github.com/angelmsger' | grep '\.'`
+Expected: no output. `pkg/webauth` pulls no third-party dependency at all — in particular not `yaml.v3` (which would mean `pkg/config` crept in) and not `coder/websocket`.
 
 - [ ] **Step 6: Commit**
 
@@ -547,8 +547,9 @@ EOF
 - Test: `pkg/webauth/driver_test.go`
 
 **Interfaces:**
-- Consumes: `VerifyFunc` (Task 1); `pkg/auth.Session`, `pkg/auth.Credential`, `pkg/auth.EncodeSession`, `pkg/apiclient.Build`, `pkg/config.Defaults`.
-- Produces: `type Driver interface { Capture(loginURL, host string, verify VerifyFunc) (auth.Session, error) }`; `PingVerifier(baseURL, org string, d config.Defaults) VerifyFunc`.
+- Consumes: `VerifyFunc` (Task 1); `pkg/auth.Session`, `pkg/auth.Credential`, `pkg/auth.EncodeSession`, `pkg/apiclient.Build`.
+- Produces: `type Driver interface { Capture(loginURL, host string, verify VerifyFunc) (auth.Session, error) }`; `PingVerifier(baseURL, org string, timeout time.Duration, maxRetries int) VerifyFunc`.
+- `PingVerifier` deliberately takes plain values rather than a `config.Defaults`: importing `pkg/config` would pull `yaml.v3` into `pkg/webauth` and break the global constraint, and a verifier has no business knowing the config-file type. Callers pass `d.Timeout, d.MaxRetries`.
 - **Does not** declare `VerifyFunc` — it stays in `capture.go` where it already lives. Declaring it in both files will not compile.
 
 - [ ] **Step 1: Write the failing test**
@@ -565,12 +566,7 @@ import (
 	"time"
 
 	pkgauth "github.com/angelmsger/openobserve-cli/pkg/auth"
-	"github.com/angelmsger/openobserve-cli/pkg/config"
 )
-
-func testDefaults() config.Defaults {
-	return config.Defaults{Timeout: 5 * time.Second, MaxRetries: 0}
-}
 
 // An instance using native login sets no cookies; the SPA authenticates with an
 // Authorization header alone. Such a session must verify.
@@ -585,7 +581,7 @@ func TestPingVerifierAcceptsHeaderOnlySession(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	verify := PingVerifier(srv.URL, "default", testDefaults())
+	verify := PingVerifier(srv.URL, "default", 5*time.Second, 0)
 	if !verify(pkgauth.Session{Authorization: "Basic good"}) {
 		t.Fatal("header-only session that authenticates must verify")
 	}
@@ -605,14 +601,14 @@ func TestPingVerifierAcceptsCookieSession(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	verify := PingVerifier(srv.URL, "default", testDefaults())
+	verify := PingVerifier(srv.URL, "default", 5*time.Second, 0)
 	if !verify(pkgauth.Session{Cookies: "auth_tokens=good"}) {
 		t.Fatal("cookie session that authenticates must verify")
 	}
 }
 
 func TestPingVerifierRejectsUnusableSession(t *testing.T) {
-	verify := PingVerifier("http://127.0.0.1:1", "default", testDefaults())
+	verify := PingVerifier("http://127.0.0.1:1", "default", 5*time.Second, 0)
 	if verify(pkgauth.Session{}) {
 		t.Fatal("an empty session must never verify")
 	}
@@ -639,7 +635,6 @@ import (
 
 	"github.com/angelmsger/openobserve-cli/pkg/apiclient"
 	pkgauth "github.com/angelmsger/openobserve-cli/pkg/auth"
-	"github.com/angelmsger/openobserve-cli/pkg/config"
 )
 
 // Driver opens a browser at loginURL and captures the session established
@@ -660,7 +655,10 @@ const verifyTimeout = 20 * time.Second
 // PingVerifier returns a VerifyFunc that confirms a session by making a real
 // authenticated request to the instance. This is the sole success signal for
 // capture: only an authenticated response proves the captured state works.
-func PingVerifier(baseURL, org string, d config.Defaults) VerifyFunc {
+//
+// It takes plain values rather than a config.Defaults so this package stays
+// free of pkg/config (and so of yaml.v3). Callers pass d.Timeout, d.MaxRetries.
+func PingVerifier(baseURL, org string, timeout time.Duration, maxRetries int) VerifyFunc {
 	return func(sess pkgauth.Session) bool {
 		blob, err := pkgauth.EncodeSession(sess)
 		if err != nil {
@@ -678,8 +676,8 @@ func PingVerifier(baseURL, org string, d config.Defaults) VerifyFunc {
 			BaseURL:       baseURL,
 			Org:           org,
 			AuthDecorator: cred.Decorator(),
-			Timeout:       d.Timeout,
-			MaxRetries:    d.MaxRetries,
+			Timeout:       timeout,
+			MaxRetries:    maxRetries,
 		})
 		if err != nil {
 			return false
@@ -1987,7 +1985,7 @@ func runBrowserLogin(s *appState, freshProfile bool) error {
 	}
 
 	driver := cdp.New(cdp.Options{ProfileDir: profileDir})
-	verify := webauth.PingVerifier(cfg.BaseURL, s.org(), s.cfg().Defaults)
+	verify := webauth.PingVerifier(cfg.BaseURL, s.org(), s.cfg().Defaults.Timeout, s.cfg().Defaults.MaxRetries)
 
 	sess, err := driver.Capture(cfg.BaseURL+"/web/login", host, verify)
 	if err != nil {
@@ -2347,10 +2345,11 @@ func TestCaptureAgainstRealBrowser(t *testing.T) {
 	defer srv.Close()
 
 	host := mustHost(t, srv.URL)
-	verify := func(s pkgauth.Session) bool {
-		// Accept only a session that carries something real.
-		return webauth.Replayable(s)
-	}
+	// The real verifier, not a stub: apiclient.Ping issues
+	// GET /api/organizations, which is exactly what the fake instance serves
+	// and gates on credentials. So this exercises the whole chain — injected
+	// script, binding, cookie sampling, Tracker, authenticated probe.
+	verify := webauth.PingVerifier(srv.URL, "default", 5*time.Second, 0)
 
 	d := New(Options{Timeout: 90 * time.Second})
 
@@ -2804,7 +2803,8 @@ In `app.go`, delete `sessionVerifier` (lines 572-596) and change `BrowserSignIn`
 to use the shared verifier and the platform driver:
 
 ```go
-	verify := shared.PingVerifier(base, orgOrDefault(org), a.fileDefaults())
+	d := a.fileDefaults()
+	verify := shared.PingVerifier(base, orgOrDefault(org), d.Timeout, d.MaxRetries)
 	sess, err := webauth.Driver(browserProfileDir()).Capture(base+"/web/login", host, verify)
 ```
 
