@@ -15,6 +15,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sync"
 
 	"github.com/angelmsger/openobserve-cli/pkg/constants"
 	"github.com/zalando/go-keyring"
@@ -63,6 +64,9 @@ func (systemKeyring) Delete(service, account string) error {
 type Store struct {
 	dir     string // config directory for the file fallback
 	keyring Backend
+
+	probeOnce sync.Once
+	probeOK   bool
 }
 
 // Backend names reported by Save.
@@ -82,8 +86,11 @@ func NewStoreWithBackend(dir string, b Backend) *Store {
 // useKeychain reports whether the keychain is worth attempting at all. On macOS
 // a missing default keychain must be detected BEFORE the write, because the
 // write itself raises a destructive system dialog rather than an error — see
-// keychainUsable in available_darwin.go.
-func (s *Store) useKeychain() bool { return keychainUsable() }
+// probeKeychain in available_darwin.go.
+func (s *Store) useKeychain() bool {
+	s.probeOnce.Do(func() { s.probeOK = probeKeychain() })
+	return s.probeOK
+}
 
 // Save stores secret for account and returns the backend that accepted it.
 func (s *Store) Save(account, secret string) (string, error) {

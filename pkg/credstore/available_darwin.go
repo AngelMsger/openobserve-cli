@@ -5,10 +5,9 @@ package credstore
 import (
 	"os/exec"
 	"strings"
-	"sync"
 )
 
-// keychainUsable reports whether macOS has a default keychain this process can
+// probeKeychain reports whether macOS has a default keychain this process can
 // write to.
 //
 // This probe exists to keep a destructive system modal off the user's screen.
@@ -25,16 +24,16 @@ import (
 // "A default keychain could not be found." Probing with it first lets the store
 // route straight to its file fallback and never reach the dialog.
 //
-// The answer is cached: a default keychain does not appear or disappear during a
-// run, and this sits in front of every secret read and write. A keychain created
-// while the app is running is picked up on the next launch. Note this reports
-// EXISTENCE, not unlockedness — a locked keychain still exists, and go-keyring's
-// own error handling covers that case (macOS prompts to unlock, which is
-// expected and non-destructive).
-var keychainUsable = sync.OnceValue(func() bool {
+// Store caches the answer per instance (a default keychain does not appear or
+// disappear mid-run, and this sits in front of every secret read and write); it
+// is deliberately NOT cached package-wide, because the answer depends on HOME.
+// Note this reports EXISTENCE, not unlockedness — a locked keychain still
+// exists, and go-keyring's own error handling covers that case (macOS prompts
+// to unlock, which is expected and non-destructive).
+var probeKeychain = func() bool {
 	out, err := exec.Command("/usr/bin/security", "default-keychain").Output()
 	if err != nil {
 		return false
 	}
 	return strings.TrimSpace(string(out)) != ""
-})
+}

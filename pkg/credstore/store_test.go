@@ -54,9 +54,9 @@ func (s *stubKeyring) Delete(_, account string) error {
 // withKeychain forces the availability probe for the duration of a test.
 func withKeychain(t *testing.T, available bool) {
 	t.Helper()
-	prev := keychainUsable
-	keychainUsable = func() bool { return available }
-	t.Cleanup(func() { keychainUsable = prev })
+	prev := probeKeychain
+	probeKeychain = func() bool { return available }
+	t.Cleanup(func() { probeKeychain = prev })
 }
 
 func TestSavePrefersTheKeychain(t *testing.T) {
