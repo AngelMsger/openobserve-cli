@@ -4,6 +4,7 @@ go 1.24.0
 
 require (
 	github.com/charmbracelet/huh v1.0.0
+	github.com/coder/websocket v1.8.15
 	github.com/joho/godotenv v1.5.1
 	github.com/neilotoole/jsoncolor v0.7.2
 	github.com/spf13/cobra v1.10.2
