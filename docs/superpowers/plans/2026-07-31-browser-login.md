@@ -1403,9 +1403,15 @@ func findBrowser() (string, error) {
 // Port 0 makes the browser choose a free port and write it, with the WebSocket
 // path, to DevToolsActivePort inside the profile directory. Reading that file
 // is the only reliable way to learn the port.
-func launch(ctx context.Context, exe, profileDir string) (*exec.Cmd, string, error) {
+// launch owns the process lifecycle: the goroutine started here is the ONLY
+// cmd.Wait() on this Cmd. Callers learn about exit from the returned channel
+// and must not call Wait themselves — a second Wait returns an error and races
+// this one. Reaping here is also what makes the startup fast-fail work:
+// Cmd.ProcessState is populated only by Wait, so a liveness check reading it
+// without a Wait in flight is dead code that never fires.
+func launch(ctx context.Context, exe, profileDir string) (*exec.Cmd, string, <-chan struct{}, error) {
 	if err := os.MkdirAll(profileDir, 0o700); err != nil {
-		return nil, "", fmt.Errorf("create browser profile directory: %w", err)
+		return nil, "", nil, fmt.Errorf("create browser profile directory: %w", err)
 	}
 	// A stale port file from a previous run would be read as if it were ours.
 	_ = os.Remove(filepath.Join(profileDir, "DevToolsActivePort"))
@@ -1419,16 +1425,31 @@ func launch(ctx context.Context, exe, profileDir string) (*exec.Cmd, string, err
 		"about:blank",
 	)
 	if err := cmd.Start(); err != nil {
-		return nil, "", fmt.Errorf("start browser: %w", err)
+		return nil, "", nil, fmt.Errorf("start browser: %w", err)
 	}
 
-	alive := func() bool { return cmd.ProcessState == nil }
+	exited := make(chan struct{})
+	go func() {
+		_ = cmd.Wait()
+		close(exited)
+	}()
+
+	alive := func() bool {
+		select {
+		case <-exited:
+			return false
+		default:
+			return true
+		}
+	}
+
 	wsURL, err := readDevToolsURL(profileDir, 30*time.Second, alive)
 	if err != nil {
 		_ = cmd.Process.Kill()
-		return nil, "", err
+		<-exited // let the reaper finish so the process is not left behind
+		return nil, "", nil, err
 	}
-	return cmd, wsURL, nil
+	return cmd, wsURL, exited, nil
 }
 
 // readDevToolsURL polls for the DevToolsActivePort file the browser writes on
@@ -1704,12 +1725,13 @@ func (d *Driver) Capture(loginURL, host string, verify webauth.VerifyFunc) (pkga
 	ctx, cancel := context.WithTimeout(context.Background(), d.timeout)
 	defer cancel()
 
-	cmd, wsURL, err := launch(ctx, exe, profileDir)
+	cmd, wsURL, exited, err := launch(ctx, exe, profileDir)
 	if err != nil {
 		return pkgauth.Session{}, err
 	}
-	// Kill only — never Wait here. processExited below owns the single Wait on
-	// this process; calling Wait twice returns an error and races the first.
+	// Kill only — never Wait here. launch owns the single Wait on this process
+	// and reports exit through the `exited` channel; a second Wait would error
+	// and race the first.
 	defer func() {
 		if cmd.Process != nil {
 			_ = cmd.Process.Kill()
@@ -1755,7 +1777,6 @@ func (d *Driver) Capture(loginURL, host string, verify webauth.VerifyFunc) (pkga
 	}
 
 	tracker := webauth.NewTracker(host, verify)
-	exited := processExited(cmd)
 	ticker := time.NewTicker(pollInterval)
 	defer ticker.Stop()
 
@@ -1858,17 +1879,6 @@ func sample(ctx context.Context, c *conn, sessionID string) ([]webauth.Cookie, s
 	return convertCookies(cookieResp.Cookies), eval.Result.Value, nil
 }
 
-// processExited returns a channel closed when the browser process ends, which
-// is how a user closing the window reaches the capture loop.
-func processExited(cmd *exec.Cmd) <-chan struct{} {
-	ch := make(chan struct{})
-	go func() {
-		_ = cmd.Wait()
-		close(ch)
-	}()
-	return ch
-}
-
 // DefaultProfileDir is the CLI-owned persistent browser profile. Keeping the
 // identity-provider session between logins is what stops every sign-in from
 // requiring a full SSO round trip.
@@ -1877,8 +1887,10 @@ func DefaultProfileDir(configDir string) string {
 }
 ```
 
-Note `processExited` is started once, at the point shown in `Capture`, and owns
-the only `cmd.Wait()` on the process.
+Note the `exited` channel comes from `launch` (Task 6), which owns the only
+`cmd.Wait()` on the process. Do not add a second `Wait` anywhere in this file —
+`Cmd.Wait` is not safe to call twice. The `os/exec` import is therefore only
+needed for the `*exec.Cmd` returned by `launch`.
 
 - [ ] **Step 4: Run the tests to verify they pass**
 
