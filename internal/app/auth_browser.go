@@ -1,0 +1,155 @@
+package app
+
+import (
+	"errors"
+	"net/url"
+	"os"
+	"runtime"
+	"time"
+
+	"github.com/angelmsger/openobserve-cli/internal/auth"
+	pkgauth "github.com/angelmsger/openobserve-cli/pkg/auth"
+	cerrors "github.com/angelmsger/openobserve-cli/pkg/errors"
+	"github.com/angelmsger/openobserve-cli/pkg/webauth"
+	"github.com/angelmsger/openobserve-cli/pkg/webauth/cdp"
+)
+
+// runBrowserLogin signs in through a real browser and stores the captured
+// session under the active context, in the same keychain entry the o3 desktop
+// app uses — so signing in through either client authenticates both.
+func runBrowserLogin(s *appState, freshProfile bool) error {
+	cfg := s.cfg()
+	if cfg.BaseURL == "" {
+		return cerrors.New(cerrors.CategoryConfig, "NO_BASE_URL",
+			"no server configured yet").
+			WithNextSteps("openobserve-cli config init")
+	}
+	if err := requireDisplay(); err != nil {
+		return err
+	}
+
+	profileDir := ""
+	if !freshProfile {
+		profileDir = cdp.DefaultProfileDir(s.cfgDir)
+	}
+
+	host, err := hostOfBaseURL(cfg.BaseURL)
+	if err != nil {
+		return err
+	}
+
+	driver := cdp.New(cdp.Options{ProfileDir: profileDir})
+	verify := webauth.PingVerifier(cfg.BaseURL, s.org(), s.cfg().Defaults.Timeout, s.cfg().Defaults.MaxRetries)
+
+	sess, err := driver.Capture(cfg.BaseURL+"/web/login", host, verify)
+	if err != nil {
+		return browserCaptureError(err)
+	}
+
+	blob, err := webauthEncode(sess)
+	if err != nil {
+		return err
+	}
+	cred := auth.Credential{
+		Scheme:   auth.SchemeSession,
+		Username: sess.Email,
+		Secret:   blob,
+	}
+	backend, err := auth.Save(cfg.BaseURL, cred, s.store)
+	if err != nil {
+		return cerrors.Wrap(err, cerrors.CategoryConfig, "SAVE_FAILED",
+			"captured the session but could not store it")
+	}
+
+	out := map[string]any{
+		"logged_in": true,
+		"base_url":  cfg.BaseURL,
+		"org":       s.org(),
+		"scheme":    auth.SchemeSession,
+		"stored_in": backend,
+	}
+	if sess.Email != "" {
+		out["email"] = sess.Email
+	}
+	if !sess.ExpiresAt.IsZero() {
+		out["expires_at"] = sess.ExpiresAt.UTC().Format(time.RFC3339)
+	}
+	return s.emit(out)
+}
+
+// requireDisplay rejects a browser sign-in on a headless Linux host up front,
+// rather than launching a browser that cannot draw and waiting for the timeout.
+func requireDisplay() error {
+	if runtime.GOOS != "linux" {
+		return nil
+	}
+	if os.Getenv("DISPLAY") != "" || os.Getenv("WAYLAND_DISPLAY") != "" {
+		return nil
+	}
+	return cerrors.New(cerrors.CategoryUsage, "BROWSER_NO_DISPLAY",
+		"browser sign-in needs a graphical session, but neither DISPLAY nor WAYLAND_DISPLAY is set").
+		WithHint("Over SSH or in a container, use a password or token instead.").
+		WithNextSteps("openobserve-cli auth login",
+			"Set OPENOBSERVE_EMAIL + OPENOBSERVE_PASSWORD, or OPENOBSERVE_TOKEN.")
+}
+
+// browserCaptureError translates the driver's sentinel errors into the CLI's
+// actionable error shape.
+func browserCaptureError(err error) error {
+	switch {
+	case errors.Is(err, cdp.ErrNoBrowser):
+		return cerrors.Wrap(err, cerrors.CategoryConfig, "BROWSER_NOT_FOUND",
+			"no Chrome, Chromium, Edge or Brave installation was found").
+			WithHint("Browser sign-in drives a Chromium-family browser; set OPENOBSERVE_BROWSER to point at one.").
+			WithNextSteps("openobserve-cli auth login",
+				"Install Google Chrome, or set OPENOBSERVE_BROWSER=/path/to/browser.")
+	case errors.Is(err, cdp.ErrCancelled):
+		return cerrors.Wrap(err, cerrors.CategoryAuth, "BROWSER_SIGNIN_CANCELLED",
+			"the browser was closed before sign-in completed").
+			WithNextSteps("openobserve-cli auth login --browser",
+				"openobserve-cli auth login")
+	case errors.Is(err, cdp.ErrTimeout):
+		return cerrors.Wrap(err, cerrors.CategoryAuth, "BROWSER_SIGNIN_TIMEOUT",
+			"sign-in did not complete in time").
+			WithNextSteps("openobserve-cli auth login --browser",
+				"openobserve-cli auth login")
+	default:
+		return cerrors.Wrap(err, cerrors.CategoryConfig, "BROWSER_LAUNCH_FAILED",
+			"could not run browser sign-in").
+			WithHint("Re-run with --verbose to see what the browser reported.").
+			WithNextSteps("openobserve-cli auth login",
+				"Set OPENOBSERVE_BROWSER=/path/to/browser.")
+	}
+}
+
+// hostOfBaseURL extracts the host that scopes captured cookies.
+func hostOfBaseURL(base string) (string, error) {
+	u, err := url.Parse(base)
+	if err != nil || u.Host == "" {
+		return "", cerrors.Newf(cerrors.CategoryConfig, "BAD_BASE_URL",
+			"could not parse the configured server URL %q", base)
+	}
+	return u.Host, nil
+}
+
+// webauthEncode serialises a captured session into the stored envelope.
+func webauthEncode(s pkgauth.Session) (string, error) {
+	blob, err := pkgauth.EncodeSession(s)
+	if err != nil {
+		return "", cerrors.Wrap(err, cerrors.CategoryConfig, "AUTH_BAD_SESSION",
+			"could not encode the captured session")
+	}
+	return blob, nil
+}
+
+// removeBrowserProfile deletes the persistent sign-in profile. A missing
+// profile is not an error: most contexts never used browser sign-in.
+func removeBrowserProfile(cfgDir string) error {
+	dir := cdp.DefaultProfileDir(cfgDir)
+	if err := os.RemoveAll(dir); err != nil && !os.IsNotExist(err) {
+		return cerrors.Wrap(err, cerrors.CategoryConfig, "PROFILE_REMOVE_FAILED",
+			"removed the stored credential but could not remove the browser profile").
+			WithHint("Delete " + dir + " by hand to clear the remembered browser session.")
+	}
+	return nil
+}

@@ -19,15 +19,22 @@ func newAuthCmd(s *appState) *cobra.Command {
 }
 
 func newAuthLoginCmd(s *appState) *cobra.Command {
-	return &cobra.Command{
+	var useBrowser bool
+	var freshProfile bool
+	cmd := &cobra.Command{
 		Use:   "login",
 		Short: "Store credentials for the active context (interactive)",
 		Long: "Prompts for the password (basic) or token, verifies it against the\n" +
-			"server, and stores it in the OS keychain. Requires an interactive\n" +
-			"terminal; in CI / agent sandboxes set OPENOBSERVE_EMAIL +\n" +
-			"OPENOBSERVE_PASSWORD or OPENOBSERVE_TOKEN instead.",
+			"server, and stores it in the OS keychain. With --browser, signs in\n" +
+			"through a real browser window instead and stores the captured session,\n" +
+			"which is what SSO instances require. Requires an interactive terminal\n" +
+			"(or, for --browser, a graphical session); in CI / agent sandboxes set\n" +
+			"OPENOBSERVE_EMAIL + OPENOBSERVE_PASSWORD or OPENOBSERVE_TOKEN instead.",
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
+			if useBrowser {
+				return runBrowserLogin(s, freshProfile)
+			}
 			if !stdinIsTTY() {
 				return cerrors.New(cerrors.CategoryAuth, "AUTH_LOGIN_NEEDS_TTY",
 					"auth login requires an interactive terminal").
@@ -82,6 +89,11 @@ func newAuthLoginCmd(s *appState) *cobra.Command {
 			})
 		},
 	}
+	cmd.Flags().BoolVar(&useBrowser, "browser", false,
+		"Sign in through a browser window and store the captured session")
+	cmd.Flags().BoolVar(&freshProfile, "fresh-profile", false,
+		"Use a throwaway browser profile instead of the remembered one")
+	return cmd
 }
 
 func newAuthStatusCmd(s *appState) *cobra.Command {
@@ -138,7 +150,15 @@ func newAuthLogoutCmd(s *appState) *cobra.Command {
 				return cerrors.Wrap(err, cerrors.CategoryConfig, "LOGOUT_FAILED",
 					"failed to remove stored credential")
 			}
-			return s.emit(map[string]any{"logged_out": true, "base_url": cfg.BaseURL, "scheme": scheme})
+			if err := removeBrowserProfile(s.cfgDir); err != nil {
+				return err
+			}
+			return s.emit(map[string]any{
+				"logged_out":              true,
+				"base_url":                cfg.BaseURL,
+				"scheme":                  scheme,
+				"browser_profile_removed": true,
+			})
 		},
 	}
 }
