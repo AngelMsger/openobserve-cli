@@ -48,9 +48,28 @@ func TestPingVerifierAcceptsCookieSession(t *testing.T) {
 	}
 }
 
-func TestPingVerifierRejectsUnusableSession(t *testing.T) {
+// An empty session is rejected by Credential.Validate before any request is
+// attempted; this pins that short circuit.
+func TestPingVerifierRejectsInvalidSessionWithoutRequesting(t *testing.T) {
 	verify := PingVerifier("http://127.0.0.1:1", "default", 5*time.Second, 0)
 	if verify(pkgauth.Session{}) {
 		t.Fatal("an empty session must never verify")
+	}
+}
+
+// A well-formed session against a host that refuses the connection must fail
+// closed and promptly. PingVerifier runs in a polling loop while the user is
+// mid-login, so a hang here would wedge capture rather than retry it.
+func TestPingVerifierFailsClosedOnUnreachableHost(t *testing.T) {
+	verify := PingVerifier("http://127.0.0.1:1", "default", 2*time.Second, 0)
+	done := make(chan bool, 1)
+	go func() { done <- verify(pkgauth.Session{Cookies: "sid=x"}) }()
+	select {
+	case ok := <-done:
+		if ok {
+			t.Fatal("an unreachable host must not verify")
+		}
+	case <-time.After(30 * time.Second):
+		t.Fatal("PingVerifier hung on an unreachable host")
 	}
 }
