@@ -1046,6 +1046,11 @@ func (c *conn) read() {
 		if err != nil {
 			c.mu.Lock()
 			c.readErr = err
+			// Mark the connection dead so no LATER call can register work the
+			// reader will never serve. Without this a call issued after a
+			// spontaneous disconnect (browser closed mid-capture) writes to a
+			// dead socket and then waits forever.
+			c.closed = true
 			for id, ch := range c.pending {
 				close(ch)
 				delete(c.pending, id)
@@ -1107,8 +1112,12 @@ func (c *conn) call(ctx context.Context, sessionID, method string, params map[st
 	ch := make(chan rpcResponse, 1)
 	c.mu.Lock()
 	if c.closed {
+		readErr := c.readErr
 		c.mu.Unlock()
-		return fmt.Errorf("devtools connection closed")
+		if readErr != nil {
+			return fmt.Errorf("%s: devtools connection lost: %w", method, readErr)
+		}
+		return fmt.Errorf("%s: devtools connection closed", method)
 	}
 	c.pending[id] = ch
 	c.mu.Unlock()
@@ -1140,23 +1149,33 @@ func (c *conn) call(ctx context.Context, sessionID, method string, params map[st
 	}
 }
 
-// Close tears the connection down; in-flight calls fail rather than hang.
+// Close tears the connection down; in-flight calls fail rather than hang, and
+// the reader goroutine has exited by the time this returns.
 func (c *conn) Close() error {
 	c.mu.Lock()
 	if c.closed {
 		c.mu.Unlock()
+		<-c.readerDone
 		return nil
 	}
 	c.closed = true
 	c.mu.Unlock()
-	return c.ws.CloseNow()
+	err := c.ws.CloseNow()
+	<-c.readerDone
+	return err
 }
 ```
+
+Note `[]func(string, json.RawMessage)(nil)` is **not valid Go** — that slice
+conversion is grammatically ambiguous and will not compile. Use
+`[]func(string, json.RawMessage){}` in the handler copy at the end of `read()`.
+The nil-vs-empty distinction does not matter there: the copy is only ranged
+over locally.
 
 - [ ] **Step 5: Run the tests to verify they pass**
 
 Run: `go test ./pkg/webauth/cdp/ -race -v`
-Expected: PASS (4 tests), no race reported.
+Expected: PASS (5 tests, including `TestConnCallFailsAfterSpontaneousDisconnect`), no race reported.
 
 - [ ] **Step 6: Confirm the dependency did not leak into the pure core**
 
