@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/angelmsger/openobserve-cli/internal/auth"
+	"github.com/angelmsger/openobserve-cli/pkg/apiclient"
 	pkgauth "github.com/angelmsger/openobserve-cli/pkg/auth"
 	cerrors "github.com/angelmsger/openobserve-cli/pkg/errors"
 	"github.com/angelmsger/openobserve-cli/pkg/webauth"
@@ -24,6 +25,14 @@ func runBrowserLogin(s *appState, freshProfile bool) error {
 			"no server configured yet").
 			WithNextSteps("openobserve-cli config init")
 	}
+	// Normalize before anything derives from it. OPENOBSERVE_URL never passes
+	// through `config init`, so a bare host:port or a trailing slash reaches
+	// here verbatim; every other client path normalizes, and the keychain
+	// entry is keyed off this value.
+	baseURL, err := apiclient.NormalizeBaseURL(cfg.BaseURL)
+	if err != nil {
+		return err
+	}
 	if err := requireDisplay(); err != nil {
 		return err
 	}
@@ -33,15 +42,15 @@ func runBrowserLogin(s *appState, freshProfile bool) error {
 		profileDir = cdp.DefaultProfileDir(s.cfgDir)
 	}
 
-	host, err := hostOfBaseURL(cfg.BaseURL)
+	host, err := hostOfBaseURL(baseURL)
 	if err != nil {
 		return err
 	}
 
 	driver := cdp.New(cdp.Options{ProfileDir: profileDir})
-	verify := webauth.PingVerifier(cfg.BaseURL, s.org(), s.cfg().Defaults.Timeout, s.cfg().Defaults.MaxRetries)
+	verify := webauth.PingVerifier(baseURL, s.org(), s.cfg().Defaults.Timeout, s.cfg().Defaults.MaxRetries)
 
-	sess, err := driver.Capture(cfg.BaseURL+"/web/login", host, verify)
+	sess, err := driver.Capture(baseURL+"/web/login", host, verify)
 	if err != nil {
 		return browserCaptureError(err)
 	}
@@ -55,7 +64,7 @@ func runBrowserLogin(s *appState, freshProfile bool) error {
 		Username: sess.Email,
 		Secret:   blob,
 	}
-	backend, err := auth.Save(cfg.BaseURL, cred, s.store)
+	backend, err := auth.Save(baseURL, cred, s.store)
 	if err != nil {
 		return cerrors.Wrap(err, cerrors.CategoryConfig, "SAVE_FAILED",
 			"captured the session but could not store it")
@@ -63,7 +72,7 @@ func runBrowserLogin(s *appState, freshProfile bool) error {
 
 	out := map[string]any{
 		"logged_in": true,
-		"base_url":  cfg.BaseURL,
+		"base_url":  baseURL,
 		"org":       s.org(),
 		"scheme":    auth.SchemeSession,
 		"stored_in": backend,

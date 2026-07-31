@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/angelmsger/openobserve-cli/pkg/apiclient"
 	cerrors "github.com/angelmsger/openobserve-cli/pkg/errors"
 	"github.com/angelmsger/openobserve-cli/pkg/webauth/cdp"
 )
@@ -68,5 +69,34 @@ func TestRemoveBrowserProfileDeletesTheDirectory(t *testing.T) {
 func TestRemoveBrowserProfileToleratesNoProfile(t *testing.T) {
 	if err := removeBrowserProfile(t.TempDir()); err != nil {
 		t.Fatalf("a context that never used browser sign-in must log out cleanly: %v", err)
+	}
+}
+
+// TestBrowserLoginNormalizesBaseURL pins the normalization boundary
+// runBrowserLogin relies on. OPENOBSERVE_URL never passes through
+// `config init`, so a bare host:port or a trailing slash can reach
+// runBrowserLogin verbatim; hostOfBaseURL and the login URL it builds must be
+// derived from the *normalized* base URL, not the raw config value.
+func TestBrowserLoginNormalizesBaseURL(t *testing.T) {
+	cases := []struct{ raw, wantHost, wantLogin string }{
+		{"localhost:5080", "localhost:5080", "http://localhost:5080/web/login"},
+		{"http://o2.example.com/", "o2.example.com", "http://o2.example.com/web/login"},
+		{"https://o2.example.com", "o2.example.com", "https://o2.example.com/web/login"},
+	}
+	for _, tc := range cases {
+		base, err := apiclient.NormalizeBaseURL(tc.raw)
+		if err != nil {
+			t.Fatalf("%q: normalize: %v", tc.raw, err)
+		}
+		host, err := hostOfBaseURL(base)
+		if err != nil {
+			t.Fatalf("%q: host: %v", tc.raw, err)
+		}
+		if host != tc.wantHost {
+			t.Errorf("%q: host = %q, want %q", tc.raw, host, tc.wantHost)
+		}
+		if got := base + "/web/login"; got != tc.wantLogin {
+			t.Errorf("%q: login URL = %q, want %q", tc.raw, got, tc.wantLogin)
+		}
 	}
 }
