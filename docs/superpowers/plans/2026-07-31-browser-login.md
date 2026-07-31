@@ -414,15 +414,35 @@ func TestTrackerRetriesWhenStateChanges(t *testing.T) {
 // Off-darwin builds and older tests run without a verifier; the pure heuristic
 // is the fallback so behaviour is preserved.
 func TestTrackerFallsBackToHeuristicWithoutVerifier(t *testing.T) {
+	// A generic session cookie, NOT one of the known post-login auth cookies —
+	// those succeed on their own and would bypass the URL check below.
+	plain := []Cookie{{Name: "sid", Value: "x", Domain: "o2.example.com", Path: "/"}}
+
 	tr := NewTracker("o2.example.com", nil)
-	if _, ok := tr.Observe(hostCookies(), "https://o2.example.com/web/login", "", ""); ok {
-		t.Fatal("still on the login page; heuristic must not report success")
+	if _, ok := tr.Observe(plain, "https://o2.example.com/web/login", "", ""); ok {
+		t.Fatal("still on the login page with only a generic cookie; heuristic must not report success")
 	}
-	if _, ok := tr.Observe(hostCookies(), "https://o2.example.com/web/logs", "", ""); !ok {
+	if _, ok := tr.Observe(plain, "https://o2.example.com/web/logs", "", ""); !ok {
 		t.Fatal("navigated off the login page with a host cookie; heuristic must report success")
 	}
 }
+
+// A known post-login auth cookie is sufficient on its own: OpenObserve sets it
+// only after a successful login, so capture must not wait for a navigation that
+// a single-page app may never make.
+func TestTrackerHeuristicAcceptsAuthCookieOnLoginPage(t *testing.T) {
+	tr := NewTracker("o2.example.com", nil)
+	if _, ok := tr.Observe(hostCookies(), "https://o2.example.com/web/login", "", ""); !ok {
+		t.Fatal("auth_tokens present; heuristic must report success even on the login path")
+	}
+}
 ```
+
+`LoginSucceeded` has two independent success paths: a known post-login auth
+cookie (`auth_ext` / `auth_tokens`) succeeds immediately regardless of URL,
+and otherwise a host cookie plus a navigation away from `/login` succeeds.
+`hostCookies()` returns `auth_tokens`, so the fallback test must use a
+different cookie name or it silently tests the first path twice.
 
 - [ ] **Step 2: Run the test to verify it fails**
 
@@ -514,7 +534,7 @@ func (t *Tracker) Observe(cookies []Cookie, currentURL, authz, email string) (pk
 - [ ] **Step 4: Run the test to verify it passes**
 
 Run: `go test ./pkg/webauth/ -run TestTracker -v`
-Expected: PASS (6 tests).
+Expected: PASS (7 tests).
 
 - [ ] **Step 5: Run the race detector**
 
