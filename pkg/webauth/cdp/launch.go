@@ -62,7 +62,7 @@ func findBrowser() (string, error) {
 			if resolved, lookErr := exec.LookPath(override); lookErr == nil {
 				return resolved, nil
 			}
-			return "", fmt.Errorf("OPENOBSERVE_BROWSER is set to %q, which is not executable: %w", override, err)
+			return "", fmt.Errorf("OPENOBSERVE_BROWSER is set to %q, which cannot be used: %w", override, err)
 		}
 		return override, nil
 	}
@@ -81,7 +81,13 @@ func findBrowser() (string, error) {
 }
 
 // launch starts the browser on about:blank with remote debugging enabled and
-// returns the process plus the browser-level WebSocket URL.
+// returns the process, the browser-level WebSocket URL, and a channel closed
+// when the browser process exits.
+//
+// launch owns the process lifecycle: the goroutine started here is the ONLY
+// cmd.Wait() on this Cmd. Callers learn about exit from the returned channel
+// and must not call Wait themselves — a second Wait returns an error and races
+// this one.
 //
 // The browser starts on about:blank rather than the login URL so the capture
 // script can be installed before any instance page loads. Injecting after the
@@ -91,9 +97,9 @@ func findBrowser() (string, error) {
 // Port 0 makes the browser choose a free port and write it, with the WebSocket
 // path, to DevToolsActivePort inside the profile directory. Reading that file
 // is the only reliable way to learn the port.
-func launch(ctx context.Context, exe, profileDir string) (*exec.Cmd, string, error) {
+func launch(ctx context.Context, exe, profileDir string) (*exec.Cmd, string, <-chan struct{}, error) {
 	if err := os.MkdirAll(profileDir, 0o700); err != nil {
-		return nil, "", fmt.Errorf("create browser profile directory: %w", err)
+		return nil, "", nil, fmt.Errorf("create browser profile directory: %w", err)
 	}
 	// A stale port file from a previous run would be read as if it were ours.
 	_ = os.Remove(filepath.Join(profileDir, "DevToolsActivePort"))
@@ -107,16 +113,31 @@ func launch(ctx context.Context, exe, profileDir string) (*exec.Cmd, string, err
 		"about:blank",
 	)
 	if err := cmd.Start(); err != nil {
-		return nil, "", fmt.Errorf("start browser: %w", err)
+		return nil, "", nil, fmt.Errorf("start browser: %w", err)
 	}
 
-	alive := func() bool { return cmd.ProcessState == nil }
+	exited := make(chan struct{})
+	go func() {
+		_ = cmd.Wait()
+		close(exited)
+	}()
+
+	alive := func() bool {
+		select {
+		case <-exited:
+			return false
+		default:
+			return true
+		}
+	}
+
 	wsURL, err := readDevToolsURL(profileDir, 30*time.Second, alive)
 	if err != nil {
 		_ = cmd.Process.Kill()
-		return nil, "", err
+		<-exited // let the reaper finish so the process is not left behind
+		return nil, "", nil, err
 	}
-	return cmd, wsURL, nil
+	return cmd, wsURL, exited, nil
 }
 
 // readDevToolsURL polls for the DevToolsActivePort file the browser writes on

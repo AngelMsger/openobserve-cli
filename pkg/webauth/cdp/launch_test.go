@@ -1,6 +1,7 @@
 package cdp
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -79,5 +80,22 @@ func TestReadDevToolsURLFailsWhenProcessDies(t *testing.T) {
 	_, err := readDevToolsURL(t.TempDir(), 3*time.Second, func() bool { return false })
 	if err == nil {
 		t.Fatal("must fail fast when the browser process is gone, not wait for the timeout")
+	}
+}
+
+// The fast-fail path must be driven by launch's OWN liveness callback, not a
+// stub. /bin/sh rejects Chrome's flags and exits immediately, standing in for a
+// browser that dies on startup (missing library, bad flag, sandbox refusal).
+func TestLaunchFailsFastWhenBrowserExitsImmediately(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("needs a POSIX shell")
+	}
+	start := time.Now()
+	_, _, _, err := launch(context.Background(), "/bin/sh", t.TempDir())
+	if err == nil {
+		t.Fatal("launch must fail when the browser exits immediately")
+	}
+	if elapsed := time.Since(start); elapsed > 20*time.Second {
+		t.Fatalf("launch took %s — the liveness fast-fail never fired", elapsed)
 	}
 }
