@@ -187,3 +187,43 @@ func TestConnDispatchesEvents(t *testing.T) {
 		t.Fatal("event handler never fired")
 	}
 }
+
+// A browser the user closes mid-capture kills the socket without an orderly
+// close. Calls issued after that must fail promptly, not wait on a reader that
+// no longer exists.
+func TestConnCallFailsAfterSpontaneousDisconnect(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		c, err := websocket.Accept(w, r, nil)
+		if err != nil {
+			return
+		}
+		_, _, _ = c.Read(r.Context())
+		c.CloseNow()
+	}))
+	defer srv.Close()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	c, err := dial(ctx, wsURL(srv))
+	if err != nil {
+		t.Fatalf("dial: %v", err)
+	}
+	defer c.Close()
+
+	if err := c.call(ctx, "", "First.method", nil, nil); err == nil {
+		t.Fatal("a call in flight when the connection dies must fail")
+	}
+
+	// No deadline on this one: before the fix it hung forever, because call()
+	// admitted work the departed reader could never serve.
+	done := make(chan error, 1)
+	go func() { done <- c.call(context.Background(), "", "Second.method", nil, nil) }()
+	select {
+	case err := <-done:
+		if err == nil {
+			t.Fatal("a call issued after the connection died must fail")
+		}
+	case <-time.After(10 * time.Second):
+		t.Fatal("call hung after the connection died")
+	}
+}
