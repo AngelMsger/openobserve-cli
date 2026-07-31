@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"net/http"
 	"testing"
 	"time"
 )
@@ -46,10 +47,40 @@ func TestDecodeSessionMalformedEnvelope(t *testing.T) {
 	}
 }
 
-func TestParseSessionRequiresCookies(t *testing.T) {
-	for _, secret := range []string{"", "{}", `{"authorization":"Bearer tok"}`} {
+func TestParseSessionRequiresSomethingReplayable(t *testing.T) {
+	for _, secret := range []string{"", "{}", `{"email":"ops@example.com"}`} {
 		if _, err := ParseSession(secret); err == nil {
-			t.Fatalf("ParseSession(%q) error = nil, want missing-cookie error", secret)
+			t.Fatalf("ParseSession(%q) error = nil, want empty-session error", secret)
 		}
+	}
+}
+
+// A session captured from an instance that authenticates its own web app with an
+// Authorization header (native email + password login) carries no cookies at
+// all. Rejecting it made browser sign-in impossible against such instances.
+func TestParseSessionAcceptsAuthorizationWithoutCookies(t *testing.T) {
+	got, err := ParseSession(`{"authorization":"Basic dXNlcjpwYXNz","email":"ops@example.com"}`)
+	if err != nil {
+		t.Fatalf("ParseSession() error = %v, want nil", err)
+	}
+	if got.Authorization != "Basic dXNlcjpwYXNz" || got.Cookies != "" {
+		t.Fatalf("parsed session = %+v, want the header with no cookies", got)
+	}
+
+	// It must also authenticate a request: the header is set, no Cookie header.
+	cred := Credential{Scheme: SchemeSession, Secret: `{"authorization":"Basic dXNlcjpwYXNz"}`}
+	if err := cred.Validate(); err != nil {
+		t.Fatalf("Validate() error = %v, want nil", err)
+	}
+	req, err := http.NewRequest(http.MethodGet, "https://observe.example.com/api/organizations", nil)
+	if err != nil {
+		t.Fatalf("NewRequest: %v", err)
+	}
+	cred.Decorator()(req)
+	if got := req.Header.Get("Authorization"); got != "Basic dXNlcjpwYXNz" {
+		t.Fatalf("Authorization = %q, want the captured header", got)
+	}
+	if got := req.Header.Get("Cookie"); got != "" {
+		t.Fatalf("Cookie = %q, want none", got)
 	}
 }

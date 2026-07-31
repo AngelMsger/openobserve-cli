@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.1] - 2026-07-31
+
+### Fixed
+
+- A browser-captured session (`session` scheme) is no longer rejected when it
+  carries an `Authorization` header but no cookies. An OpenObserve instance
+  using native email + password login authenticates its own web app with a
+  header built in the browser and sets no cookies at all, so a valid capture
+  from one was refused with "session has no cookies" — o3's browser sign-in
+  could never complete against such an instance. A session is now accepted when
+  it carries cookies, an `Authorization` header, or both.
+
 ## [0.8.0] - 2026-07-16
 
 ### Added
@@ -240,7 +252,8 @@ Initial release — a read-only, agent-facing CLI for OpenObserve (O2).
   release binaries and `make install`. A generated CLI reference
   (`docs/cli/`) and a GitHub Pages landing page.
 
-[Unreleased]: https://github.com/AngelMsger/openobserve-cli/compare/v0.8.0...HEAD
+[Unreleased]: https://github.com/AngelMsger/openobserve-cli/compare/v0.8.1...HEAD
+[0.8.1]: https://github.com/AngelMsger/openobserve-cli/compare/v0.8.0...v0.8.1
 [0.8.0]: https://github.com/AngelMsger/openobserve-cli/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/AngelMsger/openobserve-cli/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/AngelMsger/openobserve-cli/compare/v0.5.0...v0.6.0

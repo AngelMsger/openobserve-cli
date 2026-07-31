@@ -32,8 +32,11 @@ func EncodeSession(s Session) (string, error) {
 
 // ParseSession parses and validates a SchemeSession Secret. It accepts either
 // the JSON envelope produced by EncodeSession or a bare "k1=v1; k2=v2" cookie
-// string. A captured session must contain cookies; Authorization is only an
-// optional fallback for instances whose API expects the header sent by the SPA.
+// string. A captured session must carry at least one replayable credential —
+// cookies, an Authorization header, or both. Requiring cookies specifically was
+// wrong: an instance using native (email + password) login authenticates its own
+// web app with an Authorization header and sets no cookies at all, so a valid
+// capture from one was rejected and browser sign-in could never complete.
 func ParseSession(secret string) (Session, error) {
 	trimmed := strings.TrimSpace(secret)
 	if trimmed == "" {
@@ -49,8 +52,8 @@ func ParseSession(secret string) (Session, error) {
 		s.Cookies = trimmed
 	}
 
-	if strings.TrimSpace(s.Cookies) == "" {
-		return Session{}, fmt.Errorf("session has no cookies")
+	if strings.TrimSpace(s.Cookies) == "" && strings.TrimSpace(s.Authorization) == "" {
+		return Session{}, fmt.Errorf("session has neither cookies nor an authorization header")
 	}
 	if strings.ContainsAny(s.Cookies, "\r\n") || strings.ContainsAny(s.Authorization, "\r\n") {
 		return Session{}, fmt.Errorf("session contains an invalid header value")
