@@ -122,8 +122,9 @@ The pure, dependency-light credential model lives in the public **`pkg/auth`**:
 `transport.Decorator` it becomes. Three schemes are supported: `basic` (email +
 password → `Authorization: Basic base64(email:pw)`), `token` (a pre-generated
 credential sent verbatim, or wrapped as `Basic`), and `session` (browser-captured
-cookies with an optional Authorization fallback, established and managed by
-o3). The config/keychain-coupled resolution stays in `internal/auth`: `Resolve`
+cookies with an optional Authorization fallback, established by `auth login
+--browser` here or by o3's native sign-in — both write the same keychain
+entry). The config/keychain-coupled resolution stays in `internal/auth`: `Resolve`
 produces a validated `Credential` from config + secrets, loading the secret from
 the keychain when not supplied via flags/env; the `Store` prefers the OS keychain
 (`go-keyring`) and falls back to a per-user DPAPI-encrypted file on Windows or
@@ -133,6 +134,25 @@ preserved rather than collapsed into "missing":
 `CREDENTIAL_STORE_INACCESSIBLE` and `CREDENTIAL_NOT_VISIBLE_OR_MISSING` carry a
 host-scope recovery instruction so an Agent host can retry before asking the
 user to reconfigure credentials.
+
+## Browser sign-in (`pkg/webauth` + `pkg/webauth/cdp`)
+
+The pure capture core lives in **`pkg/webauth`**: cookie shaping and host
+scoping, the `LoginSucceeded` heuristic, the injected capture script
+(`ProbeJS`), and the `Tracker` that decides when a captured state counts as a
+completed login. It imports only the standard library and `pkg/auth`, so the o3
+desktop app shares it.
+
+The transport is the `Driver` seam. **`pkg/webauth/cdp`** implements it by
+launching a Chromium-family browser with `--remote-debugging-port=0` and
+speaking a small subset of the DevTools Protocol over one WebSocket; o3 keeps a
+second implementation over a native WKWebView on macOS and uses the CDP driver
+elsewhere.
+
+An authenticated API request is the sole success signal
+(`webauth.PingVerifier`): only a real authenticated response distinguishes a
+completed login from a benign login-page cookie or an in-progress redirect to an
+external identity provider.
 
 ## Time (`internal/timeutil`)
 

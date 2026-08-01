@@ -55,17 +55,53 @@ fi
   (config/3)** — when `recovery.scope` is `host`, request host access and retry
   the same invocation once. Repeating it in the same sandbox will not help.
   Only configure credentials when the host retry also reports them missing; for
-  a browser session, sign in through o3 rather than running `config init`.
+  a browser session, run `openobserve-cli auth login --browser` on the host (or
+  sign in through o3) rather than running `config init` — `--browser` needs a
+  graphical session, so sandboxes still use `OPENOBSERVE_EMAIL`/
+  `OPENOBSERVE_PASSWORD` or `OPENOBSERVE_TOKEN`.
 - **`NO_BASE_URL` (config/3)** — no server configured. Run `config init` or set
   `OPENOBSERVE_URL`.
 - **`AUTH_LOGIN_NEEDS_TTY` (auth/4)** — `auth login`/`config init` need a
   terminal. In CI/agents set `OPENOBSERVE_EMAIL`+`OPENOBSERVE_PASSWORD` (or
   `OPENOBSERVE_TOKEN`).
 - **`AUTH_BAD_SESSION` (config/3)** — the browser-captured session is malformed
-  or contains no cookies. Sign in through o3 again to replace it.
-- **`SESSION_BROWSER_MANAGED` (usage/2)** — `config init` or `auth login` was
-  used on a session context. Browser sessions are created and refreshed in o3;
-  the CLI can consume, inspect, switch, and log out of them.
+  or contains no cookies. Sign in again with `auth login --browser`, or through
+  o3, to replace it — both write the same keychain entry.
+- **`SESSION_BROWSER_MANAGED` (usage/2)** — `config init` or plain `auth login`
+  (without `--browser`) was used on a session context. Refresh it with
+  `openobserve-cli auth login --browser`, here or in o3; the CLI can also
+  consume, inspect, switch, and log out of a session context without
+  re-establishing it.
+- **`BROWSER_NOT_FOUND` (config/3)** — `auth login --browser` found no
+  Chromium-family browser. Install Chrome / Chromium / Edge / Brave, or set
+  `OPENOBSERVE_BROWSER=/path/to/browser`; otherwise use `auth login` with a
+  password or token.
+- **`BROWSER_NO_DISPLAY` (usage/2)** — `--browser` on a Linux host with neither
+  `DISPLAY` nor `WAYLAND_DISPLAY`. It needs a graphical session, so over SSH or
+  inside a container / agent sandbox use `OPENOBSERVE_EMAIL`+
+  `OPENOBSERVE_PASSWORD` or `OPENOBSERVE_TOKEN` instead.
+- **`BROWSER_SIGNIN_CANCELLED` (auth/4)** — the sign-in window was closed before
+  login completed. Nothing was stored; re-run `auth login --browser`.
+- **`BROWSER_SIGNIN_TIMEOUT` (auth/4)** — sign-in did not complete within the
+  ten-minute window. Re-run `auth login --browser`, or use a password / token.
+- **`BROWSER_LAUNCH_FAILED` (config/3)** — the browser could not be launched or
+  driven. The underlying failure is in `message`; the browser's own output is
+  not captured. Set `OPENOBSERVE_BROWSER` to a specific executable, or use
+  `auth login`.
+- **`FRESH_PROFILE_NEEDS_BROWSER` (usage/2)** — `--fresh-profile` was passed
+  without `--browser`. It selects a throwaway browser profile and means nothing
+  to a password / token login.
+- **`CONTEXT_BASE_URL_MISMATCH` (config/3)** — `auth login --browser` captured
+  and stored the session, but the active context on disk points at a different
+  server, so `auth.scheme: session` was not recorded in it. `OPENOBSERVE_URL` /
+  `--base-url` override the server but not the context name. Re-run with a
+  context whose `base_url` is the server you signed in to (`--use-context
+  <name>`, or `config use-context <name>`); `config contexts` lists them, and
+  `config init` creates one.
+- **`PROFILE_REMOVE_FAILED` (config/3)** — `auth logout` removed the stored
+  credential but could not delete
+  `~/.angelmsger/openobserve/browser-profile`. The credential is gone; delete
+  that directory by hand to clear the remembered browser session.
 - **`BAD_TIME_RANGE` (usage/2)** — pass `--since 1h` or `--from`/`--to`.
 - **`STREAM_NOT_FOUND` (not_found/6)** — run `stream list`; names are
   case-sensitive.

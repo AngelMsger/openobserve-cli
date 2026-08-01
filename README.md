@@ -167,6 +167,27 @@ position). See the **SSO / OAuth** section of
 [the getting-started reference](skills/openobserve/references/getting-started.md)
 for the full walkthrough.
 
+### Browser sign-in
+
+Instances behind SSO cannot use a password or a generated token. Sign in
+through a real browser instead:
+
+```bash
+openobserve-cli auth login --browser
+```
+
+A browser window opens on your instance's login page; once you are signed in
+the CLI captures the session, verifies it with an authenticated request, and
+stores it in the OS keychain. The captured session is the same one the
+[o3](https://github.com/angelmsger/o3) desktop app uses, so signing in through
+either leaves the other authenticated.
+
+Requires a Chromium-family browser (Chrome, Chromium, Edge or Brave) and a
+graphical session. Set `OPENOBSERVE_BROWSER` to choose a specific one. The
+browser profile is remembered under `~/.angelmsger/openobserve/browser-profile`
+so you are not sent through SSO on every login; `--fresh-profile` opts out, and
+`auth logout` removes it.
+
 ## Commands
 
 | Command | Purpose |

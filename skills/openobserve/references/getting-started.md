@@ -3,7 +3,8 @@
 `openobserve-cli` talks to either a self-hosted OpenObserve (default
 `http://localhost:5080`) or OpenObserve Cloud (`https://api.openobserve.ai`).
 Authentication is HTTP Basic — email + password — or a pre-generated token.
-Contexts created by the o3 desktop can instead carry a browser-captured session.
+A context can instead carry a browser-captured session, established by `auth
+login --browser` here or by the o3 desktop's native sign-in.
 
 ## Interactive setup (humans, on a terminal)
 
@@ -39,9 +40,10 @@ login` inside the sandbox.
 
 Only when the host retry also reports missing credentials should the user
 configure them in their terminal or provide environment variables. For a
-browser-session context, sign in through o3 again instead. The CLI cannot and
-must not elevate itself; `recovery.scope=host` is an instruction to the Agent
-host or approval layer.
+browser-session context, the user runs `openobserve-cli auth login --browser`
+on their own host (it opens a real browser window, so it needs a display and
+does not work inside the sandbox). The CLI cannot and must not elevate itself;
+`recovery.scope=host` is an instruction to the Agent host or approval layer.
 
 ## Headless setup (CI and genuinely unconfigured environments)
 
@@ -60,17 +62,40 @@ export OPENOBSERVE_TOKEN='cm9vdEBleGFtcGxlLmNvbTpDb21wbGV4cGFzcw=='
 `OPENOBSERVE_TOKEN` is the base64 portion of a Basic credential; a full
 `Basic …` / `Bearer …` value is also accepted and passed through verbatim.
 
-## Browser-captured sessions (o3 desktop)
+## Browser sign-in
 
-The o3 desktop can sign in through an instance's own browser login page and
-store a `session` context in the same config and keychain used by this CLI. The
-CLI can use that context normally, including `auth status`, `doctor`, and all
-read commands. Select it with `--use-context <name>` or `config use-context`.
+```
+openobserve-cli auth login --browser
+```
 
-Browser sessions cannot be created or refreshed by `config init` or `auth
-login`; sign in through o3 again when one expires or needs to change. A malformed
-or cookie-less captured session is rejected as `AUTH_BAD_SESSION` instead of
-being sent as an unauthenticated request.
+A browser window opens on the instance's own login page (a one-line notice on
+stderr says so, since the command then waits); once you sign in, the CLI
+captures the session, verifies it with an authenticated request, stores it in
+the OS keychain, and records `auth.scheme: session` plus the captured email on
+the active context in `config.yaml` — creating that context when the server
+came from `OPENOBSERVE_URL`. Only that context's `auth` block is rewritten. The
+CLI can then use the context normally, including `auth status`, `doctor`, and
+all read commands. This is the path for instances behind SSO, where neither a
+password nor a generated token works.
+
+Requires a Chromium-family browser (Chrome, Chromium, Edge or Brave) and a
+graphical session — it does not work over SSH or inside an agent sandbox. Set
+`OPENOBSERVE_BROWSER` to choose a specific browser. The browser profile is
+remembered under `~/.angelmsger/openobserve/browser-profile` so an identity
+provider does not re-prompt on every sign-in; `--fresh-profile` opts out (it
+requires `--browser`, and is a `FRESH_PROFILE_NEEDS_BROWSER` usage error
+without it), and `auth logout` removes the profile, reporting whether one was
+actually there in `browser_profile_removed`.
+
+The capture script is scoped to the instance's own hostname, so an identity
+provider on another origin — full-page or in an iframe — never has its
+`Authorization` header captured.
+
+The captured session uses the same keychain entry the o3 desktop app writes,
+so signing in through either client authenticates both; sign in again through
+either one when a session expires. A malformed or cookie-less captured session
+is rejected as `AUTH_BAD_SESSION` instead of being sent as an unauthenticated
+request.
 
 ## SSO / OAuth (dex, Authentik, Okta, Azure…): use a Service Account
 

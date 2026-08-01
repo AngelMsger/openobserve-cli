@@ -7,6 +7,99 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`auth login --browser` signs in through a real browser.** Instances behind
+  SSO, where neither a password nor a generated token works, can now be
+  authenticated from the CLI alone — previously the only path was installing the
+  o3 desktop app. Capture drives a Chromium-family browser over the DevTools
+  Protocol, so it works on macOS, Linux and Windows, and stores the session in
+  the same keychain entry o3 uses: signing in through either client
+  authenticates both. The browser profile is remembered so SSO is not repeated
+  on every login; `--fresh-profile` opts out.
+- **`pkg/webauth` is the shared capture core.** The cookie shaping, the
+  login-success heuristic, the injected capture script and the verify-by-Ping
+  contract now live in one public package used by both the CLI and o3, instead
+  of being duplicated — the capture script in particular was previously trapped
+  in an Objective-C string literal where a fix could never reach the CLI.
+
+- **New error codes.** `BROWSER_NOT_FOUND`, `BROWSER_NO_DISPLAY`,
+  `BROWSER_SIGNIN_CANCELLED`, `BROWSER_SIGNIN_TIMEOUT` and
+  `BROWSER_LAUNCH_FAILED` cover browser sign-in; `FRESH_PROFILE_NEEDS_BROWSER`
+  rejects `--fresh-profile` without `--browser`; `PROFILE_REMOVE_FAILED`
+  reports a browser profile `auth logout` could not delete;
+  `CONTEXT_BASE_URL_MISMATCH` reports a captured session that was stored but
+  could not be recorded on the active context. All are catalogued in the
+  Skill's `errors-and-exit-codes` reference.
+- New dependency:
+  [`github.com/coder/websocket`](https://github.com/coder/websocket), the
+  WebSocket client the DevTools Protocol connection is built on. It is pure Go
+  with no dependencies of its own, so `CGO_ENABLED=0` builds are unaffected.
+
+### Changed
+
+- **`SESSION_BROWSER_MANAGED` now points at the CLI's own browser sign-in.**
+  Running `auth login` or `config init` against a context that uses a captured
+  session used to direct the user to the o3 desktop app; it now offers
+  `openobserve-cli auth login --browser`. The same stale instruction in the
+  `CREDENTIAL_NOT_VISIBLE_OR_MISSING` next-steps has been repointed too.
+- **`auth logout` now also deletes the remembered browser profile** at
+  `~/.angelmsger/openobserve/browser-profile`, and reports whether one was
+  there in a new `browser_profile_removed` field. Logging out previously left
+  the identity provider's own session on disk, so the next `auth login
+  --browser` silently signed back in as the same user.
+- `auth login --browser` prints a one-line notice on stderr when it opens the
+  browser, instead of producing no output at all for up to ten minutes.
+- `--fresh-profile` without `--browser` is now a usage error rather than being
+  silently ignored.
+
+### Fixed
+
+- **A browser-captured session is now actually usable.** `auth login --browser`
+  stored the session in the keychain but never wrote `auth.scheme: session` to
+  the config file, and nothing else could: `auth.Resolve` defaults an unset
+  scheme to `basic` and `config init` refuses to write `session`. The login
+  reported success while every later command either failed to find a credential
+  or silently carried on with the context's stale password — so the feature
+  worked only for users who already had o3, exactly the audience it exists to
+  free from it. It now records the scheme and the captured email on the active
+  context (creating that context when the server came from `OPENOBSERVE_URL`),
+  rewriting only that context's `auth` block and leaving the rest of the file
+  untouched.
+- **The injected capture script is scoped to the instance's hostname.** It is
+  evaluated in every document the sign-in window loads, so an identity provider
+  on another origin — full-page or in an iframe — that sent its own
+  `Authorization` header had that header captured, written to the user's
+  keychain, and then sent on every request to the OpenObserve instance. The
+  script is now inert unless `location.hostname` is the instance host or a
+  subdomain of it; `webauth.ProbeJS` takes that host as a second argument.
+- **Closing the sign-in window ends the command immediately.** On macOS the
+  browser process outlives its last window, so the CLI never noticed and spun
+  on a dead DevTools session for the full ten-minute timeout before reporting
+  `BROWSER_SIGNIN_TIMEOUT` — `BROWSER_SIGNIN_CANCELLED` was effectively
+  unreachable there. `Target.detachedFromTarget` is now watched alongside
+  process exit.
+- **`--fresh-profile` no longer leaves the throwaway profile behind on
+  Windows.** The profile directory was removed without waiting for the killed
+  browser to exit, which fails with a sharing violation while Chrome still
+  holds handles inside it — leaving a complete profile of live
+  identity-provider cookies in `%TEMP%` on every use, precisely what
+  `--fresh-profile` exists to prevent. The browser is now reaped, with a
+  bounded wait, before the directory is removed.
+- **`auth login --browser` no longer rewrites a context that points at another
+  server.** `OPENOBSERVE_URL` and `--base-url` override the server but not the
+  context name, so a browser login against an overridden server stamped
+  `auth.scheme: session` — and the newly captured email — onto a context still
+  naming the original one. Nothing surfaced until the override went away, at
+  which point that context looked up a session credential filed under a
+  different server and every command failed. The write is now guarded by the
+  account key both sides will actually resolve; when they disagree the new
+  `CONTEXT_BASE_URL_MISMATCH` error reports that the session was stored but the
+  scheme was not recorded, and how to select the right context. Creating a
+  fresh context for the server just signed in to still works, including for a
+  scheme-less `OPENOBSERVE_URL` with a trailing slash, whose raw and normalized
+  forms used to hash to different account keys and orphan the credential.
+
 ## [0.9.1] - 2026-07-31
 
 ### Fixed
