@@ -45,7 +45,7 @@ func Resolve(cfg config.Config, secrets config.Secrets, store *Store) (Credentia
 func credentialNotVisibleOrMissingError(scheme string) error {
 	lastStep := "Only if the host retry also reports missing credentials, run `openobserve-cli config init` in the user's terminal or set OPENOBSERVE_* environment variables."
 	if scheme == SchemeSession {
-		lastStep = "Only if the host retry also reports a missing browser session, sign in through o3 again; browser sessions are not created by `config init`."
+		lastStep = "Only if the host retry also reports a missing browser session, run `openobserve-cli auth login --browser` in the user's graphical session (or sign in through o3 — both write the same keychain entry); browser sessions are not created by `config init`."
 	}
 	return cerrors.New(cerrors.CategoryConfig, "CREDENTIAL_NOT_VISIBLE_OR_MISSING",
 		"stored OpenObserve credentials are missing or not visible in this execution environment").

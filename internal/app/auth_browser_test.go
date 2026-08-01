@@ -63,8 +63,12 @@ func TestRemoveBrowserProfileDeletesTheDirectory(t *testing.T) {
 	if err := os.MkdirAll(filepath.Join(profile, "Default"), 0o700); err != nil {
 		t.Fatal(err)
 	}
-	if err := removeBrowserProfile(cfgDir); err != nil {
+	removed, err := removeBrowserProfile(cfgDir)
+	if err != nil {
 		t.Fatalf("removeBrowserProfile: %v", err)
+	}
+	if !removed {
+		t.Fatal("a profile that existed and was deleted must be reported as removed")
 	}
 	if _, err := os.Stat(profile); !os.IsNotExist(err) {
 		t.Fatal("browser profile survived logout; the remembered session is still on disk")
@@ -72,8 +76,14 @@ func TestRemoveBrowserProfileDeletesTheDirectory(t *testing.T) {
 }
 
 func TestRemoveBrowserProfileToleratesNoProfile(t *testing.T) {
-	if err := removeBrowserProfile(t.TempDir()); err != nil {
+	removed, err := removeBrowserProfile(t.TempDir())
+	if err != nil {
 		t.Fatalf("a context that never used browser sign-in must log out cleanly: %v", err)
+	}
+	// `auth logout` reports this verbatim; most contexts never used browser
+	// sign-in and must not be told a profile was deleted.
+	if removed {
+		t.Fatal("reported removing a browser profile that never existed")
 	}
 }
 
@@ -123,9 +133,16 @@ func (failingKeyring) Delete(string, string) error {
 }
 
 // newTestAppState builds an appState with the given (possibly un-normalized)
-// base URL, a temp config dir, and a file-backed credential store so
-// auth.Save/Resolve/Forget work without touching the real OS keychain.
-func newTestAppState(t *testing.T, baseURL string) *appState {
+// base URL and starting auth scheme, a temp config dir, and a file-backed
+// credential store so auth.Save/Resolve/Forget work without touching the real
+// OS keychain.
+//
+// scheme is whatever the context started with — "" (never configured) and
+// "basic" (a password context switching to SSO) are the two states a real user
+// runs `auth login --browser` from. Neither may be pre-set to `session`: the
+// account key mixes the scheme in, so a test that hands itself the answer would
+// pass even if the login never recorded `scheme: session` anywhere.
+func newTestAppState(t *testing.T, baseURL, scheme string) *appState {
 	t.Helper()
 	dir := t.TempDir()
 	return &appState{
@@ -133,13 +150,7 @@ func newTestAppState(t *testing.T, baseURL string) *appState {
 			Config: config.Config{
 				BaseURL: baseURL,
 				Org:     "default",
-				// Auth.Scheme must be SchemeSession: Resolve defaults to
-				// SchemeBasic when this is unset, which would look the
-				// credential up under a different account key than the one
-				// runBrowserLoginWith saves under (AccountKey mixes the
-				// scheme in), and the round trip below would fail even with
-				// a correctly file-backed store.
-				Auth: config.AuthConfig{Scheme: auth.SchemeSession},
+				Auth:    config.AuthConfig{Scheme: scheme},
 				Defaults: config.Defaults{
 					Format:     "json",
 					Timeout:    5 * time.Second,
@@ -150,6 +161,27 @@ func newTestAppState(t *testing.T, baseURL string) *appState {
 		store:  auth.NewStoreWithBackend(dir, failingKeyring{}),
 		cfgDir: dir,
 	}
+}
+
+// loadFromDisk re-resolves configuration from a config directory the way a
+// fresh CLI invocation would, with the environment neutralised so only the
+// file under test decides the outcome.
+func loadFromDisk(t *testing.T, cfgDir string) *config.Resolved {
+	t.Helper()
+	for _, k := range []string{
+		"OPENOBSERVE_URL", "OPENOBSERVE_ORG", "OPENOBSERVE_EMAIL",
+		"OPENOBSERVE_PASSWORD", "OPENOBSERVE_TOKEN", "OPENOBSERVE_CONTEXT",
+	} {
+		t.Setenv(k, "")
+	}
+	resolved, err := config.Load(config.LoadOptions{
+		ConfigDir:  cfgDir,
+		DotenvPath: filepath.Join(t.TempDir(), "absent.env"),
+	})
+	if err != nil {
+		t.Fatalf("reload config: %v", err)
+	}
+	return resolved
 }
 
 // fakeDriver stands in for cdp.Driver in tests: it records the arguments
@@ -179,7 +211,7 @@ func TestRunBrowserLoginNormalizesBeforeCapture(t *testing.T) {
 		{"http://o2.example.com/", "http://o2.example.com/web/login", "o2.example.com"},
 	}
 	for _, tc := range cases {
-		s := newTestAppState(t, tc.raw)
+		s := newTestAppState(t, tc.raw, "")
 		d := &fakeDriver{sess: pkgauth.Session{Cookies: "auth_tokens=x", Email: "ops@example.com"}}
 		if err := runBrowserLoginWith(s, d); err != nil {
 			t.Fatalf("%q: %v", tc.raw, err)
@@ -206,7 +238,7 @@ func TestRunBrowserLoginNormalizesBeforeCapture(t *testing.T) {
 // used the normalized value instead of the raw one.
 func TestRunBrowserLoginSavesUnderRawBaseURL(t *testing.T) {
 	raw := "o2.example.com:8080/"
-	s := newTestAppState(t, raw)
+	s := newTestAppState(t, raw, "")
 	d := &fakeDriver{sess: pkgauth.Session{Cookies: "auth_tokens=x", Email: "ops@example.com"}}
 	if err := runBrowserLoginWith(s, d); err != nil {
 		t.Fatal(err)
@@ -220,5 +252,187 @@ func TestRunBrowserLoginSavesUnderRawBaseURL(t *testing.T) {
 	}
 	if cred.Scheme != auth.SchemeSession {
 		t.Fatalf("resolved scheme = %q, want %q", cred.Scheme, auth.SchemeSession)
+	}
+}
+
+// TestRunBrowserLoginPersistsSessionScheme is the regression test for the
+// release blocker: --browser stored the captured session under the `session`
+// account key but never wrote `auth.scheme: session` anywhere, and nothing else
+// could. auth.Resolve defaults an unset scheme to `basic` and `config init`
+// refuses to write `session`, so the login reported success and every later
+// command then either failed to find a credential or silently carried on with
+// the context's stale password.
+//
+// It therefore starts from the two states a real user is in — never configured,
+// and a working password context moving to SSO — and asserts on the CONFIG FILE
+// plus a fresh reload, not on the in-memory state the login just mutated.
+func TestRunBrowserLoginPersistsSessionScheme(t *testing.T) {
+	cases := []struct {
+		name   string
+		scheme string
+	}{
+		{"scheme never configured", ""},
+		{"context previously used a password", auth.SchemeBasic},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			s := newTestAppState(t, "https://o2.example.com", tc.scheme)
+			if tc.scheme != "" {
+				// The context exists on disk, as it would after `config init`.
+				writeContext(t, s.cfgDir, config.NamedContext{
+					Name:    config.DefaultContextName,
+					BaseURL: "https://o2.example.com",
+					Org:     "default",
+					Auth:    config.AuthConfig{Scheme: tc.scheme, Username: "old@example.com"},
+				})
+			}
+			d := &fakeDriver{sess: pkgauth.Session{
+				Cookies: "auth_tokens=captured", Email: "ops@example.com",
+			}}
+			if err := runBrowserLoginWith(s, d); err != nil {
+				t.Fatalf("runBrowserLoginWith: %v", err)
+			}
+
+			// 1. The file itself now says `session`.
+			file, ok, err := config.ReadFile(s.cfgDir)
+			if err != nil || !ok {
+				t.Fatalf("config file not written (ok=%v): %v", ok, err)
+			}
+			nc, found := file.Context(config.DefaultContextName)
+			if !found {
+				t.Fatalf("no %q context in the config file: %+v", config.DefaultContextName, file)
+			}
+			if nc.Auth.Scheme != auth.SchemeSession {
+				t.Fatalf("config file records scheme %q, want %q — nothing else writes it, "+
+					"so the captured session is unreachable", nc.Auth.Scheme, auth.SchemeSession)
+			}
+			if nc.Auth.Username != "ops@example.com" {
+				t.Errorf("username = %q, want the captured email", nc.Auth.Username)
+			}
+
+			// 2. A fresh invocation resolves the captured session from it.
+			reloaded := loadFromDisk(t, s.cfgDir)
+			cred, err := auth.Resolve(reloaded.Config, reloaded.Secrets, s.store)
+			if err != nil {
+				t.Fatalf("a fresh invocation cannot resolve the captured session: %v", err)
+			}
+			if cred.Scheme != auth.SchemeSession {
+				t.Fatalf("reloaded scheme = %q, want %q", cred.Scheme, auth.SchemeSession)
+			}
+			sess, err := pkgauth.ParseSession(cred.Secret)
+			if err != nil {
+				t.Fatalf("resolved secret is not the captured session: %v", err)
+			}
+			if sess.Cookies != "auth_tokens=captured" {
+				t.Fatalf("resolved cookies = %q, want the captured ones", sess.Cookies)
+			}
+		})
+	}
+}
+
+// Writing the scheme must not cost the user the rest of their config file.
+func TestRunBrowserLoginPreservesTheRestOfTheConfigFile(t *testing.T) {
+	s := newTestAppState(t, "https://prod.example.com", auth.SchemeBasic)
+	s.resolved.ActiveContext = "prod"
+	before := config.File{
+		CurrentContext: "prod",
+		Contexts: []config.NamedContext{
+			{Name: "staging", BaseURL: "https://staging.example.com", Org: "stg",
+				Auth: config.AuthConfig{Scheme: auth.SchemeToken, Username: "svc@example.com"}},
+			{Name: "prod", BaseURL: "https://prod.example.com", Org: "default",
+				Auth: config.AuthConfig{Scheme: auth.SchemeBasic, Username: "old@example.com"}},
+		},
+		Defaults: config.Defaults{Format: "table", Timeout: 42 * time.Second, MaxRetries: 7, ReadOnly: true},
+	}
+	if err := config.WriteFile(s.cfgDir, before); err != nil {
+		t.Fatal(err)
+	}
+
+	d := &fakeDriver{sess: pkgauth.Session{Cookies: "auth_tokens=x", Email: "ops@example.com"}}
+	if err := runBrowserLoginWith(s, d); err != nil {
+		t.Fatal(err)
+	}
+
+	after, _, err := config.ReadFile(s.cfgDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if after.CurrentContext != "prod" {
+		t.Errorf("current_context = %q, want prod", after.CurrentContext)
+	}
+	if after.Defaults != before.Defaults {
+		t.Errorf("shared defaults were clobbered: %+v, want %+v", after.Defaults, before.Defaults)
+	}
+	stg, _ := after.Context("staging")
+	if stg != before.Contexts[0] {
+		t.Errorf("the unrelated context changed: %+v, want %+v", stg, before.Contexts[0])
+	}
+	prod, _ := after.Context("prod")
+	want := config.NamedContext{
+		Name: "prod", BaseURL: "https://prod.example.com", Org: "default",
+		Auth: config.AuthConfig{Scheme: auth.SchemeSession, Username: "ops@example.com"},
+	}
+	if prod != want {
+		t.Errorf("prod context = %+v, want %+v", prod, want)
+	}
+}
+
+// `auth logout` forgets the scheme the context actually uses. Keying the
+// deletion off `basic` would report logged_out: true and leave the captured
+// session sitting in the store.
+func TestAuthLogoutRemovesTheSessionCredential(t *testing.T) {
+	s := newTestAppState(t, "https://o2.example.com", "")
+	d := &fakeDriver{sess: pkgauth.Session{Cookies: "auth_tokens=x", Email: "ops@example.com"}}
+	if err := runBrowserLoginWith(s, d); err != nil {
+		t.Fatal(err)
+	}
+	key := auth.AccountKey(s.cfg().BaseURL, auth.SchemeSession)
+	if _, err := s.store.Load(key); err != nil {
+		t.Fatalf("precondition: session credential was not stored: %v", err)
+	}
+
+	cmd := newAuthLogoutCmd(s)
+	if err := cmd.RunE(cmd, nil); err != nil {
+		t.Fatalf("auth logout: %v", err)
+	}
+	// The test store's keychain backend always fails, so a missing secret
+	// surfaces as a store-access error rather than ErrSecretNotFound; what
+	// matters is that the secret is no longer loadable when it was a moment ago.
+	if secret, err := s.store.Load(key); err == nil {
+		t.Fatalf("the captured session survived logout (still loads %d bytes); "+
+			"logout reported success while leaving the credential in the store", len(secret))
+	}
+}
+
+// --fresh-profile selects a throwaway browser profile; nothing but --browser
+// reads it. Accepting it silently would hide a typo'd invocation behind an
+// apparently successful password login.
+func TestFreshProfileWithoutBrowserIsAUsageError(t *testing.T) {
+	s := newTestAppState(t, "https://o2.example.com", "")
+	cmd := newAuthLoginCmd(s)
+	if err := cmd.Flags().Set("fresh-profile", "true"); err != nil {
+		t.Fatal(err)
+	}
+	err := cmd.RunE(cmd, nil)
+	if err == nil {
+		t.Fatal("--fresh-profile without --browser was accepted")
+	}
+	ce := cerrors.AsCLIError(err)
+	if ce.Code != "FRESH_PROFILE_NEEDS_BROWSER" {
+		t.Fatalf("code = %q, want FRESH_PROFILE_NEEDS_BROWSER", ce.Code)
+	}
+	if len(ce.NextSteps) == 0 {
+		t.Error("the error carries no next steps")
+	}
+}
+
+// writeContext seeds a config file holding exactly one context.
+func writeContext(t *testing.T, dir string, nc config.NamedContext) {
+	t.Helper()
+	if err := config.WriteFile(dir, config.File{
+		CurrentContext: nc.Name,
+		Contexts:       []config.NamedContext{nc},
+	}); err != nil {
+		t.Fatal(err)
 	}
 }

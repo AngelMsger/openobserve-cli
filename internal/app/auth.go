@@ -35,6 +35,16 @@ func newAuthLoginCmd(s *appState) *cobra.Command {
 			if useBrowser {
 				return runBrowserLogin(s, freshProfile)
 			}
+			// --fresh-profile only means anything to the browser driver.
+			// Silently ignoring it would hide a typo'd invocation behind an
+			// apparently successful password login.
+			if freshProfile {
+				return cerrors.New(cerrors.CategoryUsage, "FRESH_PROFILE_NEEDS_BROWSER",
+					"--fresh-profile only applies to browser sign-in").
+					WithHint("It selects a throwaway browser profile, which nothing but --browser uses.").
+					WithNextSteps("openobserve-cli auth login --browser --fresh-profile",
+						"openobserve-cli auth login")
+			}
 			if !stdinIsTTY() {
 				return cerrors.New(cerrors.CategoryAuth, "AUTH_LOGIN_NEEDS_TTY",
 					"auth login requires an interactive terminal").
@@ -142,6 +152,10 @@ func newAuthLogoutCmd(s *appState) *cobra.Command {
 				return cerrors.New(cerrors.CategoryConfig, "NO_BASE_URL",
 					"no server configured").WithNextSteps("openobserve-cli config init")
 			}
+			// Forget the scheme this context actually uses: the account key
+			// mixes the scheme in, so logging out of a `session` context with
+			// the `basic` key would report success and leave the captured
+			// session in the store.
 			scheme := cfg.Auth.Scheme
 			if scheme == "" {
 				scheme = auth.SchemeBasic
@@ -150,14 +164,15 @@ func newAuthLogoutCmd(s *appState) *cobra.Command {
 				return cerrors.Wrap(err, cerrors.CategoryConfig, "LOGOUT_FAILED",
 					"failed to remove stored credential")
 			}
-			if err := removeBrowserProfile(s.cfgDir); err != nil {
+			profileRemoved, err := removeBrowserProfile(s.cfgDir)
+			if err != nil {
 				return err
 			}
 			return s.emit(map[string]any{
 				"logged_out":              true,
 				"base_url":                cfg.BaseURL,
 				"scheme":                  scheme,
-				"browser_profile_removed": true,
+				"browser_profile_removed": profileRemoved,
 			})
 		},
 	}
