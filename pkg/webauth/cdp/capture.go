@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"sync"
 	"time"
@@ -34,6 +35,13 @@ const pollInterval = time.Second
 // bindingName is the global function the injected script calls. It is scoped
 // with an unlikely prefix to avoid colliding with anything in the page.
 const bindingName = "__openobserveCliProbe"
+
+// exitGrace bounds how long the kill defer waits for the browser process to
+// actually go away. Waiting matters on Windows, where removing the temporary
+// profile directory fails with a sharing violation while the browser still
+// holds handles inside it; the bound keeps a wedged process from hanging the
+// command instead.
+const exitGrace = 5 * time.Second
 
 // Options configures a Driver.
 type Options struct {
@@ -104,6 +112,45 @@ func parseBindingPayload(payload string) (authorization, email string) {
 	return p.Authorization, p.Email
 }
 
+// detachedIsOurs reports whether a Target.detachedFromTarget event refers to
+// the page session Capture is driving. The protocol carries the detached
+// session in the event's own params; anything else (a worker, a
+// service-worker target, another tab) must not cancel the sign-in.
+func detachedIsOurs(params json.RawMessage, sessionID string) bool {
+	if sessionID == "" {
+		return false
+	}
+	var p struct {
+		SessionID string `json:"sessionId"`
+	}
+	if json.Unmarshal(params, &p) != nil {
+		return false
+	}
+	return p.SessionID == sessionID
+}
+
+// killAndReap kills the browser and waits, for at most grace, for launch's
+// reaper to observe the exit. Callers rely on the wait: a deferred removal of a
+// temporary profile directory registered before this one runs afterwards, and
+// on Windows it fails with a sharing violation while the browser still has the
+// profile open — silently leaving a directory full of live identity-provider
+// cookies behind. The bound means a process that refuses to die delays the
+// command instead of hanging it.
+func killAndReap(cmd *exec.Cmd, exited <-chan struct{}, grace time.Duration) {
+	if cmd.Process != nil {
+		_ = cmd.Process.Kill()
+	}
+	if exited == nil {
+		return
+	}
+	timer := time.NewTimer(grace)
+	defer timer.Stop()
+	select {
+	case <-exited:
+	case <-timer.C:
+	}
+}
+
 // Capture opens the browser at loginURL and blocks until the session is
 // verified, the user closes the browser, or the timeout elapses.
 func (d *Driver) Capture(loginURL, host string, verify webauth.VerifyFunc) (pkgauth.Session, error) {
@@ -118,6 +165,11 @@ func (d *Driver) Capture(loginURL, host string, verify webauth.VerifyFunc) (pkga
 		if err != nil {
 			return pkgauth.Session{}, err
 		}
+		// Registered BEFORE the kill defer below, so LIFO ordering runs the
+		// kill-and-reap first and this removal second — the browser is gone by
+		// the time the directory is deleted. A throwaway profile holds live
+		// identity-provider cookies, and removing it is the entire point of
+		// --fresh-profile, so it must not be left behind.
 		defer os.RemoveAll(tmp)
 		profileDir = tmp
 	}
@@ -131,12 +183,9 @@ func (d *Driver) Capture(loginURL, host string, verify webauth.VerifyFunc) (pkga
 	}
 	// Kill only — never Wait here. launch owns the single Wait on this process
 	// and reports exit through the `exited` channel; a second Wait would error
-	// and race the first.
-	defer func() {
-		if cmd.Process != nil {
-			_ = cmd.Process.Kill()
-		}
-	}()
+	// and race the first. Draining that channel is what makes the temporary
+	// profile removal registered above safe.
+	defer killAndReap(cmd, exited, exitGrace)
 
 	c, err := dial(ctx, wsURL)
 	if err != nil {
@@ -148,6 +197,21 @@ func (d *Driver) Capture(loginURL, host string, verify webauth.VerifyFunc) (pkga
 	if err != nil {
 		return pkgauth.Session{}, err
 	}
+
+	// Closing the sign-in window does NOT end the browser process on macOS —
+	// the app stays running with no windows — so `exited` never fires. What
+	// does fire is Target.detachedFromTarget for our page session, after which
+	// every sample() fails permanently ("Session with given id not found") and
+	// the poll loop would spin until the ten-minute timeout. Both signals are
+	// real; watch for both.
+	detached := make(chan struct{})
+	var detachOnce sync.Once
+	c.onEvent("Target.detachedFromTarget", func(_ string, params json.RawMessage) {
+		if !detachedIsOurs(params, sessionID) {
+			return
+		}
+		detachOnce.Do(func() { close(detached) })
+	})
 
 	// Observations pushed by the injected script. Guarded because they arrive
 	// on the connection's reader goroutine.
@@ -183,6 +247,8 @@ func (d *Driver) Capture(loginURL, host string, verify webauth.VerifyFunc) (pkga
 	for {
 		select {
 		case <-exited:
+			return pkgauth.Session{}, ErrCancelled
+		case <-detached:
 			return pkgauth.Session{}, ErrCancelled
 		case <-ctx.Done():
 			return pkgauth.Session{}, ErrTimeout

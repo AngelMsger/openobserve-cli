@@ -3,6 +3,8 @@
 package cdp
 
 import (
+	"context"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -233,6 +235,100 @@ setTimeout(function(){ location.href = '/web/logs'; }, 200);
 		t.Fatalf("captured an Authorization header from a foreign origin: %q — "+
 			"it would be written to the keychain and sent to the OpenObserve instance",
 			sess.Authorization)
+	}
+}
+
+// TestCaptureReturnsCancelledWhenThePageTargetCloses pins the fix for the
+// ten-minute hang: closing the sign-in window leaves the browser process alive
+// on macOS, so `exited` never fires; every later sample() then fails with
+// "Session with given id not found" and the poll loop spun until the timeout,
+// making BROWSER_SIGNIN_CANCELLED unreachable. Closing the page target is what
+// the user's window close does at the protocol level, so drive that directly
+// through a second debugger connection to the same browser.
+func TestCaptureReturnsCancelledWhenThePageTargetCloses(t *testing.T) {
+	if _, err := findBrowser(); err != nil {
+		t.Skipf("no browser available: %v", err)
+	}
+	mux := http.NewServeMux()
+	// A page that never signs in: only the close can end this capture.
+	mux.HandleFunc("/web/login", func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "text/html")
+		_, _ = w.Write([]byte(`<!doctype html><html><body>waiting for sign-in</body></html>`))
+	})
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+
+	// A known profile directory is what lets the test find the browser's
+	// debugging endpoint and act as a second client.
+	profileDir := t.TempDir()
+	d := New(Options{ProfileDir: profileDir, Timeout: 90 * time.Second})
+
+	done := make(chan struct{})
+	var captureErr error
+	go func() {
+		defer close(done)
+		_, captureErr = d.Capture(srv.URL+"/web/login", mustHost(t, srv.URL),
+			func(pkgauth.Session) bool { return false })
+	}()
+
+	closePageTarget(t, profileDir, "/web/login")
+
+	select {
+	case <-done:
+	case <-time.After(30 * time.Second):
+		t.Fatal("Capture did not return within 30s of the window closing; " +
+			"it is spinning on a dead session until the sign-in timeout")
+	}
+	if !errors.Is(captureErr, ErrCancelled) {
+		t.Fatalf("Capture returned %v, want ErrCancelled", captureErr)
+	}
+}
+
+// closePageTarget waits for a page target whose URL contains want, then closes
+// it — the protocol-level equivalent of the user closing the sign-in window.
+func closePageTarget(t *testing.T, profileDir, want string) {
+	t.Helper()
+	wsURL, err := readDevToolsURL(profileDir, 30*time.Second, func() bool { return true })
+	if err != nil {
+		t.Fatalf("find the browser's debugging endpoint: %v", err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	c, err := dial(ctx, wsURL)
+	if err != nil {
+		t.Fatalf("dial devtools: %v", err)
+	}
+	defer c.Close()
+
+	deadline := time.Now().Add(30 * time.Second)
+	for {
+		var targets struct {
+			TargetInfos []struct {
+				TargetID string `json:"targetId"`
+				Type     string `json:"type"`
+				URL      string `json:"url"`
+			} `json:"targetInfos"`
+		}
+		if err := c.call(ctx, "", "Target.getTargets", nil, &targets); err != nil {
+			t.Fatalf("Target.getTargets: %v", err)
+		}
+		for _, tg := range targets.TargetInfos {
+			if tg.Type != "page" || !strings.Contains(tg.URL, want) {
+				continue
+			}
+			// Give Capture a moment to finish attaching and start polling, so
+			// the close lands on an established session rather than racing it.
+			time.Sleep(2 * time.Second)
+			if err := c.call(ctx, "", "Target.closeTarget",
+				map[string]any{"targetId": tg.TargetID}, nil); err != nil {
+				t.Fatalf("Target.closeTarget: %v", err)
+			}
+			return
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("no page target reached %q", want)
+		}
+		time.Sleep(200 * time.Millisecond)
 	}
 }
 
