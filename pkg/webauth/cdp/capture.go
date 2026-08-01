@@ -172,7 +172,7 @@ func (d *Driver) Capture(loginURL, host string, verify webauth.VerifyFunc) (pkga
 		}
 	})
 
-	if err := prepare(ctx, c, sessionID, loginURL); err != nil {
+	if err := prepare(ctx, c, sessionID, loginURL, host); err != nil {
 		return pkgauth.Session{}, err
 	}
 
@@ -233,7 +233,10 @@ func attachToPage(ctx context.Context, c *conn) (string, error) {
 // prepare installs the capture script, then navigates to the login page. The
 // order matters: addScriptToEvaluateOnNewDocument applies to documents loaded
 // after it is registered, so navigating first would miss the SPA's own boot.
-func prepare(ctx context.Context, c *conn, sessionID, loginURL string) error {
+//
+// That same breadth is why the script is scoped to host: it runs in every
+// document the target loads, including an identity provider on another origin.
+func prepare(ctx context.Context, c *conn, sessionID, loginURL, host string) error {
 	if err := c.call(ctx, sessionID, "Runtime.enable", nil, nil); err != nil {
 		return err
 	}
@@ -245,7 +248,7 @@ func prepare(ctx context.Context, c *conn, sessionID, loginURL string) error {
 		return err
 	}
 	if err := c.call(ctx, sessionID, "Page.addScriptToEvaluateOnNewDocument",
-		map[string]any{"source": webauth.ProbeJS(bindingName)}, nil); err != nil {
+		map[string]any{"source": webauth.ProbeJS(bindingName, host)}, nil); err != nil {
 		return err
 	}
 	return c.call(ctx, sessionID, "Page.navigate", map[string]any{"url": loginURL}, nil)
