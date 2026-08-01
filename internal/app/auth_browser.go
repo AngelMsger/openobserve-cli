@@ -19,6 +19,20 @@ import (
 // session under the active context, in the same keychain entry the o3 desktop
 // app uses — so signing in through either client authenticates both.
 func runBrowserLogin(s *appState, freshProfile bool) error {
+	profileDir := ""
+	if !freshProfile {
+		profileDir = cdp.DefaultProfileDir(s.cfgDir)
+	}
+	return runBrowserLoginWith(s, cdp.New(cdp.Options{ProfileDir: profileDir}))
+}
+
+// runBrowserLoginWith is the testable core of runBrowserLogin: everything
+// except choosing the driver. Splitting the driver out lets tests pass a fake
+// that records the login URL and host it was handed — the only way to pin
+// that the base URL was normalized before use, since NormalizeBaseURL and
+// hostOfBaseURL individually stay correct even if a caller forgets to chain
+// them.
+func runBrowserLoginWith(s *appState, driver webauth.Driver) error {
 	cfg := s.cfg()
 	if cfg.BaseURL == "" {
 		return cerrors.New(cerrors.CategoryConfig, "NO_BASE_URL",
@@ -27,8 +41,7 @@ func runBrowserLogin(s *appState, freshProfile bool) error {
 	}
 	// Normalize before anything derives from it. OPENOBSERVE_URL never passes
 	// through `config init`, so a bare host:port or a trailing slash reaches
-	// here verbatim; every other client path normalizes, and the keychain
-	// entry is keyed off this value.
+	// here verbatim; every other client path normalizes.
 	baseURL, err := apiclient.NormalizeBaseURL(cfg.BaseURL)
 	if err != nil {
 		return err
@@ -37,17 +50,11 @@ func runBrowserLogin(s *appState, freshProfile bool) error {
 		return err
 	}
 
-	profileDir := ""
-	if !freshProfile {
-		profileDir = cdp.DefaultProfileDir(s.cfgDir)
-	}
-
 	host, err := hostOfBaseURL(baseURL)
 	if err != nil {
 		return err
 	}
 
-	driver := cdp.New(cdp.Options{ProfileDir: profileDir})
 	verify := webauth.PingVerifier(baseURL, s.org(), s.cfg().Defaults.Timeout, s.cfg().Defaults.MaxRetries)
 
 	sess, err := driver.Capture(baseURL+"/web/login", host, verify)
@@ -64,7 +71,13 @@ func runBrowserLogin(s *appState, freshProfile bool) error {
 		Username: sess.Email,
 		Secret:   blob,
 	}
-	backend, err := auth.Save(baseURL, cred, s.store)
+	// The keychain key deliberately uses the RAW base URL: auth.Resolve and
+	// auth.Forget (used by every other command and by `auth logout`) key off
+	// cfg.BaseURL too, exactly as verifyAndSave does for basic/token. Saving
+	// under the normalized value here while lookups elsewhere use the raw one
+	// would store a credential nothing could find whenever the two disagree
+	// (e.g. a trailing slash, or a bare host:port from OPENOBSERVE_URL).
+	backend, err := auth.Save(cfg.BaseURL, cred, s.store)
 	if err != nil {
 		return cerrors.Wrap(err, cerrors.CategoryConfig, "SAVE_FAILED",
 			"captured the session but could not store it")
