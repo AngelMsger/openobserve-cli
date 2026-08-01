@@ -27,8 +27,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `BROWSER_SIGNIN_CANCELLED`, `BROWSER_SIGNIN_TIMEOUT` and
   `BROWSER_LAUNCH_FAILED` cover browser sign-in; `FRESH_PROFILE_NEEDS_BROWSER`
   rejects `--fresh-profile` without `--browser`; `PROFILE_REMOVE_FAILED`
-  reports a browser profile `auth logout` could not delete. All are catalogued
-  in the Skill's `errors-and-exit-codes` reference.
+  reports a browser profile `auth logout` could not delete;
+  `CONTEXT_BASE_URL_MISMATCH` reports a captured session that was stored but
+  could not be recorded on the active context. All are catalogued in the
+  Skill's `errors-and-exit-codes` reference.
 - New dependency:
   [`github.com/coder/websocket`](https://github.com/coder/websocket), the
   WebSocket client the DevTools Protocol connection is built on. It is pure Go
@@ -84,6 +86,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   identity-provider cookies in `%TEMP%` on every use, precisely what
   `--fresh-profile` exists to prevent. The browser is now reaped, with a
   bounded wait, before the directory is removed.
+- **`auth login --browser` no longer rewrites a context that points at another
+  server.** `OPENOBSERVE_URL` and `--base-url` override the server but not the
+  context name, so a browser login against an overridden server stamped
+  `auth.scheme: session` — and the newly captured email — onto a context still
+  naming the original one. Nothing surfaced until the override went away, at
+  which point that context looked up a session credential filed under a
+  different server and every command failed. The write is now guarded by the
+  account key both sides will actually resolve; when they disagree the new
+  `CONTEXT_BASE_URL_MISMATCH` error reports that the session was stored but the
+  scheme was not recorded, and how to select the right context. Creating a
+  fresh context for the server just signed in to still works, including for a
+  scheme-less `OPENOBSERVE_URL` with a trailing slash, whose raw and normalized
+  forms used to hash to different account keys and orphan the credential.
 
 ## [0.9.1] - 2026-07-31
 

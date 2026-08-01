@@ -91,6 +91,13 @@ fi
 - **`FRESH_PROFILE_NEEDS_BROWSER` (usage/2)** — `--fresh-profile` was passed
   without `--browser`. It selects a throwaway browser profile and means nothing
   to a password / token login.
+- **`CONTEXT_BASE_URL_MISMATCH` (config/3)** — `auth login --browser` captured
+  and stored the session, but the active context on disk points at a different
+  server, so `auth.scheme: session` was not recorded in it. `OPENOBSERVE_URL` /
+  `--base-url` override the server but not the context name. Re-run with a
+  context whose `base_url` is the server you signed in to (`--use-context
+  <name>`, or `config use-context <name>`); `config contexts` lists them, and
+  `config init` creates one.
 - **`PROFILE_REMOVE_FAILED` (config/3)** — `auth logout` removed the stored
   credential but could not delete
   `~/.angelmsger/openobserve/browser-profile`. The credential is gone; delete

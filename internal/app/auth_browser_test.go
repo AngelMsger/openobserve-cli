@@ -377,6 +377,112 @@ func TestRunBrowserLoginPreservesTheRestOfTheConfigFile(t *testing.T) {
 	}
 }
 
+// TestRunBrowserLoginRefusesToRewriteADifferentServersContext is the
+// regression test for the corruption the session-scheme fix introduced. The
+// context NAME comes from the config file and is unaffected by OPENOBSERVE_URL
+// or --base-url, which override only the server. So a browser login against an
+// overridden server used to rewrite the auth block of a context still pointing
+// at the ORIGINAL server: that context ended up claiming `scheme: session`
+// (with the newly captured email replacing its recorded username) while its
+// credential was filed under the other server's account key. Nothing surfaced
+// until the override went away, at which point every command failed to resolve
+// a credential.
+func TestRunBrowserLoginRefusesToRewriteADifferentServersContext(t *testing.T) {
+	// The config file describes prod; this invocation was pointed at a local
+	// instance, exactly as `OPENOBSERVE_URL=http://localhost:5080 ... --browser`
+	// would leave things.
+	s := newTestAppState(t, "http://localhost:5080", auth.SchemeBasic)
+	s.resolved.ActiveContext = config.DefaultContextName
+	before := config.NamedContext{
+		Name:    config.DefaultContextName,
+		BaseURL: "https://prod.example.com",
+		Org:     "default",
+		Auth:    config.AuthConfig{Scheme: auth.SchemeBasic, Username: "old@example.com"},
+	}
+	writeContext(t, s.cfgDir, before)
+	raw, err := os.ReadFile(config.ConfigFilePath(s.cfgDir))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	d := &fakeDriver{sess: pkgauth.Session{Cookies: "auth_tokens=x", Email: "ops@example.com"}}
+	err = runBrowserLoginWith(s, d)
+	if err == nil {
+		t.Fatal("browser login silently rewrote a context that points at a different server")
+	}
+	ce := cerrors.AsCLIError(err)
+	if ce.Code != "CONTEXT_BASE_URL_MISMATCH" {
+		t.Fatalf("code = %q, want CONTEXT_BASE_URL_MISMATCH", ce.Code)
+	}
+	if len(ce.NextSteps) == 0 {
+		t.Error("the error carries no next steps; the user cannot act on it")
+	}
+
+	// The whole context must survive untouched — not just the scheme. The
+	// recorded username was collateral damage of the same write.
+	after, ok, err := config.ReadFile(s.cfgDir)
+	if err != nil || !ok {
+		t.Fatalf("config file unreadable (ok=%v): %v", ok, err)
+	}
+	got, found := after.Context(config.DefaultContextName)
+	if !found {
+		t.Fatalf("the context disappeared: %+v", after)
+	}
+	if got != before {
+		t.Errorf("context = %+v, want it byte-identical: %+v", got, before)
+	}
+	nowRaw, err := os.ReadFile(config.ConfigFilePath(s.cfgDir))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(nowRaw) != string(raw) {
+		t.Errorf("the config file was rewritten:\n--- before ---\n%s\n--- after ---\n%s", raw, nowRaw)
+	}
+
+	// The session itself really was captured and stored, which is precisely
+	// why the failure has to be reported rather than swallowed.
+	if _, err := s.store.Load(auth.AccountKey(s.cfg().BaseURL, auth.SchemeSession)); err != nil {
+		t.Errorf("the captured session was not stored, so the error message is wrong: %v", err)
+	}
+}
+
+// TestRunBrowserLoginFreshContextWithTrailingSlashResolvesLater covers the
+// other half of the same guard. A scheme-less OPENOBSERVE_URL with a trailing
+// slash makes the raw and normalized base URLs hash to different account keys:
+// url.Parse finds no Host in "o2.example.com:8080/" so AccountKey hashes the
+// whole string, while the normalized "http://o2.example.com:8080" hashes to the
+// host alone. Materializing the fresh context from the normalized value while
+// auth.Save used the raw one therefore orphaned the credential the moment the
+// environment variable went away. A brand-new context for the server that was
+// just signed in to is legitimate, so this must keep working end to end rather
+// than erroring.
+func TestRunBrowserLoginFreshContextWithTrailingSlashResolvesLater(t *testing.T) {
+	s := newTestAppState(t, "o2.example.com:8080/", "")
+	d := &fakeDriver{sess: pkgauth.Session{
+		Cookies: "auth_tokens=captured", Email: "ops@example.com",
+	}}
+	if err := runBrowserLoginWith(s, d); err != nil {
+		t.Fatalf("a fresh context for the server just signed in to must be created: %v", err)
+	}
+
+	// The env var is gone: only the config file decides now.
+	reloaded := loadFromDisk(t, s.cfgDir)
+	cred, err := auth.Resolve(reloaded.Config, reloaded.Secrets, s.store)
+	if err != nil {
+		t.Fatalf("the captured session is unresolvable once OPENOBSERVE_URL is gone: %v", err)
+	}
+	if cred.Scheme != auth.SchemeSession {
+		t.Fatalf("reloaded scheme = %q, want %q", cred.Scheme, auth.SchemeSession)
+	}
+	sess, err := pkgauth.ParseSession(cred.Secret)
+	if err != nil {
+		t.Fatalf("resolved secret is not the captured session: %v", err)
+	}
+	if sess.Cookies != "auth_tokens=captured" {
+		t.Fatalf("resolved cookies = %q, want the captured ones", sess.Cookies)
+	}
+}
+
 // `auth logout` forgets the scheme the context actually uses. Keying the
 // deletion off `basic` would report logged_out: true and leave the captured
 // session sitting in the store.

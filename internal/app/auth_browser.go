@@ -130,6 +130,12 @@ func runBrowserLoginWith(s *appState, driver webauth.Driver) error {
 // shared defaults and the current-context pointer are read back from disk and
 // written out again unchanged, so an unrelated field cannot be clobbered. When
 // nothing would change, the file is not rewritten at all.
+//
+// The context NAME comes from the config file (or OPENOBSERVE_CONTEXT), while
+// the server can be overridden for a single invocation by OPENOBSERVE_URL or
+// --base-url. The two can therefore disagree, so before writing anything this
+// checks that the on-disk context actually resolves to the server that was
+// just authenticated against — see contextBaseURLMismatchError.
 func persistSessionScheme(s *appState, baseURL, org, email string) (string, error) {
 	file, _, err := config.ReadFile(s.cfgDir)
 	if err != nil {
@@ -141,12 +147,31 @@ func persistSessionScheme(s *appState, baseURL, org, email string) (string, erro
 	if name == "" {
 		name = config.DefaultContextName
 	}
+
+	// The credential was filed under auth.AccountKey(cfg.BaseURL, session) —
+	// the RAW base URL, matching what auth.Resolve computes later. The context
+	// that carries `scheme: session` must produce that same key, or the scheme
+	// only sends every later command looking somewhere the credential is not.
+	rawBase := s.cfg().BaseURL
+	wantKey := auth.AccountKey(rawBase, auth.SchemeSession)
+
 	nc, found := file.Context(name)
-	if !found {
+	dirty := !found
+	switch {
+	case !found:
 		// No context on disk yet: the server came from OPENOBSERVE_URL or
 		// --base-url. Materialize one so the captured session survives the
-		// environment that created it.
-		nc = config.NamedContext{Name: name, BaseURL: baseURL, Org: org}
+		// environment that created it. A brand-new context for this server is
+		// legitimate; only an EXISTING context naming a different one is the
+		// hazard.
+		nc = config.NamedContext{Name: name, BaseURL: contextBaseURL(baseURL, rawBase), Org: org}
+	case nc.BaseURL == "":
+		// A context that never recorded a server is not pointing at a
+		// different one; fill it in rather than refusing.
+		nc.BaseURL = contextBaseURL(baseURL, rawBase)
+		dirty = true
+	case auth.AccountKey(nc.BaseURL, auth.SchemeSession) != wantKey:
+		return "", contextBaseURLMismatchError(name, nc.BaseURL, baseURL)
 	}
 
 	want := config.AuthConfig{Scheme: auth.SchemeSession, Username: nc.Auth.Username}
@@ -154,7 +179,7 @@ func persistSessionScheme(s *appState, baseURL, org, email string) (string, erro
 		want.Username = email
 	}
 	s.resolved.Config.Auth = want
-	if found && nc.Auth == want {
+	if !dirty && nc.Auth == want {
 		return nc.Name, nil
 	}
 
@@ -168,6 +193,47 @@ func persistSessionScheme(s *appState, baseURL, org, email string) (string, erro
 			"stored the captured session but could not record it in the config file")
 	}
 	return nc.Name, nil
+}
+
+// contextBaseURL picks the base URL to record for a context that does not have
+// one yet. The normalized form is what a user wants to read in their config
+// file, but the credential was filed under auth.AccountKey of the RAW base URL
+// (see the comment on auth.Save above), so the raw form wins whenever
+// normalizing would move the account key. That happens for a scheme-less
+// OPENOBSERVE_URL with a trailing slash — "o2.example.com:8080/" hashes whole
+// because url.Parse finds no Host, while its normalized form
+// "http://o2.example.com:8080" hashes to the host alone. Recording the
+// normalized value there would leave the credential orphaned the moment the
+// environment variable went away.
+func contextBaseURL(normalized, raw string) string {
+	if auth.AccountKey(normalized, auth.SchemeSession) == auth.AccountKey(raw, auth.SchemeSession) {
+		return normalized
+	}
+	return raw
+}
+
+// contextBaseURLMismatchError reports that the session was captured and stored
+// but `auth.scheme: session` was deliberately NOT written, because the active
+// context on disk names a different server.
+//
+// The context name comes from the config file; OPENOBSERVE_URL and --base-url
+// override only the server. Rewriting that context's auth block anyway would
+// point its credential lookup at a server the session was never filed under —
+// and discard the username it recorded — so the next command run without the
+// override would fail to resolve anything. Failing loudly is the only honest
+// option: the credential really is stored, so silently skipping the write
+// would leave the user with a successful login they cannot use and no idea why.
+func contextBaseURLMismatchError(name, ctxBaseURL, loggedInTo string) error {
+	return cerrors.Newf(cerrors.CategoryConfig, "CONTEXT_BASE_URL_MISMATCH",
+		"stored the captured session for %s, but the active context %q points at %s, "+
+			"so `auth.scheme: session` was not recorded", loggedInTo, name, ctxBaseURL).
+		WithHint("OPENOBSERVE_URL or --base-url overrode the server, but not the context name, "+
+			"so the context that would have been rewritten is not the one that was signed in to.").
+		WithNextSteps(
+			"openobserve-cli config contexts",
+			"Re-run `openobserve-cli auth login --browser` with a context whose base_url is "+
+				loggedInTo+" selected (--use-context <name>, or `config use-context <name>`).",
+			"openobserve-cli config init")
 }
 
 // requireDisplay rejects a browser sign-in on a headless Linux host up front,
