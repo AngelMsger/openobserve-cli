@@ -532,6 +532,73 @@ func TestFreshProfileWithoutBrowserIsAUsageError(t *testing.T) {
 	}
 }
 
+// TestRequireDisplayOnHeadlessLinux pins the actual decision the display
+// check makes, including the branch that only fires on Linux. This CLI's
+// dev machines are macOS, where checkDisplay is always a no-op because
+// runtime.GOOS is fixed at compile time — a test running here has no way to
+// observe the Linux behavior except by calling the parameterized decision
+// directly. This is what release CI (headless Linux) actually hits.
+func TestRequireDisplayOnHeadlessLinux(t *testing.T) {
+	cases := []struct {
+		name             string
+		goos             string
+		display, wayland string
+		wantErr          bool
+	}{
+		{"linux with neither set", "linux", "", "", true},
+		{"linux with DISPLAY set", "linux", ":0", "", false},
+		{"linux with WAYLAND_DISPLAY set", "linux", "", "wayland-0", false},
+		{"darwin never needs a display", "darwin", "", "", false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			err := requireDisplayOn(tc.goos, tc.display, tc.wayland)
+			if (err != nil) != tc.wantErr {
+				t.Fatalf("requireDisplayOn(%q, %q, %q) = %v, want error: %v",
+					tc.goos, tc.display, tc.wayland, err, tc.wantErr)
+			}
+			if err != nil {
+				if ce := cerrors.AsCLIError(err); ce.Code != "BROWSER_NO_DISPLAY" {
+					t.Fatalf("code = %q, want BROWSER_NO_DISPLAY", ce.Code)
+				}
+			}
+		})
+	}
+}
+
+// TestRunBrowserLoginWithNeverConsultsTheDisplayCheck is the regression test
+// for the release blocker itself: requireDisplay used to be called inside
+// runBrowserLoginWith, so every test that drove it through a fake driver —
+// the six listed in the v0.10.0 CI failure — demanded a graphical session
+// they had no use for, and only passed on macOS because checkDisplay is a
+// no-op there. The check belongs in runBrowserLogin, which is the only
+// caller that ever constructs a real (drawing) browser driver.
+//
+// This substitutes a spy for the package-level requireDisplay var and proves
+// runBrowserLoginWith completes an entire successful login — including the
+// filesystem/config-file work persistSessionScheme does — without calling it
+// even once, regardless of the host OS or environment the test happens to
+// run under.
+func TestRunBrowserLoginWithNeverConsultsTheDisplayCheck(t *testing.T) {
+	calls := 0
+	orig := requireDisplay
+	requireDisplay = func() error {
+		calls++
+		return errors.New("the display check must not run on the injected-driver path")
+	}
+	t.Cleanup(func() { requireDisplay = orig })
+
+	s := newTestAppState(t, "https://o2.example.com", "")
+	d := &fakeDriver{sess: pkgauth.Session{Cookies: "auth_tokens=x", Email: "ops@example.com"}}
+	if err := runBrowserLoginWith(s, d); err != nil {
+		t.Fatalf("runBrowserLoginWith failed (display check should never have run): %v", err)
+	}
+	if calls != 0 {
+		t.Fatalf("runBrowserLoginWith consulted the display check %d time(s); "+
+			"it must stay reachable with an injected driver regardless of display state", calls)
+	}
+}
+
 // writeContext seeds a config file holding exactly one context.
 func writeContext(t *testing.T, dir string, nc config.NamedContext) {
 	t.Helper()

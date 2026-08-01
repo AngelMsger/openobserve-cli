@@ -21,6 +21,13 @@ import (
 // session under the active context, in the same keychain entry the o3 desktop
 // app uses — so signing in through either client authenticates both.
 func runBrowserLogin(s *appState, freshProfile bool) error {
+	// Only the real driver launches a browser that needs somewhere to draw, so
+	// the display check belongs here rather than in runBrowserLoginWith: that
+	// function is driver-agnostic by design and must stay runnable with an
+	// injected fake on a headless host (as the tests do).
+	if err := requireDisplay(); err != nil {
+		return err
+	}
 	profileDir := ""
 	if !freshProfile {
 		profileDir = cdp.DefaultProfileDir(s.cfgDir)
@@ -46,9 +53,6 @@ func runBrowserLoginWith(s *appState, driver webauth.Driver) error {
 	// here verbatim; every other client path normalizes.
 	baseURL, err := apiclient.NormalizeBaseURL(cfg.BaseURL)
 	if err != nil {
-		return err
-	}
-	if err := requireDisplay(); err != nil {
 		return err
 	}
 
@@ -236,13 +240,33 @@ func contextBaseURLMismatchError(name, ctxBaseURL, loggedInTo string) error {
 			"openobserve-cli config init")
 }
 
-// requireDisplay rejects a browser sign-in on a headless Linux host up front,
-// rather than launching a browser that cannot draw and waiting for the timeout.
-func requireDisplay() error {
-	if runtime.GOOS != "linux" {
+// requireDisplay is a package variable, not a plain function, purely so tests
+// can substitute a spy that records whether it was ever called. That is the
+// only way to pin, from any host OS, that runBrowserLoginWith — which must
+// stay callable with an injected fake driver on a headless Linux CI runner —
+// never consults it; runtime.GOOS is fixed at compile time, so a darwin test
+// run cannot otherwise exercise the "would this fire on Linux" question by
+// actually running on Linux. Production code only ever assigns checkDisplay.
+var requireDisplay = checkDisplay
+
+// checkDisplay rejects a browser sign-in on a headless Linux host up front,
+// rather than launching a browser that cannot draw and waiting for the
+// timeout. It is called from runBrowserLogin, which owns the real driver —
+// never from runBrowserLoginWith, which is driver-agnostic and must succeed
+// under a fake driver regardless of display state.
+func checkDisplay() error {
+	return requireDisplayOn(runtime.GOOS, os.Getenv("DISPLAY"), os.Getenv("WAYLAND_DISPLAY"))
+}
+
+// requireDisplayOn is the pure decision behind checkDisplay, parameterized so
+// its Linux-headless branch can be unit-tested from any host OS: runtime.GOOS
+// is fixed at compile time, so a test running on darwin has no other way to
+// exercise the branch that actually fires in CI.
+func requireDisplayOn(goos, display, wayland string) error {
+	if goos != "linux" {
 		return nil
 	}
-	if os.Getenv("DISPLAY") != "" || os.Getenv("WAYLAND_DISPLAY") != "" {
+	if display != "" || wayland != "" {
 		return nil
 	}
 	return cerrors.New(cerrors.CategoryUsage, "BROWSER_NO_DISPLAY",
