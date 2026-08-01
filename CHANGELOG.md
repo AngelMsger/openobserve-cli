@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`auth login --browser` signs in through a real browser.** Instances behind
+  SSO, where neither a password nor a generated token works, can now be
+  authenticated from the CLI alone — previously the only path was installing the
+  o3 desktop app. Capture drives a Chromium-family browser over the DevTools
+  Protocol, so it works on macOS, Linux and Windows, and stores the session in
+  the same keychain entry o3 uses: signing in through either client
+  authenticates both. The browser profile is remembered so SSO is not repeated
+  on every login; `--fresh-profile` opts out.
+- **`pkg/webauth` is the shared capture core.** The cookie shaping, the
+  login-success heuristic, the injected capture script and the verify-by-Ping
+  contract now live in one public package used by both the CLI and o3, instead
+  of being duplicated — the capture script in particular was previously trapped
+  in an Objective-C string literal where a fix could never reach the CLI.
+
+### Changed
+
+- **`SESSION_BROWSER_MANAGED` now points at the CLI's own browser sign-in.**
+  Running `auth login` or `config init` against a context that uses a captured
+  session used to direct the user to the o3 desktop app; it now offers
+  `openobserve-cli auth login --browser`.
+
 ## [0.9.1] - 2026-07-31
 
 ### Fixed

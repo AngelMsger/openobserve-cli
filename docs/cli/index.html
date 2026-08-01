@@ -137,12 +137,21 @@ with `openobserve-cli skill status`; install it with `openobserve-cli skill inst
     <section class="cmd" id="openobserve-cli-auth-login">
       <h2>openobserve-cli auth login</h2>
       <p class="short">Store credentials for the active context (interactive)</p>
-      <pre>openobserve-cli auth login</pre>
+      <pre>openobserve-cli auth login [flags]</pre>
       <p class="long">Prompts for the password (basic) or token, verifies it against the
-server, and stores it in the OS keychain. Requires an interactive
-terminal; in CI / agent sandboxes set OPENOBSERVE_EMAIL &#43;
-OPENOBSERVE_PASSWORD or OPENOBSERVE_TOKEN instead.</p>
-      
+server, and stores it in the OS keychain. With --browser, signs in
+through a real browser window instead and stores the captured session,
+which is what SSO instances require. Requires an interactive terminal
+(or, for --browser, a graphical session); in CI / agent sandboxes set
+OPENOBSERVE_EMAIL &#43; OPENOBSERVE_PASSWORD or OPENOBSERVE_TOKEN instead.</p>
+      <h3>Options</h3>
+      <table>
+        <thead><tr><th>Flag</th><th>Default</th><th>Description</th></tr></thead>
+        <tbody>
+        <tr><td><code>--browser</code></td><td><code>false</code></td><td>Sign in through a browser window and store the captured session</td></tr>
+        <tr><td><code>--fresh-profile</code></td><td><code>false</code></td><td>Use a throwaway browser profile instead of the remembered one</td></tr>
+        </tbody>
+      </table>
       
     </section>
     
