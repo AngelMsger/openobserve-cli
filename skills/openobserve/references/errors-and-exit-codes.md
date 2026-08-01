@@ -72,6 +72,29 @@ fi
   `openobserve-cli auth login --browser`, here or in o3; the CLI can also
   consume, inspect, switch, and log out of a session context without
   re-establishing it.
+- **`BROWSER_NOT_FOUND` (config/3)** — `auth login --browser` found no
+  Chromium-family browser. Install Chrome / Chromium / Edge / Brave, or set
+  `OPENOBSERVE_BROWSER=/path/to/browser`; otherwise use `auth login` with a
+  password or token.
+- **`BROWSER_NO_DISPLAY` (usage/2)** — `--browser` on a Linux host with neither
+  `DISPLAY` nor `WAYLAND_DISPLAY`. It needs a graphical session, so over SSH or
+  inside a container / agent sandbox use `OPENOBSERVE_EMAIL`+
+  `OPENOBSERVE_PASSWORD` or `OPENOBSERVE_TOKEN` instead.
+- **`BROWSER_SIGNIN_CANCELLED` (auth/4)** — the sign-in window was closed before
+  login completed. Nothing was stored; re-run `auth login --browser`.
+- **`BROWSER_SIGNIN_TIMEOUT` (auth/4)** — sign-in did not complete within the
+  ten-minute window. Re-run `auth login --browser`, or use a password / token.
+- **`BROWSER_LAUNCH_FAILED` (config/3)** — the browser could not be launched or
+  driven. The underlying failure is in `message`; the browser's own output is
+  not captured. Set `OPENOBSERVE_BROWSER` to a specific executable, or use
+  `auth login`.
+- **`FRESH_PROFILE_NEEDS_BROWSER` (usage/2)** — `--fresh-profile` was passed
+  without `--browser`. It selects a throwaway browser profile and means nothing
+  to a password / token login.
+- **`PROFILE_REMOVE_FAILED` (config/3)** — `auth logout` removed the stored
+  credential but could not delete
+  `~/.angelmsger/openobserve/browser-profile`. The credential is gone; delete
+  that directory by hand to clear the remembered browser session.
 - **`BAD_TIME_RANGE` (usage/2)** — pass `--since 1h` or `--from`/`--to`.
 - **`STREAM_NOT_FOUND` (not_found/6)** — run `stream list`; names are
   case-sensitive.

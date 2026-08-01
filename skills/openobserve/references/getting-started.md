@@ -68,18 +68,28 @@ export OPENOBSERVE_TOKEN='cm9vdEBleGFtcGxlLmNvbTpDb21wbGV4cGFzcw=='
 openobserve-cli auth login --browser
 ```
 
-A browser window opens on the instance's own login page; once you sign in, the
-CLI captures the session, verifies it with an authenticated request, and
-stores it in the OS keychain. The CLI can then use that context normally,
-including `auth status`, `doctor`, and all read commands. This is the path for
-instances behind SSO, where neither a password nor a generated token works.
+A browser window opens on the instance's own login page (a one-line notice on
+stderr says so, since the command then waits); once you sign in, the CLI
+captures the session, verifies it with an authenticated request, stores it in
+the OS keychain, and records `auth.scheme: session` plus the captured email on
+the active context in `config.yaml` — creating that context when the server
+came from `OPENOBSERVE_URL`. Only that context's `auth` block is rewritten. The
+CLI can then use the context normally, including `auth status`, `doctor`, and
+all read commands. This is the path for instances behind SSO, where neither a
+password nor a generated token works.
 
 Requires a Chromium-family browser (Chrome, Chromium, Edge or Brave) and a
 graphical session — it does not work over SSH or inside an agent sandbox. Set
 `OPENOBSERVE_BROWSER` to choose a specific browser. The browser profile is
 remembered under `~/.angelmsger/openobserve/browser-profile` so an identity
-provider does not re-prompt on every sign-in; `--fresh-profile` opts out, and
-`auth logout` removes it.
+provider does not re-prompt on every sign-in; `--fresh-profile` opts out (it
+requires `--browser`, and is a `FRESH_PROFILE_NEEDS_BROWSER` usage error
+without it), and `auth logout` removes the profile, reporting whether one was
+actually there in `browser_profile_removed`.
+
+The capture script is scoped to the instance's own hostname, so an identity
+provider on another origin — full-page or in an iframe — never has its
+`Authorization` header captured.
 
 The captured session uses the same keychain entry the o3 desktop app writes,
 so signing in through either client authenticates both; sign in again through
