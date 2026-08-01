@@ -37,6 +37,40 @@ func TestBrowserCandidatesAreAbsoluteOrBareNames(t *testing.T) {
 	}
 }
 
+// TestBrowserCandidatesCoverEveryDocumentedBrowser guards the claim made in
+// README.md and the companion Skill docs: on every supported OS, `auth login
+// --browser` discovers Chrome, Chromium, Edge, AND Brave, not just some of
+// them. browserCandidates() switches internally on runtime.GOOS, so only the
+// branch for the OS actually running this test executes here (this machine
+// only exercises "darwin"); the "windows" and "linux" entries are declared
+// anyway so the requirement for those platforms is written down and
+// reviewable even where it cannot execute in CI on this host. This is the
+// test that would have caught pkg/webauth/cdp/launch.go's Windows branch
+// shipping only chrome.exe and msedge.exe (missing Chromium and Brave) —
+// running it with that older candidate list fails on the "chromium" and
+// "brave" markers.
+func TestBrowserCandidatesCoverEveryDocumentedBrowser(t *testing.T) {
+	requiredMarkers := map[string][]string{
+		"darwin":  {"chrome", "chromium", "edge", "brave"},
+		"windows": {"chrome", "chromium", "edge", "brave"},
+		"linux":   {"chrome", "chromium", "edge", "brave"},
+	}
+
+	markers, ok := requiredMarkers[runtime.GOOS]
+	if !ok {
+		t.Skipf("no documented candidate list declared for GOOS=%s", runtime.GOOS)
+	}
+
+	got := browserCandidates()
+	joined := strings.ToLower(strings.Join(got, "|"))
+	for _, marker := range markers {
+		if !strings.Contains(joined, marker) {
+			t.Errorf("browserCandidates() on GOOS=%s has no candidate mentioning %q: %v",
+				runtime.GOOS, marker, got)
+		}
+	}
+}
+
 func TestFindBrowserPrefersEnvOverride(t *testing.T) {
 	fake := filepath.Join(t.TempDir(), "my-browser")
 	if err := os.WriteFile(fake, []byte("#!/bin/sh\n"), 0o755); err != nil {

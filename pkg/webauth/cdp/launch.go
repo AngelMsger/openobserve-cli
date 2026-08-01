@@ -40,7 +40,9 @@ func browserCandidates() []string {
 			}
 			out = append(out,
 				filepath.Join(base, `Google\Chrome\Application\chrome.exe`),
+				filepath.Join(base, `Chromium\Application\chrome.exe`),
 				filepath.Join(base, `Microsoft\Edge\Application\msedge.exe`),
+				filepath.Join(base, `BraveSoftware\Brave-Browser\Application\brave.exe`),
 			)
 		}
 		return out
