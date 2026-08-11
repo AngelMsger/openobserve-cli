@@ -58,7 +58,7 @@ $ openobserve-cli search run --stream default --where "level = 'ERROR'" --since 
   YAML config file, or an interactive wizard; multiple named server *contexts*;
   secrets stored in the OS keychain.
 - **Companion Skill** — an `openobserve` Skill, embedded in the binary, that
-  guides coding agents (Claude Code, Codex) through the CLI.
+  guides coding agents (Claude Code, Codex, Grok Build) through the CLI.
 
 > **Scope (v0.2):** read-only — organizations, streams (discovery + schema), SQL
 > search / histogram / tail, PromQL metrics, and trace search / get. Dashboards,
@@ -95,7 +95,7 @@ and the companion Skill.
 ### 2. Deploy the companion Skill
 
 The `openobserve` Skill is embedded in the binary; it teaches your coding agent
-(**Claude Code**, **Codex**) how to drive the CLI. `skill install` probes for
+(**Claude Code**, **Codex**, **Grok Build**) how to drive the CLI. `skill install` probes for
 installed agents and installs into each one found:
 
 ```bash

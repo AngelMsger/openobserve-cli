@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-08-11
+
+### Added
+
+- **Grok Build skill install target.** `skill install` now deploys the companion
+  Skill for Grok Build (`--agent grok`) to `~/.grok/skills/<name>` globally and
+  `./.grok/skills/<name>` with `--project`. Auto-detection probes `~/.grok` /
+  `./.grok` alongside Claude Code and Codex. Installation guides, generated CLI
+  docs, and agent help text list the new target.
+
+
 ## [0.10.0] - 2026-08-01
 
 ### Added
@@ -378,7 +389,8 @@ Initial release — a read-only, agent-facing CLI for OpenObserve (O2).
   release binaries and `make install`. A generated CLI reference
   (`docs/cli/`) and a GitHub Pages landing page.
 
-[Unreleased]: https://github.com/AngelMsger/openobserve-cli/compare/v0.10.0...HEAD
+[Unreleased]: https://github.com/AngelMsger/openobserve-cli/compare/v0.11.0...HEAD
+[0.11.0]: https://github.com/AngelMsger/openobserve-cli/compare/v0.10.0...v0.11.0
 [0.10.0]: https://github.com/AngelMsger/openobserve-cli/compare/v0.9.1...v0.10.0
 [0.9.1]: https://github.com/AngelMsger/openobserve-cli/compare/v0.9.0...v0.9.1
 [0.9.0]: https://github.com/AngelMsger/openobserve-cli/compare/v0.8.1...v0.9.0
