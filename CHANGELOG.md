@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.2] - 2026-08-12
+
+### Added
+
+- **Broader skill install agent matrix.** `skill install` now treats Cursor,
+  the shared Agents tree, Gemini CLI, GitHub Copilot, OpenCode, Continue,
+  Windsurf, Kilo Code, and Roo Code as first-class targets alongside Claude
+  Code, Codex, Grok Build, and Pi (13 agents total). Auto-detection probes
+  each product's home and project markers; `--agent` accepts the full id
+  list. Installation guides, generated CLI docs, and help text stay in sync.
+
+
 ## [0.11.1] - 2026-08-11
 
 ### Added
@@ -400,7 +412,8 @@ Initial release — a read-only, agent-facing CLI for OpenObserve (O2).
   release binaries and `make install`. A generated CLI reference
   (`docs/cli/`) and a GitHub Pages landing page.
 
-[Unreleased]: https://github.com/AngelMsger/openobserve-cli/compare/v0.11.1...HEAD
+[Unreleased]: https://github.com/AngelMsger/openobserve-cli/compare/v0.11.2...HEAD
+[0.11.2]: https://github.com/AngelMsger/openobserve-cli/compare/v0.11.1...v0.11.2
 [0.11.1]: https://github.com/AngelMsger/openobserve-cli/compare/v0.11.0...v0.11.1
 [0.11.0]: https://github.com/AngelMsger/openobserve-cli/compare/v0.10.0...v0.11.0
 [0.10.0]: https://github.com/AngelMsger/openobserve-cli/compare/v0.9.1...v0.10.0

@@ -437,7 +437,7 @@ backfill a window first; otherwise only rows arriving after start are shown.</p>
     
     <section class="cmd" id="openobserve-cli-skill">
       <h2>openobserve-cli skill</h2>
-      <p class="short">Install the companion Skill for coding agents (Claude Code, Codex, Grok Build, Pi)</p>
+      <p class="short">Install the companion Skill for coding agents</p>
       <pre>openobserve-cli skill</pre>
       
       
@@ -450,16 +450,16 @@ backfill a window first; otherwise only rows arriving after start are shown.</p>
       <pre>openobserve-cli skill install [flags]</pre>
       <p class="long">Write the companion `openobserve` Skill — bundled inside this binary —
 into a coding agent&#39;s skills directory. With no flags it probes for
-installed agents (Claude Code, Codex, Grok Build, Pi) and installs into each one found.
-Re-run it after upgrading the CLI to refresh the Skill to the matching
-version.</p>
+installed agents (claude-code, codex, cursor, agents, gemini, github-copilot, opencode, continue, windsurf, grok, pi, kilo, roo) and installs
+into each one found. Re-run it after upgrading the CLI to refresh the
+Skill to the matching version.</p>
       <h3>Options</h3>
       <table>
         <thead><tr><th>Flag</th><th>Default</th><th>Description</th></tr></thead>
         <tbody>
-        <tr><td><code>--agent</code></td><td><code>[]</code></td><td>target agents instead of auto-detecting (claude-code, codex, grok, pi)</td></tr>
+        <tr><td><code>--agent</code></td><td><code>[]</code></td><td>target agents instead of auto-detecting (claude-code, codex, cursor, agents, gemini, github-copilot, opencode, continue, windsurf, grok, pi, kilo, roo)</td></tr>
         <tr><td><code>--dir</code></td><td></td><td>explicit skills base directory; installs into &lt;dir&gt;/openobserve</td></tr>
-        <tr><td><code>--project</code></td><td><code>false</code></td><td>install into the project (./.claude/skills, ./.agents/skills, ./.grok/skills, ./.pi/skills) instead of $HOME</td></tr>
+        <tr><td><code>--project</code></td><td><code>false</code></td><td>install into each agent&#39;s project skills directory instead of $HOME</td></tr>
         </tbody>
       </table>
       
@@ -474,7 +474,7 @@ version.</p>
       <table>
         <thead><tr><th>Flag</th><th>Default</th><th>Description</th></tr></thead>
         <tbody>
-        <tr><td><code>--agent</code></td><td><code>[]</code></td><td>limit to specific agents (claude-code, codex, grok, pi)</td></tr>
+        <tr><td><code>--agent</code></td><td><code>[]</code></td><td>limit to specific agents (claude-code, codex, cursor, agents, gemini, github-copilot, opencode, continue, windsurf, grok, pi, kilo, roo)</td></tr>
         <tr><td><code>--dir</code></td><td></td><td>explicit skills base directory</td></tr>
         <tr><td><code>--project</code></td><td><code>false</code></td><td>use the project skills directories instead of $HOME</td></tr>
         </tbody>
@@ -500,7 +500,7 @@ version.</p>
       <table>
         <thead><tr><th>Flag</th><th>Default</th><th>Description</th></tr></thead>
         <tbody>
-        <tr><td><code>--project</code></td><td><code>false</code></td><td>check the project skills dirs (./.claude/skills, ./.agents/skills, ./.grok/skills, ./.pi/skills) instead of $HOME</td></tr>
+        <tr><td><code>--project</code></td><td><code>false</code></td><td>check each agent&#39;s project skills directory instead of $HOME</td></tr>
         </tbody>
       </table>
       
@@ -511,15 +511,15 @@ version.</p>
       <p class="short">Remove the companion Skill from a coding agent&#39;s skills directory</p>
       <pre>openobserve-cli skill uninstall [flags]</pre>
       <p class="long">Delete a previously installed `openobserve` Skill. With no flags it
-probes for installed agents (Claude Code, Codex, Grok Build, Pi) and removes the Skill
-from each one found.</p>
+probes for installed agents (claude-code, codex, cursor, agents, gemini, github-copilot, opencode, continue, windsurf, grok, pi, kilo, roo)
+and removes the Skill from each one found.</p>
       <h3>Options</h3>
       <table>
         <thead><tr><th>Flag</th><th>Default</th><th>Description</th></tr></thead>
         <tbody>
-        <tr><td><code>--agent</code></td><td><code>[]</code></td><td>target agents instead of auto-detecting (claude-code, codex, grok, pi)</td></tr>
+        <tr><td><code>--agent</code></td><td><code>[]</code></td><td>target agents instead of auto-detecting (claude-code, codex, cursor, agents, gemini, github-copilot, opencode, continue, windsurf, grok, pi, kilo, roo)</td></tr>
         <tr><td><code>--dir</code></td><td></td><td>explicit skills base directory; removes &lt;dir&gt;/openobserve</td></tr>
-        <tr><td><code>--project</code></td><td><code>false</code></td><td>remove from the project (./.claude/skills, ./.agents/skills, ./.grok/skills, ./.pi/skills) instead of $HOME</td></tr>
+        <tr><td><code>--project</code></td><td><code>false</code></td><td>remove from each agent&#39;s project skills directory instead of $HOME</td></tr>
         </tbody>
       </table>
       
