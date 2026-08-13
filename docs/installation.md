@@ -80,16 +80,21 @@ shell.
 ## 3. Install the companion Skill
 
 The `openobserve` Skill is embedded in the binary, so it always matches the CLI
-version. `skill install` detects your coding agents (Claude Code, Codex, Grok Build, Pi, Pi) and
-installs into each:
+version. `skill install` detects your coding agents — **Claude Code**, **Codex**,
+**Cursor**, **Agents** (shared), **Gemini CLI**, **GitHub Copilot**,
+**OpenCode**, **Continue**, **Windsurf**, **Grok Build**, **Pi**,
+**Kilo Code**, and **Roo Code** — and installs into each:
 
 ```bash
 openobserve-cli skill install                 # auto-detect, install for each agent
 openobserve-cli skill install --agent codex   # target one agent
-openobserve-cli skill install --project       # into ./.claude/skills, ./.agents/skills, ./.grok/skills, ./.pi/skills
+openobserve-cli skill install --project       # into each agent's project skills dir
 openobserve-cli skill uninstall               # remove it
 openobserve-cli skill path                     # show where it would install, and status
 ```
+
+`skill path` prints every agent's resolved location and install status, so use
+it rather than memorising the per-agent directories.
 
 Re-run `skill install` after upgrading the CLI to keep the Skill version-matched.
 

@@ -164,9 +164,14 @@ window is non-empty and correctly ordered.
 ## Skill embedding (`assets.go`)
 
 The companion Skill is embedded with `//go:embed all:skills/openobserve`, so a
-binary always ships a Skill matching its version. `skill install` detects agent
-directories and writes the tree. A test (`assets_test.go`) guards the Skill
-`description` against Codex's 1024-character limit.
+binary always ships a Skill matching its version. A test (`assets_test.go`)
+guards the Skill `description` against Codex's 1024-character limit.
+
+`skill install` uses an agent path table (`agentSpecs` in
+`internal/app/skill.go`) mapping each agent to its global / project skills
+directory and probe markers: Claude Code uses `~/.claude/skills` and `./.claude/skills`; Codex uses `~/.codex/skills` and `./.agents/skills`; Cursor uses `~/.cursor/skills` and `./.cursor/skills`; the shared Agents tree uses `~/.agents/skills` and `./.agents/skills`; Gemini CLI uses `~/.gemini/skills` and `./.gemini/skills`; GitHub Copilot uses `~/.copilot/skills` and `./.agents/skills`; OpenCode uses `~/.config/opencode/skills` and `./.opencode/skills`; Continue uses `~/.continue/skills` and `./.continue/skills`; Windsurf uses `~/.codeium/windsurf/skills` and `./.windsurf/skills`; Grok Build uses `~/.grok/skills` and `./.grok/skills`; Pi uses `~/.pi/agent/skills` and `./.pi/skills`; Kilo Code uses `~/.kilocode/skills` and `./.kilocode/skills`; Roo Code uses `~/.roo/skills` and `./.roo/skills`. With no flag it
+probes which directories exist and installs / removes for each hit;
+`--agent` selects explicitly; `--dir` is the agent-agnostic explicit path.
 
 ## Generated reference (`cmd/gen-docs`)
 
