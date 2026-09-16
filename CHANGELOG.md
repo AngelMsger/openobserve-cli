@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.12.2] - 2026-09-16
+
+### Fixed
+
+- Inject a fixed release version into the update-notice end-to-end test so
+  shallow CI checkouts do not depend on tag discovery.
+
 ## [0.12.1] - 2026-09-16
 
 ### Fixed

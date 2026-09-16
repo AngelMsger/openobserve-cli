@@ -9,10 +9,8 @@ BIN="$ROOT/bin/openobserve-cli"
 ADDR="127.0.0.1:45080"
 URL="http://$ADDR"
 
-if [[ ! -x "$BIN" ]]; then
-  echo "building binary..."
-  (cd "$ROOT" && make build >/dev/null)
-fi
+LDFLAGS="-X github.com/angelmsger/openobserve-cli/pkg/constants.Version=0.0.1"
+(cd "$ROOT" && go build -ldflags "$LDFLAGS" -o "$BIN" ./cmd/openobserve-cli)
 
 TMP="$(mktemp -d)"
 cleanup() {
