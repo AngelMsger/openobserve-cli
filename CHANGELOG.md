@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.12.1] - 2026-09-16
+
+### Fixed
+
+- Make the companion-Skill doctor test use both Unix `HOME` and Windows
+  `USERPROFILE`, so native Windows CI validates version alignment against the
+  isolated test home instead of the runner account.
+
 ## [0.12.0] - 2026-09-16
 
 ### Added
@@ -440,7 +448,8 @@ Initial release — a read-only, agent-facing CLI for OpenObserve (O2).
   release binaries and `make install`. A generated CLI reference
   (`docs/cli/`) and a GitHub Pages landing page.
 
-[Unreleased]: https://github.com/AngelMsger/openobserve-cli/compare/v0.12.0...HEAD
+[Unreleased]: https://github.com/AngelMsger/openobserve-cli/compare/v0.12.1...HEAD
+[0.12.1]: https://github.com/AngelMsger/openobserve-cli/compare/v0.12.0...v0.12.1
 [0.12.0]: https://github.com/AngelMsger/openobserve-cli/compare/v0.11.4...v0.12.0
 [0.11.4]: https://github.com/AngelMsger/openobserve-cli/compare/v0.11.3...v0.11.4
 [0.11.3]: https://github.com/AngelMsger/openobserve-cli/compare/v0.11.2...v0.11.3
