@@ -39,6 +39,8 @@ export OPENOBSERVE_URL="$URL"
 export OPENOBSERVE_ORG="default"
 export OPENOBSERVE_EMAIL="root@example.com"
 export OPENOBSERVE_PASSWORD="pass"
+export OPENOBSERVE_RELEASE_API="$URL/releases/latest"
+export OPENOBSERVE_CLI_SKILL=0.3.4
 
 run() { "$BIN" --config "$TMP" "$@"; }
 
@@ -80,6 +82,30 @@ check "trace get tree"  '"children"'     -- run trace get abc123 --stream apptra
 check "trace get count" '"span_count"'   -- run trace get abc123 --stream apptraces --since 1h
 
 check "doctor healthy"  '"healthy": true' -- run doctor --no-update-check
+check "doctor reports Skill" '"companion-skill"' -- run doctor --no-update-check
+
+SKILL_HOME="$TMP/skill-home"
+mkdir -p "$SKILL_HOME"
+check "skill install for Codex" '"alignment": "current"' -- \
+  env HOME="$SKILL_HOME" "$BIN" --config "$TMP" skill install --agent codex
+check "skill status version aligned" '"loaded_status": "current"' -- \
+  env HOME="$SKILL_HOME" OPENOBSERVE_CLI_SKILL=0.3.4 "$BIN" --config "$TMP" skill status
+legacy_out="$(env HOME="$SKILL_HOME" OPENOBSERVE_CLI_SKILL=1 OPENOBSERVE_CLI_NO_UPDATE_NOTIFIER=1 \
+  "$BIN" --config "$TMP" stream list 2>&1 || true)"
+if grep -q '"status":"unknown"' <<<"$legacy_out"; then
+  echo "ok   - legacy Skill handshake is detected"
+  pass=$((pass + 1))
+else
+  echo "FAIL - legacy Skill handshake is detected"; exit 1
+fi
+update_out="$(env -u OPENOBSERVE_CLI_NO_UPDATE_NOTIFIER OPENOBSERVE_CLI_SKILL=0.3.4 \
+  "$BIN" --config "$TMP" stream list 2>&1 || true)"
+if grep -q '"next_steps"' <<<"$update_out" && grep -q 'openobserve-cli skill install' <<<"$update_out"; then
+  echo "ok   - update notice includes Skill refresh"
+  pass=$((pass + 1))
+else
+  echo "FAIL - update notice includes Skill refresh"; exit 1
+fi
 
 # Exit-code contract: missing stream -> not_found (6).
 set +e

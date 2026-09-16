@@ -96,7 +96,9 @@ openobserve-cli skill path                     # show where it would install, an
 `skill path` prints every agent's resolved location and install status, so use
 it rather than memorising the per-agent directories.
 
-Re-run `skill install` after upgrading the CLI to keep the Skill version-matched.
+After every CLI upgrade, run `openobserve-cli skill install`, then reload the
+agent context. `openobserve-cli skill status` compares the loaded, installed,
+and embedded versions and reports the next steps when they differ.
 
 Alternatively, install it from the git repository with the `npx skills` workflow:
 

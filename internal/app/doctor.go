@@ -72,6 +72,7 @@ func newDoctorCmd(s *appState) *cobra.Command {
 					add("org_visible", orgVisible, statusForOK(orgVisible, "not_visible"), s.org(), "")
 				}
 			}
+			checks = append(checks, companionSkillDoctorCheck())
 
 			healthy := serverOK && credOK && connOK
 			report := map[string]any{
@@ -93,6 +94,45 @@ func newDoctorCmd(s *appState) *cobra.Command {
 	cmd.Flags().BoolVar(&skipUpdate, "no-update-check", false,
 		"skip the check for a newer openobserve-cli release")
 	return cmd
+}
+
+func companionSkillDoctorCheck() doctorCheck {
+	load := currentSkillLoadState()
+	installs, err := inspectSkillInstalls(false)
+	if err != nil {
+		return doctorCheck{Check: "companion-skill", Status: "invalid", Detail: err.Error()}
+	}
+	projectInstalls, err := inspectSkillInstalls(true)
+	if err != nil {
+		return doctorCheck{Check: "companion-skill", Status: "invalid", Detail: err.Error()}
+	}
+	installs = append(installs, projectInstalls...)
+	currentInstalled := false
+	installed := false
+	for _, item := range installs {
+		installed = installed || item.Status == "installed"
+		currentInstalled = currentInstalled || item.Alignment == "current"
+	}
+	switch {
+	case load.Status == "current":
+		return doctorCheck{Check: "companion-skill", OK: true, Status: "current",
+			Detail: "loaded Skill " + load.Version + " matches " + embeddedSkillVersion()}
+	case load.Loaded && currentInstalled:
+		return doctorCheck{Check: "companion-skill", Status: "reload_required",
+			Detail: "current Skill is installed; reload the agent context to load it"}
+	case load.Loaded:
+		return doctorCheck{Check: "companion-skill", Status: load.Status,
+			Detail: "run `" + constants.AppName + " skill install`, then reload the agent context"}
+	case currentInstalled:
+		return doctorCheck{Check: "companion-skill", OK: true, Status: "installed_not_loaded",
+			Detail: "current Skill is installed; reload the agent context to load it"}
+	case installed:
+		return doctorCheck{Check: "companion-skill", Status: "outdated",
+			Detail: "run `" + constants.AppName + " skill install`, then reload the agent context"}
+	default:
+		return doctorCheck{Check: "companion-skill", Status: "not_installed",
+			Detail: "run `" + constants.AppName + " skill install`, then reload the agent context"}
+	}
 }
 
 func statusForOK(ok bool, failure string) string {

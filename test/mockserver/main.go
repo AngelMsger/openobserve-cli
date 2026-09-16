@@ -19,6 +19,9 @@ func main() {
 	}
 
 	mux := http.NewServeMux()
+	mux.HandleFunc("/releases/latest", func(w http.ResponseWriter, _ *http.Request) {
+		writeJSON(w, map[string]any{"tag_name": "v99.0.0", "html_url": "https://example/releases"})
+	})
 
 	mux.HandleFunc("/api/organizations", func(w http.ResponseWriter, r *http.Request) {
 		if !requireAuth(w, r) {

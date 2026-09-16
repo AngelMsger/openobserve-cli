@@ -1,6 +1,6 @@
 ---
 name: openobserve
-version: 0.3.3
+version: 0.3.4
 description: "Query OpenObserve (O2) logs, metrics, and traces: discover streams and fields, search SQL logs, inspect histograms, evaluate PromQL, reconstruct traces, and follow live logs. Use for an OpenObserve URL or an investigation whose backend is known to be OpenObserve, including errors, latency, request volume, and stream discovery. Supports self-hosted and Cloud instances. Remote operations are read-only; dashboards, alerts, pipelines, and user management are not supported."
 metadata:
   requires:
@@ -126,18 +126,19 @@ current context.
 
 ## Agent-facing conventions
 
-- **Skill handshake — set `OPENOBSERVE_CLI_SKILL=1`.** Once you have loaded this
-  Skill, export `OPENOBSERVE_CLI_SKILL=1` in the environment you run the CLI
-  from. When the variable is absent the CLI assumes you may be inferring commands
-  blindly and prints a one-line `{"_notice":{"skill":{…}}}` discovery hint on
-  **stderr** (non-interactive sessions only). Setting it silences the hint;
-  `openobserve-cli skill status` reports whether it is set. (To suppress the hint
-  without loading the Skill, use `OPENOBSERVE_CLI_NO_SKILL_HINT=1`.)
+- **Skill handshake — set `OPENOBSERVE_CLI_SKILL=0.3.4`.** Once you have
+  loaded this Skill, export that exact value in the environment used to run the
+  CLI. The CLI compares it with the embedded Skill version and emits a
+  structured stderr notice when the Skill is missing, old, or uses the legacy
+  unversioned handshake. `openobserve-cli skill status` reports loaded,
+  installed, and embedded versions. To suppress the notice without loading the
+  Skill, set `OPENOBSERVE_CLI_NO_SKILL_HINT=1`.
 - **Update notices on stderr.** When a newer release exists, commands print a
   one-line `{"_notice":{"update":{…}}}` to **stderr** (never stdout) — on failed
-  commands too, not just successful ones. It carries the latest version and an
-  `npm install -g @angelmsger/openobserve-cli@latest` hint. Silence it with
-  `OPENOBSERVE_CLI_NO_UPDATE_NOTIFIER=1`, or skip the check per-run with
+  commands too, not just successful ones. Follow every `next_steps` entry:
+  upgrade the CLI, run `openobserve-cli skill install`, then reload the agent
+  context. `doctor` reports CLI and Skill status too. Silence update notices
+  with `OPENOBSERVE_CLI_NO_UPDATE_NOTIFIER=1`, or skip the check per-run with
   `doctor --no-update-check`.
 - stdout is data only; diagnostics and errors go to stderr.
 - Exit codes are stable and categorized (0 ok, 2 usage, 3 config, 4 auth, …);

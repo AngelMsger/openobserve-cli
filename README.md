@@ -101,10 +101,11 @@ installed agents and installs into each one found:
 ```bash
 openobserve-cli skill install            # auto-detect; install for each agent found
 openobserve-cli skill install --agent codex
+openobserve-cli skill status             # compare loaded, installed, embedded versions
 openobserve-cli skill uninstall          # remove it again
 ```
 
-Re-run it after upgrading the CLI to keep the Skill version-matched.
+After upgrading the CLI, re-run `skill install` and reload the agent context.
 
 ### 3. Enable shell completion (optional)
 

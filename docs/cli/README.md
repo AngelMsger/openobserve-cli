@@ -60,9 +60,9 @@ is published at <https://angelmsger.github.io/openobserve-cli/cli/>.
 | --- | --- |
 | [`openobserve-cli skill`](https://angelmsger.github.io/openobserve-cli/cli/#openobserve-cli-skill) | Install the companion Skill for coding agents |
 | [`openobserve-cli skill install`](https://angelmsger.github.io/openobserve-cli/cli/#openobserve-cli-skill-install) | Deploy the embedded Skill into a coding agent's skills directory |
-| [`openobserve-cli skill path`](https://angelmsger.github.io/openobserve-cli/cli/#openobserve-cli-skill-path) | Print where the Skill would be installed, and whether it is |
+| [`openobserve-cli skill path`](https://angelmsger.github.io/openobserve-cli/cli/#openobserve-cli-skill-path) | Print Skill paths, installation state and version alignment |
 | [`openobserve-cli skill show`](https://angelmsger.github.io/openobserve-cli/cli/#openobserve-cli-skill-show) | Print the embedded SKILL.md to stdout |
-| [`openobserve-cli skill status`](https://angelmsger.github.io/openobserve-cli/cli/#openobserve-cli-skill-status) | Report whether the companion Skill is loaded and installed |
+| [`openobserve-cli skill status`](https://angelmsger.github.io/openobserve-cli/cli/#openobserve-cli-skill-status) | Report loaded, installed and embedded Skill versions |
 | [`openobserve-cli skill uninstall`](https://angelmsger.github.io/openobserve-cli/cli/#openobserve-cli-skill-uninstall) | Remove the companion Skill from a coding agent's skills directory |
 
 ## stream
