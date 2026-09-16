@@ -40,12 +40,16 @@ server) or not. Environment changes use the optional `recovery` object instead.
 Scripted use:
 
 ```bash
-if ! openobserve-cli search run --stream app --since 1h >/tmp/hits.json; then
-  case $? in
+if openobserve-cli search run --stream app --since 1h >hits.json; then
+  : # consume hits.json
+else
+  rc=$?
+  case "$rc" in
     3|4) echo "fix auth/config" ;;
     6)   echo "stream missing — run: openobserve-cli stream list" ;;
     7|8|9) echo "transient — retry later" ;;
   esac
+  exit "$rc"
 fi
 ```
 

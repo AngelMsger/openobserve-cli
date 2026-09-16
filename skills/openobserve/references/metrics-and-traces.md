@@ -6,7 +6,7 @@ traces a dedicated span model, so this CLI exposes them as their own commands.
 
 ## Metrics — `metrics query` and `metrics query-range`
 
-Metric names are the `metrics`-type streams. Discover them first:
+Metric names are the `metrics`-type streams. Discover them when unknown:
 
 ```
 openobserve-cli stream list --type metrics
@@ -38,8 +38,9 @@ openobserve-cli metrics query-range \
 
 Output is `{ query, result_type, result }` where `result_type` is
 `vector` (instant) or `matrix` (range); `--format ndjson` streams one series per
-line. A bad expression or unknown metric returns a structured `PROMQL_ERROR` whose
-`next_steps` points back at `stream list --type metrics`.
+line. A rejected expression returns `PROMQL_ERROR`. An empty successful result
+does not establish that a metric is absent: check the metric, labels, org, and
+time window before drawing that conclusion.
 
 ## Traces — `trace search` and `trace get`
 
@@ -93,4 +94,5 @@ query the stream directly with `search run --where "trace_id = '<id>'"`.
 - `trace search --filter` takes an SQL-style predicate (e.g.
   `"span_status = 'ERROR'"`); it also accepts `@file` / `@-`.
 - The time range must contain the trace — widen `--since` if `trace get` reports
-  `TRACE_NOT_FOUND`.
+  `TRACE_NOT_FOUND`. Keep the discovered trace ID and its incident window fixed
+  while inspecting it; widen the window deliberately if spans may fall outside it.

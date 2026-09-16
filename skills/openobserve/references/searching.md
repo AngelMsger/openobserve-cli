@@ -2,8 +2,8 @@
 
 ## The workflow
 
-OpenObserve stores a lot of data. Pulling raw rows blindly is slow and floods
-your context. Work in two passes:
+For a broad incident or volume question, narrow the data in two passes. For a
+known request or a precise window, query it directly.
 
 1. **Map** — `search histogram` shows how many rows fall in each time bucket, so
    you see *where* the interesting activity is without reading any rows.
@@ -15,8 +15,9 @@ your context. Work in two passes:
 openobserve-cli search histogram --stream default --since 6h --interval 5m \
   --where "level = 'ERROR'"
 
-# 2. the spike was ~14:30; pull those rows
-openobserve-cli search run --stream default --since 30m \
+# 2. use the actual spike's window and timezone (illustrative timestamps)
+openobserve-cli search run --stream default \
+  --from 2026-09-16T14:30:00+08:00 --to 2026-09-16T14:35:00+08:00 \
   --where "level = 'ERROR'" --limit 50
 ```
 
@@ -48,6 +49,12 @@ Output (JSON) is a summary plus the hits:
 `--format ndjson` instead streams the raw hits one per line — ideal for
 `| jq` / `| grep`.
 
+`--all` requests every page and always emits NDJSON; use it only when the task
+needs complete rows and supply `--max` as a budget. With `--all`, `--limit` is
+the page size, not the total. A `--max` cap is reported on stderr; retain that
+limitation in any conclusion. Keep the same absolute window when paginating or
+comparing queries so new events do not move the target between requests.
+
 ## `search histogram`
 
 Runs `histogram(_timestamp, '<interval>')` with `count(*)`, grouped per bucket.
@@ -56,6 +63,20 @@ Runs `histogram(_timestamp, '<interval>')` with `count(*)`, grouped per bucket.
 - `--interval` accepts compact widths: `30s`, `1m`, `5m`, `1h`, `1d` (default `1m`).
 
 Returns `{ buckets: [ { bucket, count }, … ] }`.
+
+## Live monitoring
+
+Use finite `search run` snapshots for ordinary inspection. Use `search tail`
+only for requested live monitoring; `--since` backfills history but does not
+limit how long it runs. The global `--timeout` bounds each request, not the
+follow loop. There is no built-in duration or row cap for tail.
+
+Choose a deadline or observable stopping condition from the request and enforce
+it through the agent host's process controls. If none is specified, state a
+short observation window before starting. Stop the process when that condition
+is met, bound the output retained, and report meaningful changes or blockers
+rather than narrating every poll. Do not leave an unattended tail running after
+the task ends.
 
 ## Time ranges
 

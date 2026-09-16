@@ -61,6 +61,8 @@ together.
   or point its error `next_steps` at — the command that lists values of that kind.
 - **Keep the CLI reference in sync.** After changing a command or flag, run
   `make docs` and commit the regenerated `docs/cli/`.
+- **Check Skill examples.** Follow the [agent guide](AGENTS.md) for query,
+  monitoring, and executable recovery-example expectations.
 - **Update the changelog.** Add a bullet under `[Unreleased]` in
   [CHANGELOG.md](CHANGELOG.md) for any user-visible change.
 - **Never commit** credentials, `.env`, `dist/`, `bin/`, or build artifacts.

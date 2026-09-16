@@ -1,7 +1,7 @@
 ---
 name: openobserve
-version: 0.3.2
-description: "Query an OpenObserve (O2) backend from the command line across logs, metrics and traces: discover streams and schema, run SQL searches and histograms over logs, follow a stream live (tail -f), query metrics with PromQL (instant and range), and rebuild a trace into a span waterfall — with agent-friendly JSON and structured errors. Use this skill when the user mentions OpenObserve or O2, gives an OpenObserve URL, or asks to search / query / grep / tail logs; to query metrics or write PromQL (rate, p99, error rate); to inspect a trace, span or request latency; to find why a service is erroring, slow or crashing; to look at error rates, log volume or recent events; or to list or inspect streams or their fields. Covers self-hosted (localhost:5080) and Cloud. Set up with `openobserve-cli config init`, or OPENOBSERVE_URL / OPENOBSERVE_ORG / OPENOBSERVE_EMAIL / OPENOBSERVE_PASSWORD (or OPENOBSERVE_TOKEN) env vars. It is read-only: it cannot create dashboards, alerts, functions/pipelines or users yet."
+version: 0.3.3
+description: "Query OpenObserve (O2) logs, metrics, and traces: discover streams and fields, search SQL logs, inspect histograms, evaluate PromQL, reconstruct traces, and follow live logs. Use for an OpenObserve URL or an investigation whose backend is known to be OpenObserve, including errors, latency, request volume, and stream discovery. Supports self-hosted and Cloud instances. Remote operations are read-only; dashboards, alerts, pipelines, and user management are not supported."
 metadata:
   requires:
     bins: ["openobserve-cli"]
@@ -22,18 +22,21 @@ microsecond timestamp**. Don't. The CLI gives you discovery commands for each:
 
 1. **Org** — `org list` shows the organizations you can use. The default is
    `default`. Pass `--org` or set it once with `org use <id>`.
-2. **Stream** — `stream list` shows the streams (the data sets). Never guess a
-   name; list first.
+2. **Stream** — reuse a name supplied by the user or already verified in the
+   same server and org; otherwise discover it with `stream list`.
 3. **Columns** — `stream schema <name>` shows the queryable fields and the
    full-text-search keys, so your SQL `WHERE`/`SELECT` reference real columns.
 4. **Time** — never compute epochs by hand. Use `--since 1h` (or `--from`/`--to`
    with RFC3339, a date, or `now-30m`); the CLI converts to the microseconds the
    API needs.
 
+Reuse discovery results within the same context. Prefer per-command `--org` and
+`--use-context`; persist a different default only when the user asks for it.
+
 ## Decision tree
 
-- User asks to **look at / search / grep logs** (or traces/metrics) →
-  `stream list` to find the stream, then `search run --stream <name> --since <window>`.
+- User asks to **look at / search / grep logs** → discover the stream if unknown,
+  then `search run --stream <name> --since <window>`.
   Add `--where "<sql condition>"` to filter (e.g. `--where "level = 'ERROR'"`).
 - User asks **"why is X erroring / how much / what's the volume"** → start with
   `search histogram --stream <name> --since <window> --interval <bucket>` to see
@@ -41,7 +44,8 @@ microsecond timestamp**. Don't. The CLI gives you discovery commands for each:
   `search run` (the *terrain*). See [searching.md](references/searching.md).
 - User asks to **follow / tail logs live** → `search tail --stream <name>`
   (optionally `--where ...`, `--since 5m` to backfill); it streams new rows as
-  ndjson until interrupted.
+  ndjson until interrupted. Before starting, choose a deadline or stopping
+  condition from the request; see [Live monitoring](references/searching.md#live-monitoring).
 - User asks about **metrics / a PromQL expression / rate / error rate / p99** →
   metrics are PromQL, not SQL. `stream list --type metrics` to find the metric
   names, then `metrics query --query '<promql>'` (instant) or
@@ -76,19 +80,24 @@ so it only works where there is one. See
 
 ## Guardrails
 
-- **Always bound the time range.** Every `search` requires `--since` or
+- **Always bound the time range.** `search run` and `search histogram` require `--since` or
   `--from`/`--to`. Default to a narrow window (e.g. `1h`) and widen only if
   needed — unbounded scans are slow and flood your context.
-- **Keep `--limit` small** (default 100). Pull a histogram first; only fetch the
-  rows you actually need.
-- **Reference real names only.** If you didn't get a stream or column from
-  `stream list` / `stream schema`, don't put it in SQL. The same holds for metric
-  names (`stream list --type metrics`) and trace streams (`--type traces`).
+- **Keep `--limit` small** (default 100). Use a histogram for broad volume
+  investigations; go directly to a known request or narrow incident window.
+- **Reference real names only.** Use known stream names and confirmed schema
+  fields. Discover unknown metrics with `stream list --type metrics` and trace
+  streams with `--type traces`.
 - **Metrics are PromQL, not SQL.** Use `metrics query` / `query-range` with a
   PromQL expression; don't try to `search run` a metrics stream.
 - Prefer `--format ndjson` when piping hits into `jq`/`grep`; it streams one row
   per line. For very large result sets, `search run --all` pages through every
   matching row as ndjson (bound it with `--max`).
+
+Report the finding first, then the org/stream, exact time window with timezone,
+and decisive evidence. Distinguish observations from likely causes and disclose
+sampling or truncation that limits the conclusion. Quote short, relevant log
+excerpts with credentials and personal data removed, not whole responses.
 
 ## Commands
 
