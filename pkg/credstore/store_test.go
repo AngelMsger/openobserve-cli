@@ -4,6 +4,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/zalando/go-keyring"
@@ -165,6 +166,9 @@ func TestDeleteRemovesFromBothBackends(t *testing.T) {
 }
 
 func TestFallbackFileIsNotWorldReadable(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Windows fallback security uses per-user DPAPI, not POSIX mode bits")
+	}
 	withKeychain(t, false)
 	dir := t.TempDir()
 	s := NewStoreWithBackend(dir, newStub(nil))

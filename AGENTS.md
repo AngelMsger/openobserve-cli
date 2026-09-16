@@ -57,6 +57,9 @@ it directly, so `openobserve-cli` is the family's reference for how a sibling CL
 ## Ground rules
 
 - Run `make test` and `make build` before claiming a change is complete.
+- Credential fallback tests assert `0600` only on non-Windows platforms.
+  Windows tests must verify DPAPI-encrypted on-disk data and a store round trip;
+  Windows `FileMode` does not represent POSIX access permissions.
 - stdout is data only; errors / notices / `--verbose` go to stderr.
 - Keep query and monitoring guidance in the companion Skill: reuse verified
   identifiers, bound retrieval and follow loops, and report evidence with its
