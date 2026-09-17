@@ -56,6 +56,9 @@ func runBrowserLoginWith(s *appState, driver webauth.Driver) error {
 		return err
 	}
 
+	if _, _, err := loginFile(s, cfg, auth.Credential{Scheme: auth.SchemeSession, Username: cfg.Auth.Username}); err != nil {
+		return err
+	}
 	host, err := hostOfBaseURL(baseURL)
 	if err != nil {
 		return err
@@ -168,17 +171,25 @@ func persistSessionScheme(s *appState, baseURL, org, email string) (string, erro
 		// environment that created it. A brand-new context for this server is
 		// legitimate; only an EXISTING context naming a different one is the
 		// hazard.
-		nc = config.NamedContext{Name: name, BaseURL: contextBaseURL(baseURL, rawBase), Org: org}
+		nc = config.NamedContext{Name: name, BaseURL: contextBaseURL(baseURL, rawBase), Org: org, Auth: config.AuthConfig{CredentialURL: s.cfg().Auth.CredentialURL}}
 	case nc.BaseURL == "":
 		// A context that never recorded a server is not pointing at a
 		// different one; fill it in rather than refusing.
 		nc.BaseURL = contextBaseURL(baseURL, rawBase)
 		dirty = true
-	case auth.AccountKey(nc.BaseURL, auth.SchemeSession) != wantKey:
-		return "", contextBaseURLMismatchError(name, nc.BaseURL, baseURL)
+	default:
+		previous, e1 := config.NormalizeServiceURL(nc.BaseURL)
+		actual, e2 := config.NormalizeServiceURL(baseURL)
+		if e1 != nil || e2 != nil || previous != actual {
+			return "", contextBaseURLMismatchError(name, nc.BaseURL, baseURL)
+		}
+		if auth.AccountKey(nc.BaseURL, auth.SchemeSession) != wantKey {
+			nc.BaseURL = contextBaseURL(baseURL, rawBase)
+			dirty = true
+		}
 	}
 
-	want := config.AuthConfig{Scheme: auth.SchemeSession, Username: nc.Auth.Username}
+	want := config.AuthConfig{Scheme: auth.SchemeSession, Username: nc.Auth.Username, CredentialURL: nc.Auth.CredentialURL}
 	if email != "" {
 		want.Username = email
 	}

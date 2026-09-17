@@ -18,8 +18,9 @@ import (
 // --- on-disk YAML shapes ---
 
 type authShape struct {
-	Scheme   string `yaml:"scheme,omitempty"`
-	Username string `yaml:"username,omitempty"`
+	CredentialURL string `yaml:"credential_url,omitempty"`
+	Scheme        string `yaml:"scheme,omitempty"`
+	Username      string `yaml:"username,omitempty"`
 }
 
 type defaultsShape struct {
@@ -47,8 +48,9 @@ type fileShape struct {
 
 // AuthConfig is the per-context auth settings persisted to the file.
 type AuthConfig struct {
-	Scheme   string `yaml:"scheme"`
-	Username string `yaml:"username,omitempty"`
+	CredentialURL string `yaml:"credential_url,omitempty"`
+	Scheme        string `yaml:"scheme"`
+	Username      string `yaml:"username,omitempty"`
 }
 
 // Defaults are runtime defaults shared across contexts.
@@ -166,7 +168,7 @@ func ReadFile(dir string) (File, bool, error) {
 			Name:    cs.Name,
 			BaseURL: cs.Server,
 			Org:     cs.Org,
-			Auth:    AuthConfig{Scheme: cs.Auth.Scheme, Username: cs.Auth.Username},
+			Auth:    AuthConfig{Scheme: cs.Auth.Scheme, Username: cs.Auth.Username, CredentialURL: cs.Auth.CredentialURL},
 		})
 	}
 	return f, true, nil
@@ -185,7 +187,7 @@ func WriteFile(dir string, f File) error {
 			Name:   c.Name,
 			Server: c.BaseURL,
 			Org:    c.Org,
-			Auth:   authShape{Scheme: c.Auth.Scheme, Username: c.Auth.Username},
+			Auth:   authShape{Scheme: c.Auth.Scheme, Username: c.Auth.Username, CredentialURL: c.Auth.CredentialURL},
 		})
 	}
 	fs.Defaults.Format = f.Defaults.Format
@@ -199,7 +201,24 @@ func WriteFile(dir string, f File) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(ConfigFilePath(dir), out, 0o600)
+	// Replace atomically so a failed write does not truncate an existing config.
+	tmp, err := os.CreateTemp(dir, ".config-*.tmp")
+	if err != nil {
+		return err
+	}
+	defer os.Remove(tmp.Name())
+	if err := tmp.Chmod(0o600); err != nil {
+		_ = tmp.Close()
+		return err
+	}
+	if _, err := tmp.Write(out); err != nil {
+		_ = tmp.Close()
+		return err
+	}
+	if err := tmp.Close(); err != nil {
+		return err
+	}
+	return os.Rename(tmp.Name(), ConfigFilePath(dir))
 }
 
 func defaultsFromShape(ds defaultsShape) Defaults {

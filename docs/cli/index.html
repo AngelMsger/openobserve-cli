@@ -27,6 +27,7 @@
     <div class="side-group">
       <div class="side-title">auth</div>
       <a href="#openobserve-cli-auth">openobserve-cli auth</a>
+      <a href="#openobserve-cli-auth-guide">openobserve-cli auth guide</a>
       <a href="#openobserve-cli-auth-login">openobserve-cli auth login</a>
       <a href="#openobserve-cli-auth-logout">openobserve-cli auth logout</a>
       <a href="#openobserve-cli-auth-status">openobserve-cli auth status</a>
@@ -36,6 +37,7 @@
       <a href="#openobserve-cli-config">openobserve-cli config</a>
       <a href="#openobserve-cli-config-contexts">openobserve-cli config contexts</a>
       <a href="#openobserve-cli-config-init">openobserve-cli config init</a>
+      <a href="#openobserve-cli-config-set-context">openobserve-cli config set-context</a>
       <a href="#openobserve-cli-config-show">openobserve-cli config show</a>
       <a href="#openobserve-cli-config-use-context">openobserve-cli config use-context</a>
       </div>
@@ -89,7 +91,7 @@
       <div class="side-title">version</div>
       <a href="#openobserve-cli-version">openobserve-cli version</a>
       </div>
-    
+
   </aside>
   <main class="cli-main">
     <span class="eyebrow">Reference</span>
@@ -112,8 +114,10 @@ After a CLI upgrade, refresh the Skill and reload the agent context.</p>
         <thead><tr><th>Flag</th><th>Default</th><th>Description</th></tr></thead>
         <tbody>
         <tr><td><code>--allow-writes</code></td><td><code>false</code></td><td>override read-only mode (defaults.read_only / OPENOBSERVE_CLI_READ_ONLY) for this invocation</td></tr>
+        <tr><td><code>--auth-scheme</code></td><td></td><td>authentication scheme (overrides environment and config)</td></tr>
         <tr><td><code>--base-url</code></td><td></td><td>OpenObserve server URL (overrides config), e.g. http://localhost:5080</td></tr>
         <tr><td><code>--config</code></td><td></td><td>config directory (default ~/.angelmsger/openobserve)</td></tr>
+        <tr><td><code>--credential-url</code></td><td></td><td>credential acquisition page URL (display only)</td></tr>
         <tr><td><code>--fields</code></td><td></td><td>comma-separated dot-path fields to keep</td></tr>
         <tr><td><code>--format, -f</code></td><td></td><td>output format: json, table or ndjson</td></tr>
         <tr><td><code>--org</code></td><td></td><td>organization identifier (overrides config)</td></tr>
@@ -125,16 +129,25 @@ After a CLI upgrade, refresh the Skill and reload the agent context.</p>
       </table>
     </section>
 
-    
+
     <section class="cmd" id="openobserve-cli-auth">
       <h2>openobserve-cli auth</h2>
       <p class="short">Log in, check identity and log out</p>
       <pre>openobserve-cli auth</pre>
-      
-      
-      
+
+
+
     </section>
-    
+
+    <section class="cmd" id="openobserve-cli-auth-guide">
+      <h2>openobserve-cli auth guide</h2>
+      <p class="short">Show offline credential acquisition guidance for this service</p>
+      <pre>openobserve-cli auth guide</pre>
+
+
+
+    </section>
+
     <section class="cmd" id="openobserve-cli-auth-login">
       <h2>openobserve-cli auth login</h2>
       <p class="short">Store credentials for the active context (interactive)</p>
@@ -153,45 +166,45 @@ OPENOBSERVE_EMAIL &#43; OPENOBSERVE_PASSWORD or OPENOBSERVE_TOKEN instead.</p>
         <tr><td><code>--fresh-profile</code></td><td><code>false</code></td><td>Use a throwaway browser profile instead of the remembered one</td></tr>
         </tbody>
       </table>
-      
+
     </section>
-    
+
     <section class="cmd" id="openobserve-cli-auth-logout">
       <h2>openobserve-cli auth logout</h2>
       <p class="short">Remove the stored credential for the active context</p>
       <pre>openobserve-cli auth logout</pre>
-      
-      
-      
+
+
+
     </section>
-    
+
     <section class="cmd" id="openobserve-cli-auth-status">
       <h2>openobserve-cli auth status</h2>
       <p class="short">Show the active identity and verify connectivity</p>
       <pre>openobserve-cli auth status</pre>
-      
-      
-      
+
+
+
     </section>
-    
+
     <section class="cmd" id="openobserve-cli-config">
       <h2>openobserve-cli config</h2>
       <p class="short">Set up and inspect configuration and contexts</p>
       <pre>openobserve-cli config</pre>
-      
-      
-      
+
+
+
     </section>
-    
+
     <section class="cmd" id="openobserve-cli-config-contexts">
       <h2>openobserve-cli config contexts</h2>
       <p class="short">List configured contexts and which one is current</p>
       <pre>openobserve-cli config contexts</pre>
-      
-      
-      
+
+
+
     </section>
-    
+
     <section class="cmd" id="openobserve-cli-config-init">
       <h2>openobserve-cli config init</h2>
       <p class="short">Interactively configure a context and store credentials</p>
@@ -215,25 +228,43 @@ OPENOBSERVE_PASSWORD (or OPENOBSERVE_TOKEN) instead.</p>
   openobserve-cli config init             # plain line-by-line wizard (scripts, non-TTY)
   openobserve-cli config init --context prod   # add/update a named context directly</pre>
     </section>
-    
+
+    <section class="cmd" id="openobserve-cli-config-set-context">
+      <h2>openobserve-cli config set-context</h2>
+      <p class="short">Configure service presets without credentials or network access</p>
+      <pre>openobserve-cli config set-context &lt;name&gt; [flags]</pre>
+      <p class="long">Write service fields from flags, environment or .env over the named target context. Personal environment fields and secrets are ignored. Existing conflicting fields require --overwrite; unrelated contexts and user identities are preserved.</p>
+      <h3>Options</h3>
+      <table>
+        <thead><tr><th>Flag</th><th>Default</th><th>Description</th></tr></thead>
+        <tbody>
+        <tr><td><code>--activate</code></td><td><code>false</code></td><td>make this the current context</td></tr>
+        <tr><td><code>--dry-run</code></td><td><code>false</code></td><td>preview configuration changes without writing files or credentials</td></tr>
+        <tr><td><code>--overwrite</code></td><td><code>false</code></td><td>update conflicting service fields; preserve personal identity and credentials</td></tr>
+        </tbody>
+      </table>
+      <h3>Examples</h3><pre>  openobserve-cli config set-context team --base-url https://service.example.com --dry-run
+  openobserve-cli config set-context team --base-url https://service.example.com --activate</pre>
+    </section>
+
     <section class="cmd" id="openobserve-cli-config-show">
       <h2>openobserve-cli config show</h2>
       <p class="short">Show the resolved configuration with field provenance</p>
       <pre>openobserve-cli config show</pre>
-      
-      
-      
+
+
+
     </section>
-    
+
     <section class="cmd" id="openobserve-cli-config-use-context">
       <h2>openobserve-cli config use-context</h2>
       <p class="short">Set the current context</p>
       <pre>openobserve-cli config use-context &lt;name&gt;</pre>
-      
-      
-      
+
+
+
     </section>
-    
+
     <section class="cmd" id="openobserve-cli-doctor">
       <h2>openobserve-cli doctor</h2>
       <p class="short">Check configuration, credentials and connectivity</p>
@@ -252,7 +283,7 @@ It also reports whether a newer openobserve-cli release is available.</p>
       <h3>Examples</h3><pre>  openobserve-cli doctor
   openobserve-cli doctor --no-update-check</pre>
     </section>
-    
+
     <section class="cmd" id="openobserve-cli-metrics">
       <h2>openobserve-cli metrics</h2>
       <p class="short">Query metrics with PromQL (instant and range)</p>
@@ -261,10 +292,10 @@ It also reports whether a newer openobserve-cli release is available.</p>
 evaluates an expression at a single instant; `metrics query-range` evaluates
 it across a time window at a step resolution (the shape you graph). Discover
 the metric names you can use with `stream list --type metrics`.</p>
-      
-      
+
+
     </section>
-    
+
     <section class="cmd" id="openobserve-cli-metrics-query">
       <h2>openobserve-cli metrics query</h2>
       <p class="short">Evaluate a PromQL expression at a single instant</p>
@@ -286,7 +317,7 @@ or --query @- to read a long expression from a file or stdin.</p>
 <span class="c">  # evaluate at a past instant</span>
   openobserve-cli metrics query --query &#39;up&#39; --time 2024-01-02T15:04:05Z</pre>
     </section>
-    
+
     <section class="cmd" id="openobserve-cli-metrics-query-range">
       <h2>openobserve-cli metrics query-range</h2>
       <p class="short">Evaluate a PromQL expression across a time window</p>
@@ -310,7 +341,7 @@ required (--since or --from/--to).</p>
   openobserve-cli metrics query-range \
     --query &#39;sum(rate(http_requests_total{status=~&#34;5..&#34;}[5m]))&#39; --since 1h --step 1m</pre>
     </section>
-    
+
     <section class="cmd" id="openobserve-cli-org">
       <h2>openobserve-cli org</h2>
       <p class="short">List organizations and set the default one</p>
@@ -318,28 +349,28 @@ required (--since or --from/--to).</p>
       <p class="long">Organizations scope every OpenObserve request. `org list` discovers
 the identifiers your credential can use; `org use` records one as the
 default so later commands need no --org.</p>
-      
-      
+
+
     </section>
-    
+
     <section class="cmd" id="openobserve-cli-org-list">
       <h2>openobserve-cli org list</h2>
       <p class="short">List organizations the credential can access</p>
       <pre>openobserve-cli org list</pre>
-      
-      
-      
+
+
+
     </section>
-    
+
     <section class="cmd" id="openobserve-cli-org-use">
       <h2>openobserve-cli org use</h2>
       <p class="short">Set the default organization in the active context</p>
       <pre>openobserve-cli org use &lt;identifier&gt;</pre>
-      
-      
-      
+
+
+
     </section>
-    
+
     <section class="cmd" id="openobserve-cli-search">
       <h2>openobserve-cli search</h2>
       <p class="short">Run SQL searches over logs, metrics and traces</p>
@@ -349,10 +380,10 @@ default so later commands need no --org.</p>
 and shape before pulling raw rows; `search tail` follows a stream live.
 Time ranges are given in human form (--since 1h, or --from/--to); the CLI
 converts them to the microsecond epochs OpenObserve needs.</p>
-      
-      
+
+
     </section>
-    
+
     <section class="cmd" id="openobserve-cli-search-histogram">
       <h2>openobserve-cli search histogram</h2>
       <p class="short">Return time-bucketed counts (the volume map before raw rows)</p>
@@ -374,7 +405,7 @@ deciding which window to pull raw rows from with `search run`.</p>
       </table>
       <h3>Examples</h3><pre>  openobserve-cli search histogram --stream default --since 6h --interval 5m</pre>
     </section>
-    
+
     <section class="cmd" id="openobserve-cli-search-run">
       <h2>openobserve-cli search run</h2>
       <p class="short">Run a SQL query and return matching rows</p>
@@ -411,7 +442,7 @@ page through every matching row as ndjson (bound it with --max).</p>
 <span class="c">  # page through every matching row (streamed as ndjson)</span>
   openobserve-cli search run --stream default --since 24h --all --max 50000</pre>
     </section>
-    
+
     <section class="cmd" id="openobserve-cli-search-tail">
       <h2>openobserve-cli search tail</h2>
       <p class="short">Follow a stream live, printing new rows as they arrive</p>
@@ -435,16 +466,16 @@ backfill a window first; otherwise only rows arriving after start are shown.</p>
 <span class="c">  # backfill the last 5 minutes, then follow</span>
   openobserve-cli search tail --stream app --since 5m --interval 3s</pre>
     </section>
-    
+
     <section class="cmd" id="openobserve-cli-skill">
       <h2>openobserve-cli skill</h2>
       <p class="short">Install the companion Skill for coding agents</p>
       <pre>openobserve-cli skill</pre>
-      
-      
-      
+
+
+
     </section>
-    
+
     <section class="cmd" id="openobserve-cli-skill-install">
       <h2>openobserve-cli skill install</h2>
       <p class="short">Deploy the embedded Skill into a coding agent&#39;s skills directory</p>
@@ -463,14 +494,14 @@ Skill to the matching version, then reload the agent context.</p>
         <tr><td><code>--project</code></td><td><code>false</code></td><td>install into each agent&#39;s project skills directory instead of $HOME</td></tr>
         </tbody>
       </table>
-      
+
     </section>
-    
+
     <section class="cmd" id="openobserve-cli-skill-path">
       <h2>openobserve-cli skill path</h2>
       <p class="short">Print Skill paths, installation state and version alignment</p>
       <pre>openobserve-cli skill path [flags]</pre>
-      
+
       <h3>Options</h3>
       <table>
         <thead><tr><th>Flag</th><th>Default</th><th>Description</th></tr></thead>
@@ -480,23 +511,23 @@ Skill to the matching version, then reload the agent context.</p>
         <tr><td><code>--project</code></td><td><code>false</code></td><td>use the project skills directories instead of $HOME</td></tr>
         </tbody>
       </table>
-      
+
     </section>
-    
+
     <section class="cmd" id="openobserve-cli-skill-show">
       <h2>openobserve-cli skill show</h2>
       <p class="short">Print the embedded SKILL.md to stdout</p>
       <pre>openobserve-cli skill show</pre>
-      
-      
-      
+
+
+
     </section>
-    
+
     <section class="cmd" id="openobserve-cli-skill-status">
       <h2>openobserve-cli skill status</h2>
       <p class="short">Report loaded, installed and embedded Skill versions</p>
       <pre>openobserve-cli skill status [flags]</pre>
-      
+
       <h3>Options</h3>
       <table>
         <thead><tr><th>Flag</th><th>Default</th><th>Description</th></tr></thead>
@@ -504,9 +535,9 @@ Skill to the matching version, then reload the agent context.</p>
         <tr><td><code>--project</code></td><td><code>false</code></td><td>check each agent&#39;s project skills directory instead of $HOME</td></tr>
         </tbody>
       </table>
-      
+
     </section>
-    
+
     <section class="cmd" id="openobserve-cli-skill-uninstall">
       <h2>openobserve-cli skill uninstall</h2>
       <p class="short">Remove the companion Skill from a coding agent&#39;s skills directory</p>
@@ -523,9 +554,9 @@ and removes the Skill from each one found.</p>
         <tr><td><code>--project</code></td><td><code>false</code></td><td>remove from each agent&#39;s project skills directory instead of $HOME</td></tr>
         </tbody>
       </table>
-      
+
     </section>
-    
+
     <section class="cmd" id="openobserve-cli-stream">
       <h2>openobserve-cli stream</h2>
       <p class="short">Discover streams and inspect their schema</p>
@@ -533,15 +564,15 @@ and removes the Skill from each one found.</p>
       <p class="long">Streams are the logs / metrics / traces collections you query with
 `search`. List them to find names, then inspect a stream&#39;s schema to
 learn which columns exist before writing SQL.</p>
-      
-      
+
+
     </section>
-    
+
     <section class="cmd" id="openobserve-cli-stream-get">
       <h2>openobserve-cli stream get</h2>
       <p class="short">Get one stream including schema, settings and stats</p>
       <pre>openobserve-cli stream get &lt;name&gt; [flags]</pre>
-      
+
       <h3>Options</h3>
       <table>
         <thead><tr><th>Flag</th><th>Default</th><th>Description</th></tr></thead>
@@ -549,9 +580,9 @@ learn which columns exist before writing SQL.</p>
         <tr><td><code>--type</code></td><td></td><td>stream type hint: logs, metrics or traces</td></tr>
         </tbody>
       </table>
-      
+
     </section>
-    
+
     <section class="cmd" id="openobserve-cli-stream-list">
       <h2>openobserve-cli stream list</h2>
       <p class="short">List streams in the organization (the discovery map)</p>
@@ -567,9 +598,9 @@ or use `stream schema &lt;name&gt;` for one stream.</p>
         <tr><td><code>--type</code></td><td></td><td>filter by stream type: logs, metrics or traces</td></tr>
         </tbody>
       </table>
-      
+
     </section>
-    
+
     <section class="cmd" id="openobserve-cli-stream-schema">
       <h2>openobserve-cli stream schema</h2>
       <p class="short">Show just a stream&#39;s queryable columns and search settings</p>
@@ -583,14 +614,14 @@ partition settings — what you need to write a correct SQL query.</p>
         <tr><td><code>--type</code></td><td></td><td>stream type hint: logs, metrics or traces</td></tr>
         </tbody>
       </table>
-      
+
     </section>
-    
+
     <section class="cmd" id="openobserve-cli-stream-stats">
       <h2>openobserve-cli stream stats</h2>
       <p class="short">Show a stream&#39;s document count, time range and storage size</p>
       <pre>openobserve-cli stream stats &lt;name&gt; [flags]</pre>
-      
+
       <h3>Options</h3>
       <table>
         <thead><tr><th>Flag</th><th>Default</th><th>Description</th></tr></thead>
@@ -598,9 +629,9 @@ partition settings — what you need to write a correct SQL query.</p>
         <tr><td><code>--type</code></td><td></td><td>stream type hint: logs, metrics or traces</td></tr>
         </tbody>
       </table>
-      
+
     </section>
-    
+
     <section class="cmd" id="openobserve-cli-trace">
       <h2>openobserve-cli trace</h2>
       <p class="short">Search distributed traces and inspect a single trace</p>
@@ -610,10 +641,10 @@ partition settings — what you need to write a correct SQL query.</p>
 finding a slow or erroring request. `trace get &lt;trace_id&gt;` then reassembles
 every span of one trace into a parent/child waterfall. Discover trace stream
 names with `stream list --type traces`.</p>
-      
-      
+
+
     </section>
-    
+
     <section class="cmd" id="openobserve-cli-trace-get">
       <h2>openobserve-cli trace get</h2>
       <p class="short">Reassemble one trace into a span waterfall</p>
@@ -634,7 +665,7 @@ flat, one per line. The time range must contain the trace.</p>
       </table>
       <h3>Examples</h3><pre>  openobserve-cli trace get 7be29a... --stream default --since 1h</pre>
     </section>
-    
+
     <section class="cmd" id="openobserve-cli-trace-search">
       <h2>openobserve-cli trace search</h2>
       <p class="short">List recent traces in a trace stream</p>
@@ -662,16 +693,16 @@ traces slower than 1s). The time range is required.</p>
 <span class="c">  # only traces with an errored span</span>
   openobserve-cli trace search --stream default --since 1h --filter &#34;span_status = &#39;ERROR&#39;&#34;</pre>
     </section>
-    
+
     <section class="cmd" id="openobserve-cli-version">
       <h2>openobserve-cli version</h2>
       <p class="short">Print version information</p>
       <pre>openobserve-cli version</pre>
-      
-      
-      
+
+
+
     </section>
-    
+
   </main>
 </div>
 <footer class="footer">

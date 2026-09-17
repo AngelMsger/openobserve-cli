@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.13.0] - 2026-09-17
+
+### Added
+
+- Add offline `config set-context` with target-specific presets, explicit conflict
+  handling, activation, and dry-run; add `--auth-scheme`, `--credential-url`, and
+  matching environment variables.
+- Add `auth guide` with display-only credential pages, navigation fallbacks, and
+  product-aware guidance shared by login, setup wizards, and missing credentials.
+
+### Fixed
+
+- Persist the personal username and authentication scheme after login; verify
+  authentication and reject a mismatched service before storing credentials.
+- Preserve credential-page metadata and replace configuration files atomically.
+
+
 ## [0.12.2] - 2026-09-16
 
 ### Fixed
@@ -455,7 +472,9 @@ Initial release — a read-only, agent-facing CLI for OpenObserve (O2).
   release binaries and `make install`. A generated CLI reference
   (`docs/cli/`) and a GitHub Pages landing page.
 
-[Unreleased]: https://github.com/AngelMsger/openobserve-cli/compare/v0.12.1...HEAD
+[Unreleased]: https://github.com/AngelMsger/openobserve-cli/compare/v0.13.0...HEAD
+[0.13.0]: https://github.com/AngelMsger/openobserve-cli/compare/v0.12.2...v0.13.0
+[0.12.2]: https://github.com/AngelMsger/openobserve-cli/compare/v0.12.1...v0.12.2
 [0.12.1]: https://github.com/AngelMsger/openobserve-cli/compare/v0.12.0...v0.12.1
 [0.12.0]: https://github.com/AngelMsger/openobserve-cli/compare/v0.11.4...v0.12.0
 [0.11.4]: https://github.com/AngelMsger/openobserve-cli/compare/v0.11.3...v0.11.4

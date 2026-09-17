@@ -154,3 +154,5 @@ key ones came from.
 Set `OPENOBSERVE_CLI_READ_ONLY=1` (or `defaults.read_only: true` in the config
 file) to assert a read-only session. The CLI has no write commands yet, so this
 is a forward-looking guard; `--allow-writes` is the per-call escape hatch.
+
+For preset team services, use `config set-context` and `auth guide` before personal login; see [team setup](team-setup.md).

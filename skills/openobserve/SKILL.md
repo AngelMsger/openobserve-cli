@@ -1,6 +1,6 @@
 ---
 name: openobserve
-version: 0.3.4
+version: 0.3.5
 description: "Query OpenObserve (O2) logs, metrics, and traces: discover streams and fields, search SQL logs, inspect histograms, evaluate PromQL, reconstruct traces, and follow live logs. Use for an OpenObserve URL or an investigation whose backend is known to be OpenObserve, including errors, latency, request volume, and stream discovery. Supports self-hosted and Cloud instances. Remote operations are read-only; dashboards, alerts, pipelines, and user management are not supported."
 metadata:
   requires:
@@ -126,7 +126,7 @@ current context.
 
 ## Agent-facing conventions
 
-- **Skill handshake — set `OPENOBSERVE_CLI_SKILL=0.3.4`.** Once you have
+- **Skill handshake — set `OPENOBSERVE_CLI_SKILL=0.3.5`.** Once you have
   loaded this Skill, export that exact value in the environment used to run the
   CLI. The CLI compares it with the embedded Skill version and emits a
   structured stderr notice when the Skill is missing, old, or uses the legacy
@@ -145,3 +145,25 @@ current context.
   see [errors-and-exit-codes.md](references/errors-and-exit-codes.md).
 - Lists come back as `{ "items": [...], "has_more": false }`.
 - `--fields a,b.c` projects output to just those dot-paths to save tokens.
+
+## Team service presets and authentication
+
+- Inspect existing configuration and reuse it. `config set-context <name>` is the
+  offline installer entrypoint; it accepts `--base-url`, `--auth-scheme`,
+  `--credential-url`, `--activate`, `--overwrite`, and `--dry-run`, plus `--org`.
+- `OPENOBSERVE_AUTH_SCHEME` and `OPENOBSERVE_CREDENTIAL_URL` complement the existing
+  service variables. Presets never copy a personal username or secret from the
+  environment. Conflicts preserve existing values unless explicitly overwritten.
+- Run `auth guide` to obtain the current instance's credential page, its source,
+  navigation steps, and limitations. Links are hints, not evidence of server
+  capabilities. Follow the returned product-specific instructions; do not invent
+  a token URL or assume ingestion credentials authorize queries.
+- Once a service is preset, direct the member to `auth login` in their terminal
+  (or `auth login --browser` for OpenObserve SSO) to save their verified personal identity and secret. Do not ask for secrets in
+  chat. In non-interactive environments use transient credential variables.
+- Preserve host-keychain recovery for inaccessible credentials. A server/context
+  mismatch requires selecting or creating a matching context; a partial login
+  write error identifies what was stored and provides recovery steps.
+
+See [team setup](references/team-setup.md) for the output fields, conflict
+semantics, credential URL overrides, and failure recovery.

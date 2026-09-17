@@ -89,10 +89,14 @@ func newRootCmdWithState() (*cobra.Command, *appState) {
 		Version:       versionString(),
 		SilenceErrors: true,
 		SilenceUsage:  true,
-		PersistentPreRunE: func(cmd *cobra.Command, _ []string) error {
+		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			output.SetErrorPretty(state.gflags.pretty)
 			// Nudge agents that shell out without the companion Skill loaded.
 			maybeSkillHint(cmd)
+			state.gflags.setupContext = ""
+			if cmd.Name() == "set-context" && cmd.Parent().Name() == "config" && len(args) == 1 {
+				state.gflags.setupContext = args[0]
+			}
 			if err := state.load(); err != nil {
 				return err
 			}
@@ -107,6 +111,8 @@ func newRootCmdWithState() (*cobra.Command, *appState) {
 	}
 
 	pf := root.PersistentFlags()
+	pf.StringVar(&state.gflags.authScheme, "auth-scheme", "", "authentication scheme (overrides environment and config)")
+	pf.StringVar(&state.gflags.credentialURL, "credential-url", "", "credential acquisition page URL (display only)")
 	pf.StringVar(&state.gflags.baseURL, "base-url", "", "OpenObserve server URL (overrides config), e.g. http://localhost:5080")
 	pf.StringVar(&state.gflags.org, "org", "", "organization identifier (overrides config)")
 	pf.StringVarP(&state.gflags.format, "format", "f", "", "output format: json, table or ndjson")

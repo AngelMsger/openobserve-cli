@@ -38,7 +38,7 @@ export OPENOBSERVE_ORG="default"
 export OPENOBSERVE_EMAIL="root@example.com"
 export OPENOBSERVE_PASSWORD="pass"
 export OPENOBSERVE_RELEASE_API="$URL/releases/latest"
-export OPENOBSERVE_CLI_SKILL=0.3.4
+export OPENOBSERVE_CLI_SKILL=0.3.5
 
 run() { "$BIN" --config "$TMP" "$@"; }
 
@@ -87,7 +87,7 @@ mkdir -p "$SKILL_HOME"
 check "skill install for Codex" '"alignment": "current"' -- \
   env HOME="$SKILL_HOME" "$BIN" --config "$TMP" skill install --agent codex
 check "skill status version aligned" '"loaded_status": "current"' -- \
-  env HOME="$SKILL_HOME" OPENOBSERVE_CLI_SKILL=0.3.4 "$BIN" --config "$TMP" skill status
+  env HOME="$SKILL_HOME" OPENOBSERVE_CLI_SKILL=0.3.5 "$BIN" --config "$TMP" skill status
 legacy_out="$(env HOME="$SKILL_HOME" OPENOBSERVE_CLI_SKILL=1 OPENOBSERVE_CLI_NO_UPDATE_NOTIFIER=1 \
   "$BIN" --config "$TMP" stream list 2>&1 || true)"
 if grep -q '"status":"unknown"' <<<"$legacy_out"; then
@@ -96,7 +96,7 @@ if grep -q '"status":"unknown"' <<<"$legacy_out"; then
 else
   echo "FAIL - legacy Skill handshake is detected"; exit 1
 fi
-update_out="$(env -u OPENOBSERVE_CLI_NO_UPDATE_NOTIFIER OPENOBSERVE_CLI_SKILL=0.3.4 \
+update_out="$(env -u OPENOBSERVE_CLI_NO_UPDATE_NOTIFIER OPENOBSERVE_CLI_SKILL=0.3.5 \
   "$BIN" --config "$TMP" stream list 2>&1 || true)"
 if grep -q '"next_steps"' <<<"$update_out" && grep -q 'openobserve-cli skill install' <<<"$update_out"; then
   echo "ok   - update notice includes Skill refresh"
@@ -149,3 +149,5 @@ fi
 
 echo ""
 echo "e2e: $pass checks passed"
+
+"$ROOT/scripts/e2e-setup.sh"

@@ -195,3 +195,27 @@ from `--help`; CI fails if the committed output is stale.
 - `scripts/e2e.sh` runs the built binary against `test/mockserver` and asserts
   the agent-facing contract (JSON output, structured errors, exit codes) with no
   real credentials.
+
+## Team service setup and login persistence
+
+`internal/config/setup.go` owns offline service-field validation, acquisition
+links and the pure `PlanServiceContext` merge used by execution and dry-run.
+`LoadOptions.Setup` selects the requested destination even when it is new and
+filters personal environment fields before credential-based scheme inference.
+Ordinary runtime precedence and transient environment secrets remain supported.
+`AuthConfig.CredentialURL` is additive, non-secret, and serialized through every
+config shape; OpenObserve exposes it in the public `pkg/config` model.
+
+`internal/app/setup.go` wires `config set-context`, `auth guide`, and wizard
+prefill. `internal/app/auth_login.go` checks the complete normalized service URL,
+verifies authentication, stores the secret, and persists the associated identity.
+Expected storage failures preserve their causes and distinguish a stored secret
+from a completed login. Error payloads may include optional non-secret `details`;
+context conflicts use field-level `before`/`after` values. Setup does not access a
+credential store and is available under the remote read-only posture.
+
+The end-to-end setup harness (`scripts/e2e-setup.sh`, part of `make e2e`) runs
+without a service or user credentials. Unit tests cover target-specific
+precedence, persistence failures, guide URLs, and reloading a stored login.
+See [installation](installation.md#team-distribution-and-personal-login) for the
+canonical user-facing contract and product-specific authentication guidance.

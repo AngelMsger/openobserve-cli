@@ -18,7 +18,7 @@ func newConfigCmd(s *appState) *cobra.Command {
 		Use:   "config",
 		Short: "Set up and inspect configuration and contexts",
 	}
-	cmd.AddCommand(
+	cmd.AddCommand(newConfigSetContextCmd(s),
 		newConfigInitCmd(s),
 		newConfigShowCmd(s),
 		newConfigContextsCmd(s),
@@ -71,13 +71,22 @@ func newConfigInitCmd(s *appState) *cobra.Command {
 				return browserManagedSessionError(target)
 			}
 
+			prefill, err = s.setupPrefill(target, prefill)
+			if err != nil {
+				return err
+			}
+
+			if prefill.Auth.Scheme == auth.SchemeSession {
+				return browserManagedSessionError(target)
+			}
 			def := initValues{}
 			if prefill != nil {
 				def = initValues{
-					baseURL: prefill.BaseURL,
-					org:     prefill.Org,
-					scheme:  prefill.Auth.Scheme,
-					email:   prefill.Auth.Username,
+					credentialURL: prefill.Auth.CredentialURL,
+					baseURL:       prefill.BaseURL,
+					org:           prefill.Org,
+					scheme:        prefill.Auth.Scheme,
+					email:         prefill.Auth.Username,
 				}
 			}
 
@@ -112,7 +121,7 @@ func newConfigInitCmd(s *appState) *cobra.Command {
 				Name:    target,
 				BaseURL: normURL,
 				Org:     org,
-				Auth:    config.AuthConfig{Scheme: cred.Scheme, Username: cred.Username},
+				Auth:    config.AuthConfig{Scheme: cred.Scheme, Username: cred.Username, CredentialURL: vals.credentialURL},
 			})
 			file.CurrentContext = target
 			if err := config.WriteFile(s.cfgDir, file); err != nil {
@@ -284,6 +293,7 @@ func newConfigShowCmd(s *appState) *cobra.Command {
 				"base_url":       cfg.BaseURL,
 				"org":            cfg.Org,
 				"auth_scheme":    cfg.Auth.Scheme,
+				"credential_url": cfg.Auth.CredentialURL,
 				"username":       cfg.Auth.Username,
 				"format":         cfg.Defaults.Format,
 				"timeout":        cfg.Defaults.Timeout.String(),
@@ -291,9 +301,11 @@ func newConfigShowCmd(s *appState) *cobra.Command {
 				"active_context": s.resolved.ActiveContext,
 				"config_dir":     s.cfgDir,
 				"sources": map[string]any{
-					"base_url": config.ExplainField(src, config.FieldServer),
-					"org":      config.ExplainField(src, config.FieldOrg),
-					"format":   config.ExplainField(src, config.FieldFormat),
+					"auth_scheme":    config.ExplainField(src, config.FieldAuthScheme),
+					"credential_url": config.ExplainField(src, config.FieldCredentialURL),
+					"base_url":       config.ExplainField(src, config.FieldServer),
+					"org":            config.ExplainField(src, config.FieldOrg),
+					"format":         config.ExplainField(src, config.FieldFormat),
 				},
 			})
 		},

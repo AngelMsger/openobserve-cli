@@ -88,14 +88,15 @@ func (r *Resolved) ContextSelectedExplicitly() bool {
 
 // Field keys used for layer maps and provenance tracking.
 const (
-	fieldServer       = "server"
-	fieldOrg          = "org"
-	fieldAuthScheme   = "auth.scheme"
-	fieldAuthUsername = "auth.username"
-	fieldFormat       = "defaults.format"
-	fieldTimeout      = "defaults.timeout"
-	fieldMaxRetries   = "defaults.max_retries"
-	fieldReadOnly     = "defaults.read_only"
+	fieldCredentialURL = "auth.credential_url"
+	fieldServer        = "server"
+	fieldOrg           = "org"
+	fieldAuthScheme    = "auth.scheme"
+	fieldAuthUsername  = "auth.username"
+	fieldFormat        = "defaults.format"
+	fieldTimeout       = "defaults.timeout"
+	fieldMaxRetries    = "defaults.max_retries"
+	fieldReadOnly      = "defaults.read_only"
 	// Secret field keys (never persisted to the YAML file).
 	fieldPassword = "secret.password"
 	fieldToken    = "secret.token"
@@ -103,14 +104,15 @@ const (
 
 // Field key accessors for callers outside this package (e.g. config show).
 const (
-	FieldServer     = fieldServer
-	FieldOrg        = fieldOrg
-	FieldAuthScheme = fieldAuthScheme
-	FieldAuthUser   = fieldAuthUsername
-	FieldFormat     = fieldFormat
-	FieldTimeout    = fieldTimeout
-	FieldMaxRetries = fieldMaxRetries
-	FieldReadOnly   = fieldReadOnly
+	FieldServer        = fieldServer
+	FieldOrg           = fieldOrg
+	FieldCredentialURL = fieldCredentialURL
+	FieldAuthScheme    = fieldAuthScheme
+	FieldAuthUser      = fieldAuthUsername
+	FieldFormat        = fieldFormat
+	FieldTimeout       = fieldTimeout
+	FieldMaxRetries    = fieldMaxRetries
+	FieldReadOnly      = fieldReadOnly
 )
 
 // defaultLayer returns the built-in defaults as a layer map.
@@ -130,8 +132,9 @@ func configFromMap(m map[string]string) Config {
 		BaseURL: m[fieldServer],
 		Org:     m[fieldOrg],
 		Auth: AuthConfig{
-			Scheme:   m[fieldAuthScheme],
-			Username: m[fieldAuthUsername],
+			CredentialURL: m[fieldCredentialURL],
+			Scheme:        m[fieldAuthScheme],
+			Username:      m[fieldAuthUsername],
 		},
 		Defaults: Defaults{
 			Format:     m[fieldFormat],

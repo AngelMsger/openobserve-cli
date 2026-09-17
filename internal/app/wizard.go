@@ -3,7 +3,9 @@ package app
 import (
 	"errors"
 	"fmt"
+	"github.com/angelmsger/openobserve-cli/internal/config"
 	"os"
+	"strings"
 
 	"github.com/angelmsger/openobserve-cli/internal/auth"
 	"github.com/angelmsger/openobserve-cli/pkg/constants"
@@ -13,11 +15,12 @@ import (
 // initValues are the inputs collected by the config-init flow, whether through
 // the interactive TUI (--pretty) or plain line prompts.
 type initValues struct {
-	baseURL string
-	org     string
-	scheme  string
-	email   string // basic scheme only
-	secret  string // password (basic) or token value (token)
+	credentialURL string
+	baseURL       string
+	org           string
+	scheme        string
+	email         string // basic scheme only
+	secret        string // password (basic) or token value (token)
 }
 
 // withDefaults seeds empty fields with sensible defaults so the wizard shows
@@ -40,7 +43,7 @@ func (v initValues) withDefaults() initValues {
 // command's JSON result on stdout stays a clean data channel.
 func runInitForm(def initValues) (initValues, error) {
 	v := def.withDefaults()
-	form := huh.NewForm(
+	serviceForm := huh.NewForm(
 		huh.NewGroup(
 			huh.NewInput().
 				Title("Server URL").
@@ -58,6 +61,15 @@ func runInitForm(def initValues) (initValues, error) {
 				).
 				Value(&v.scheme),
 		),
+	).WithInput(os.Stdin).WithOutput(os.Stderr)
+	if err := serviceForm.Run(); err != nil {
+		return v, err
+	}
+	guidance, err := wizardGuide(v)
+	if err != nil {
+		return v, err
+	}
+	form := huh.NewForm(
 		huh.NewGroup(
 			huh.NewInput().
 				Title("Email").
@@ -65,6 +77,7 @@ func runInitForm(def initValues) (initValues, error) {
 				Validate(required),
 			huh.NewInput().
 				Title("Password").
+				Description(strings.Join(guidance.Lines(), "\n")).
 				EchoMode(huh.EchoModePassword).
 				Value(&v.secret).
 				Validate(required),
@@ -72,7 +85,7 @@ func runInitForm(def initValues) (initValues, error) {
 		huh.NewGroup(
 			huh.NewInput().
 				Title("Token").
-				Description("base64(email:token), or a full Basic/Bearer value").
+				Description(strings.Join(guidance.Lines(), "\n")).
 				EchoMode(huh.EchoModePassword).
 				Value(&v.secret).
 				Validate(required),
@@ -101,6 +114,13 @@ func runInitPrompts(def initValues) (initValues, error) {
 	}
 	if v.scheme, err = promptLine("Auth scheme (basic/token)", v.scheme); err != nil {
 		return v, err
+	}
+	if g, e := wizardGuide(v); e != nil {
+		return v, e
+	} else {
+		for _, line := range g.Lines() {
+			fmt.Fprintln(os.Stderr, line)
+		}
 	}
 	switch v.scheme {
 	case auth.SchemeBasic:
@@ -159,4 +179,8 @@ func formInput(title, placeholder string) (string, error) {
 		return "", err
 	}
 	return val, nil
+}
+
+func wizardGuide(v initValues) (config.AuthGuide, error) {
+	return config.Guide(config.Config{BaseURL: v.baseURL, Auth: config.AuthConfig{Scheme: v.scheme, CredentialURL: v.credentialURL}}, nil)
 }

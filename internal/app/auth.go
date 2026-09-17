@@ -1,8 +1,6 @@
 package app
 
 import (
-	"context"
-
 	"github.com/angelmsger/openobserve-cli/internal/auth"
 	"github.com/angelmsger/openobserve-cli/pkg/apiclient"
 	cerrors "github.com/angelmsger/openobserve-cli/pkg/errors"
@@ -14,7 +12,7 @@ func newAuthCmd(s *appState) *cobra.Command {
 		Use:   "auth",
 		Short: "Log in, check identity and log out",
 	}
-	cmd.AddCommand(newAuthLoginCmd(s), newAuthStatusCmd(s), newAuthLogoutCmd(s))
+	cmd.AddCommand(newAuthGuideCmd(s), newAuthLoginCmd(s), newAuthStatusCmd(s), newAuthLogoutCmd(s))
 	return cmd
 }
 
@@ -63,6 +61,12 @@ func newAuthLoginCmd(s *appState) *cobra.Command {
 				scheme = auth.SchemeBasic
 			}
 			cred := auth.Credential{Scheme: scheme, Username: cfg.Auth.Username}
+			if _, _, err := loginFile(s, cfg, cred); err != nil {
+				return err
+			}
+			if err := printAuthGuide(cfg); err != nil {
+				return err
+			}
 			switch scheme {
 			case auth.SchemeBasic:
 				if cred.Username == "" {
@@ -86,7 +90,7 @@ func newAuthLoginCmd(s *appState) *cobra.Command {
 			case auth.SchemeSession:
 				return browserManagedSessionError(s.resolved.ActiveContext)
 			}
-			backend, err := verifyAndSave(s, cfg.BaseURL, s.org(), cred)
+			backend, err := completeLogin(s, cfg, cred, s.loginServices())
 			if err != nil {
 				return err
 			}
@@ -181,22 +185,10 @@ func newAuthLogoutCmd(s *appState) *cobra.Command {
 // verifyAndSave builds a client from cred, pings the server to confirm the
 // credential works, then persists the secret. It returns the storage backend.
 func verifyAndSave(s *appState, baseURL, org string, cred auth.Credential) (string, error) {
-	if err := cred.Validate(); err != nil {
-		return "", err
-	}
-	client, err := apiclient.Build(apiclient.BuildParams{
-		BaseURL:       baseURL,
-		Org:           org,
-		AuthDecorator: cred.Decorator(),
-		Timeout:       s.timeout(),
-		MaxRetries:    s.cfg().Defaults.MaxRetries,
-	})
-	if err != nil {
-		return "", err
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), s.timeout())
-	defer cancel()
-	if _, err := client.Ping(ctx); err != nil {
+	cfg := s.cfg()
+	cfg.BaseURL = baseURL
+	cfg.Org = org
+	if err := verifyCredential(s, cfg, cred); err != nil {
 		return "", err
 	}
 	return auth.Save(baseURL, cred, s.store)

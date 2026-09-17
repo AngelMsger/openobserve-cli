@@ -439,10 +439,12 @@ func TestRunBrowserLoginRefusesToRewriteADifferentServersContext(t *testing.T) {
 		t.Errorf("the config file was rewritten:\n--- before ---\n%s\n--- after ---\n%s", raw, nowRaw)
 	}
 
-	// The session itself really was captured and stored, which is precisely
-	// why the failure has to be reported rather than swallowed.
-	if _, err := s.store.Load(auth.AccountKey(s.cfg().BaseURL, auth.SchemeSession)); err != nil {
-		t.Errorf("the captured session was not stored, so the error message is wrong: %v", err)
+	// Reject the target before browser capture or credential persistence.
+	if d.loginURL != "" {
+		t.Error("browser capture started before checking the configured target")
+	}
+	if _, err := s.store.Load(auth.AccountKey(s.cfg().BaseURL, auth.SchemeSession)); err == nil {
+		t.Error("a mismatched login stored a session")
 	}
 }
 
@@ -607,5 +609,26 @@ func writeContext(t *testing.T, dir string, nc config.NamedContext) {
 		Contexts:       []config.NamedContext{nc},
 	}); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestBrowserLoginEquivalentURLKeepsCredentialKey(t *testing.T) {
+	s := newTestAppState(t, "https://SERVICE.example.test:443/deploy/", auth.SchemeBasic)
+	s.resolved.ActiveContext = config.DefaultContextName
+	writeContext(t, s.cfgDir, config.NamedContext{Name: config.DefaultContextName, BaseURL: "https://service.example.test/deploy", Auth: config.AuthConfig{Scheme: auth.SchemeBasic}})
+	driver := &fakeDriver{sess: pkgauth.Session{Cookies: "auth_tokens=x", Email: "ops@example.com"}}
+	if err := runBrowserLoginWith(s, driver); err != nil {
+		t.Fatal(err)
+	}
+	file, _, err := config.ReadFile(s.cfgDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	nc, _ := file.Context(config.DefaultContextName)
+	fresh := s.cfg()
+	fresh.BaseURL = nc.BaseURL
+	fresh.Auth = nc.Auth
+	if _, err := auth.Resolve(fresh, config.Secrets{}, s.store); err != nil {
+		t.Fatalf("equivalent URL orphaned browser session: %v", err)
 	}
 }
