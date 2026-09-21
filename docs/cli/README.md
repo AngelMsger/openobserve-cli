@@ -90,4 +90,3 @@ is published at <https://angelmsger.github.io/openobserve-cli/cli/>.
 | Command | Description |
 | --- | --- |
 | [`openobserve-cli version`](https://angelmsger.github.io/openobserve-cli/cli/#openobserve-cli-version) | Print version information |
-
