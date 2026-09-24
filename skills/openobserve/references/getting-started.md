@@ -156,3 +156,13 @@ file) to assert a read-only session. The CLI has no write commands yet, so this
 is a forward-looking guard; `--allow-writes` is the per-call escape hatch.
 
 For preset team services, use `config set-context` and `auth guide` before personal login; see [team setup](team-setup.md).
+
+## Reuse existing authentication
+
+`openobserve-cli --use-context team auth reuse --dry-run` previews association from
+an existing context with the same complete service URL, scheme and provider scope.
+Apply without `--dry-run`, then verify with `auth status`. No login, token copy,
+current-context switch or replacement of a populated identity occurs. A different
+verified source can be selected with `--from-context` after `config contexts`.
+`AUTH_REUSE_AMBIGUOUS` requires choosing an identity; store/network/permission
+errors require their named recovery, not automatic reauthentication.

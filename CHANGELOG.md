@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.14.0] - 2026-09-24
+### Added
+
+- Add `auth reuse` to verify and associate an existing matching login with a team
+  context without another login or copying secrets; include dry-run and explicit
+  source selection for ambiguous identities.
+
+
 ## [0.13.0] - 2026-09-17
 
 ### Added
@@ -22,7 +30,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Persist the personal username and authentication scheme after login; verify
   authentication and reject a mismatched service before storing credentials.
 - Preserve credential-page metadata and replace configuration files atomically.
-
 
 ## [0.12.2] - 2026-09-16
 
@@ -78,7 +85,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   each product's home and project markers; `--agent` accepts the full id
   list. Installation guides, generated CLI docs, and help text stay in sync.
 
-
 ## [0.11.1] - 2026-08-11
 
 ### Added
@@ -89,7 +95,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `./.pi` alongside Claude Code, Codex, and Grok Build. Installation guides,
   generated CLI docs, and agent help text list the new target.
 
-
 ## [0.11.0] - 2026-08-11
 
 ### Added
@@ -99,7 +104,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `./.grok/skills/<name>` with `--project`. Auto-detection probes `~/.grok` /
   `./.grok` alongside Claude Code and Codex. Installation guides, generated CLI
   docs, and agent help text list the new target.
-
 
 ## [0.10.0] - 2026-08-01
 
@@ -472,7 +476,8 @@ Initial release — a read-only, agent-facing CLI for OpenObserve (O2).
   release binaries and `make install`. A generated CLI reference
   (`docs/cli/`) and a GitHub Pages landing page.
 
-[Unreleased]: https://github.com/AngelMsger/openobserve-cli/compare/v0.13.0...HEAD
+[Unreleased]: https://github.com/AngelMsger/openobserve-cli/compare/v0.14.0...HEAD
+[0.14.0]: https://github.com/AngelMsger/openobserve-cli/compare/v0.13.0...v0.14.0
 [0.13.0]: https://github.com/AngelMsger/openobserve-cli/compare/v0.12.2...v0.13.0
 [0.12.2]: https://github.com/AngelMsger/openobserve-cli/compare/v0.12.1...v0.12.2
 [0.12.1]: https://github.com/AngelMsger/openobserve-cli/compare/v0.12.0...v0.12.1

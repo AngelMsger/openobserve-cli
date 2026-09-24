@@ -12,6 +12,7 @@ is published at <https://angelmsger.github.io/openobserve-cli/cli/>.
 | [`openobserve-cli auth guide`](https://angelmsger.github.io/openobserve-cli/cli/#openobserve-cli-auth-guide) | Show offline credential acquisition guidance for this service |
 | [`openobserve-cli auth login`](https://angelmsger.github.io/openobserve-cli/cli/#openobserve-cli-auth-login) | Store credentials for the active context (interactive) |
 | [`openobserve-cli auth logout`](https://angelmsger.github.io/openobserve-cli/cli/#openobserve-cli-auth-logout) | Remove the stored credential for the active context |
+| [`openobserve-cli auth reuse`](https://angelmsger.github.io/openobserve-cli/cli/#openobserve-cli-auth-reuse) | Reuse an existing login in the selected context without signing in again |
 | [`openobserve-cli auth status`](https://angelmsger.github.io/openobserve-cli/cli/#openobserve-cli-auth-status) | Show the active identity and verify connectivity |
 
 ## config

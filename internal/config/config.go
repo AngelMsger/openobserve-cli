@@ -45,10 +45,13 @@ const (
 
 // Config holds the resolved, non-secret configuration.
 type Config struct {
-	BaseURL  string     `yaml:"server"`
-	Org      string     `yaml:"org"`
-	Auth     AuthConfig `yaml:"auth"`
-	Defaults Defaults   `yaml:"defaults"`
+	// CredentialBaseURL preserves an equivalent stored URL's native lookup key.
+	// It is runtime-only and never changes the request destination.
+	CredentialBaseURL string     `yaml:"-" json:"-"`
+	BaseURL           string     `yaml:"server"`
+	Org               string     `yaml:"org"`
+	Auth              AuthConfig `yaml:"auth"`
+	Defaults          Defaults   `yaml:"defaults"`
 }
 
 // Secrets holds credentials observed in non-file layers. Empty fields mean the

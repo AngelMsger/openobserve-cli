@@ -12,7 +12,7 @@ func newAuthCmd(s *appState) *cobra.Command {
 		Use:   "auth",
 		Short: "Log in, check identity and log out",
 	}
-	cmd.AddCommand(newAuthGuideCmd(s), newAuthLoginCmd(s), newAuthStatusCmd(s), newAuthLogoutCmd(s))
+	cmd.AddCommand(newAuthReuseCmd(s), newAuthGuideCmd(s), newAuthLoginCmd(s), newAuthStatusCmd(s), newAuthLogoutCmd(s))
 	return cmd
 }
 
@@ -164,7 +164,7 @@ func newAuthLogoutCmd(s *appState) *cobra.Command {
 			if scheme == "" {
 				scheme = auth.SchemeBasic
 			}
-			if err := auth.Forget(cfg.BaseURL, scheme, s.store); err != nil {
+			if err := auth.ForgetForConfig(cfg, scheme, s.store); err != nil {
 				return cerrors.Wrap(err, cerrors.CategoryConfig, "LOGOUT_FAILED",
 					"failed to remove stored credential")
 			}
