@@ -162,10 +162,11 @@ func (s *appState) emit(v any) error {
 // has_more} envelope in the configured format.
 func (s *appState) emitList(items any, info pageInfo) error {
 	return output.EmitList(items, info.Next, info.HasMore, output.Options{
-		Format: s.cfg().Defaults.Format,
-		Fields: s.fieldList(),
-		Writer: os.Stdout,
-		Pretty: s.gflags.pretty,
+		Format:   s.cfg().Defaults.Format,
+		Fields:   s.fieldList(),
+		Writer:   os.Stdout,
+		NextFlag: "--offset",
+		Pretty:   s.gflags.pretty,
 	})
 }
 
@@ -205,10 +206,8 @@ func cmdContext(s *appState) (context.Context, context.CancelFunc) {
 	return context.WithTimeout(context.Background(), s.timeout())
 }
 
-// pageInfo carries the pagination cursor for one page of a listing. The
-// OpenObserve endpoints used in v0.1 are unpaginated, so HasMore is always
-// false; the type keeps emitList's envelope shape uniform with future paged
-// listings.
+// pageInfo carries the next row offset for a search or trace listing.
+// Discovery endpoints are unpaginated and pass an empty pageInfo.
 type pageInfo struct {
 	Next    string
 	HasMore bool

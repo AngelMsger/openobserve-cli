@@ -60,6 +60,12 @@ openobserve-cli trace search --stream default --since 1h --filter "duration > 10
 
 Each item carries `trace_id`, `duration`, and the services involved — enough to
 pick which trace to open. Results page via `--limit` / `--offset`.
+JSON exposes `next` and `has_more`; NDJSON emits only rows on stdout and reports
+the same continuation in `_notice.pagination` on stderr. Pass its `next` value
+as `--offset` with the same stream/filter and fixed absolute `--from` **and**
+`--to` values. Repeating `--since` moves the window and can duplicate or skip
+traces. Table footers also use `--offset`. Empty backend pages stop continuation
+even if the server returns a stale larger total.
 
 **`trace get <trace_id>`** reassembles every span of one trace into a parent/child
 waterfall, with each span's `offset_micros` from the trace start:

@@ -213,6 +213,16 @@ envelope; `--format ndjson` instead streams the items themselves, one JSON objec
 per line (ideal for piping `search run` hits into `jq`). `--fields a,b.c` projects
 output down to specific dot-paths.
 
+For paginated NDJSON, stderr carries a separate
+`{"_notice":{"pagination":{"next":"20","has_more":true},"next_steps":["Pass next as --offset to retrieve the next page."]}}`
+record after the rows. Pass `next` as `--offset`; keep the same query and fixed
+absolute `--from` **and** `--to` values across pages. Repeating `--since` moves
+the time window and can duplicate or skip rows. Single-page SQL search verifies
+an ambiguous full page with at most one extra single-row request, without a
+full-count query. `search run --all` traverses one resolved window automatically
+and retains its existing `--max` truncation notices. JSON search summaries are
+unchanged.
+
 Time ranges accept `--since 15m|1h|24h|7d`, or `--from`/`--to` as RFC3339, a date,
 an epoch (seconds/millis/micros), or `now-30m`; the CLI converts to the
 microsecond timestamps the search API requires.

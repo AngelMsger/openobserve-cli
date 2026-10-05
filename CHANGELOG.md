@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Preserve NDJSON continuation metadata on stderr, including projected and
+  filtered empty pages. Trace notices and table footers use `--offset`; empty
+  backend trace pages cannot repeat a non-advancing offset.
+- Expose single-page SQL search continuation in NDJSON. When a full page has
+  no larger server total, verify the next offset with at most one single-row
+  read using the same SQL and resolved time window. JSON summaries and `--all`
+  streaming/cap notices remain unchanged.
+- Update the companion Skill to `0.3.8`, including fixed absolute windows for
+  manual offset continuation.
+
 ## [0.14.0] - 2026-09-24
 ### Added
 

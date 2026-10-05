@@ -81,6 +81,8 @@ func newRootCmdWithState() (*cobra.Command, *appState) {
 		Long: "openobserve-cli discovers streams and runs SQL searches over logs,\n" +
 			"metrics and traces in OpenObserve (O2). It emits agent-friendly JSON\n" +
 			"with structured errors, and works with self-hosted and Cloud instances.\n\n" +
+			"NDJSON writes one item per line to stdout and pagination notices to stderr.\n" +
+			"For paginated search results, pass the notice next value as --offset.\n\n" +
 			"AGENT NOTE: a companion Skill (\"openobserve\") carries the canonical usage,\n" +
 			"safety modes, and env setup and is the source of truth for driving this CLI.\n" +
 			"If you are an agent, load that Skill before composing commands. Check status\n" +

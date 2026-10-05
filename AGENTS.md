@@ -61,6 +61,14 @@ it directly, so `openobserve-cli` is the family's reference for how a sibling CL
   Windows tests must verify DPAPI-encrypted on-disk data and a store round trip;
   Windows `FileMode` does not represent POSIX access permissions.
 - stdout is data only; errors / notices / `--verbose` go to stderr.
+- Keep paginated NDJSON rows on stdout and continuation in a structured
+  `_notice.pagination` record on stderr after successful rendering, including
+  filtered empty pages. Keep the real continuation flag in table and notice
+  guidance; projections never remove pagination metadata.
+  Search/trace continuations use `--offset` and must advance; empty backend
+  pages never supply continuation. SQL search may make one single-row lookahead
+  for a full page with a page-local total, preserving its SQL and resolved time
+  window. Keep JSON summaries and `--all` streaming/cap notices unchanged.
 - Keep query and monitoring guidance in the companion Skill: reuse verified
   identifiers, bound retrieval and follow loops, and report evidence with its
   time window. Execute shell recovery examples with failing stubs when editing them.

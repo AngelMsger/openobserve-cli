@@ -1,6 +1,6 @@
 ---
 name: openobserve
-version: 0.3.7
+version: 0.3.8
 description: "Query OpenObserve (O2) logs, metrics, and traces: discover streams and fields, search SQL logs, inspect histograms, evaluate PromQL, reconstruct traces, and follow live logs. Use for an OpenObserve URL or an investigation whose backend is known to be OpenObserve, including errors, latency, request volume, and stream discovery. Supports self-hosted and Cloud instances. Remote operations are read-only; dashboards, alerts, pipelines, and user management are not supported."
 metadata:
   requires:
@@ -126,7 +126,7 @@ current context.
 
 ## Agent-facing conventions
 
-- **Skill handshake — set `OPENOBSERVE_CLI_SKILL=0.3.7`.** Once you have
+- **Skill handshake — set `OPENOBSERVE_CLI_SKILL=0.3.8`.** Once you have
   loaded this Skill, export that exact value in the environment used to run the
   CLI. The CLI compares it with the embedded Skill version and emits a
   structured stderr notice when the Skill is missing, old, or uses the legacy
@@ -143,7 +143,16 @@ current context.
 - stdout is data only; diagnostics and errors go to stderr.
 - Exit codes are stable and categorized (0 ok, 2 usage, 3 config, 4 auth, …);
   see [errors-and-exit-codes.md](references/errors-and-exit-codes.md).
-- Lists come back as `{ "items": [...], "has_more": false }`.
+- JSON lists use `{ "items": [...], "next": "...", "has_more": true }`
+  when more results exist; completed lists omit `next` and set `has_more: false`.
+  NDJSON keeps only rows on stdout and reports continuation separately on
+  stderr as `_notice.pagination` with `next`, `has_more`, and sibling
+  `next_steps`. Pass `next` as `--offset`. Keep the same query and fixed absolute
+  `--from` **and** `--to` values for manual paging; repeating `--since` shifts
+  the window and can duplicate or skip rows. Single-page SQL search may make
+  one extra single-row read to verify continuation when a full page's total is
+  page-local. Use bounded `search run --all --max N` for automatic traversal
+  of one resolved time window; preserve any truncation notice in conclusions.
 - `--fields a,b.c` projects output to just those dot-paths to save tokens.
 
 ## Team service presets and authentication

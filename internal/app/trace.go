@@ -39,7 +39,9 @@ func newTraceSearchCmd(s *appState) *cobra.Command {
 		Long: "Returns recent traces newest-first, each with its trace_id, duration and the\n" +
 			"services that participated — enough to pick which trace to inspect with\n" +
 			"`trace get`. Narrow the set with --filter (e.g. \"duration > 1000000\" for\n" +
-			"traces slower than 1s). The time range is required.",
+			"traces slower than 1s). The time range is required. Follow continuation\n" +
+			"with --offset and fixed absolute --from and --to; repeating --since\n" +
+			"moves the window. NDJSON continuation notices go to stderr.",
 		Example: "  # slowest-first triage is done client-side; here, last hour of traces\n" +
 			"  openobserve-cli trace search --stream default --since 1h --limit 20\n\n" +
 			"  # only traces with an errored span\n" +
@@ -72,7 +74,7 @@ func newTraceSearchCmd(s *appState) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			hasMore := int64(offset+len(resp.Hits)) < resp.Total
+			hasMore := len(resp.Hits) > 0 && offset+len(resp.Hits) > offset && int64(offset+len(resp.Hits)) < resp.Total
 			next := ""
 			if hasMore {
 				next = strconv.Itoa(offset + len(resp.Hits))

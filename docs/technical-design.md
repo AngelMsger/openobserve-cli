@@ -98,7 +98,28 @@ per-check `status` and optional `recovery_scope`.
 ## Output (`internal/output`)
 
 `Emit` and `EmitList` render any value as `json` (default), `table`, or `ndjson`.
-Lists always use the `{items, next, has_more}` envelope. `--fields` projects
+JSON lists use the `{items, next, has_more}` envelope. NDJSON writes only rows
+to stdout; when a page has more results, the renderer writes a separate
+`_notice.pagination` record with `next` and `has_more` to stderr, followed by
+actionable `next_steps` in the same notice. Field projections and filtered empty
+pages retain this metadata. A row write failure prevents the notice; a notice
+write failure does not fail successful data output. `Options.NoticeWriter`
+defaults to stderr, and `Options.NextFlag` defaults to `--cursor`. OpenObserve's
+`emitList` selects `--offset` for both notice guidance and table footers.
+
+Trace search derives advancing offsets from nonempty pages and the endpoint's
+documented total count; empty backend pages never announce continuation. SQL
+search's total can be page-local because `track_total_hits` defaults to false.
+For single-page NDJSON search, a larger total establishes continuation; an
+otherwise full page triggers at most one `size: 1` lookahead at the next offset
+with identical SQL and resolved absolute bounds. An empty lookahead ends the
+result, and a failed lookahead returns an error rather than claiming completion.
+This avoids a full-count scan and leaves JSON summaries and `--all` streaming
+and truncation notices unchanged. Manual continuation must use fixed absolute
+`--from` and `--to` values; repeating `--since` re-resolves the window. `--all`
+resolves its window once for the entire traversal.
+
+`--fields` projects
 results to dot-path keys before rendering (filtering happens before it reaches an
 agent's context). `--pretty` enables ANSI-colored JSON on a TTY (and is silently
 downgraded to plain JSON off a TTY, so `--pretty | jq` still works).

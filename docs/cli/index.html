@@ -101,6 +101,9 @@
 metrics and traces in OpenObserve (O2). It emits agent-friendly JSON
 with structured errors, and works with self-hosted and Cloud instances.
 
+NDJSON writes one item per line to stdout and pagination notices to stderr.
+For paginated search results, pass the notice next value as --offset.
+
 AGENT NOTE: a companion Skill (&#34;openobserve&#34;) carries the canonical usage,
 safety modes, and env setup and is the source of truth for driving this CLI.
 If you are an agent, load that Skill before composing commands. Check status
@@ -436,7 +439,10 @@ deciding which window to pull raw rows from with `search run`.</p>
 narrowed by --where; or provide a full --sql query (use --sql @file or
 --sql @- to read a long query from a file or stdin). The time range is
 required (--since or --from/--to). JSON output returns a summary plus the
-hits; --format ndjson streams one hit per line for piping. Use --all to
+hits; --format ndjson streams one hit per line, with continuation notices
+on stderr (pass next as --offset with the same query and fixed absolute
+--from and --to; repeating --since moves the window).
+A full page can require one extra single-row request to check for more. Use --all to
 page through every matching row as ndjson (bound it with --max).</p>
       <h3>Options</h3>
       <table>
@@ -695,7 +701,9 @@ flat, one per line. The time range must contain the trace.</p>
       <p class="long">Returns recent traces newest-first, each with its trace_id, duration and the
 services that participated — enough to pick which trace to inspect with
 `trace get`. Narrow the set with --filter (e.g. &#34;duration &gt; 1000000&#34; for
-traces slower than 1s). The time range is required.</p>
+traces slower than 1s). The time range is required. Follow continuation
+with --offset and fixed absolute --from and --to; repeating --since
+moves the window. NDJSON continuation notices go to stderr.</p>
       <h3>Options</h3>
       <table>
         <thead><tr><th>Flag</th><th>Default</th><th>Description</th></tr></thead>

@@ -77,7 +77,10 @@ func newSearchRunCmd(s *appState) *cobra.Command {
 			"narrowed by --where; or provide a full --sql query (use --sql @file or\n" +
 			"--sql @- to read a long query from a file or stdin). The time range is\n" +
 			"required (--since or --from/--to). JSON output returns a summary plus the\n" +
-			"hits; --format ndjson streams one hit per line for piping. Use --all to\n" +
+			"hits; --format ndjson streams one hit per line, with continuation notices\n" +
+			"on stderr (pass next as --offset with the same query and fixed absolute\n" +
+			"--from and --to; repeating --since moves the window).\n" +
+			"A full page can require one extra single-row request to check for more. Use --all to\n" +
 			"page through every matching row as ndjson (bound it with --max).",
 		Example: "  # last hour of errors from the 'default' log stream\n" +
 			"  openobserve-cli search run --stream default --where \"level = 'ERROR'\" --since 1h --limit 20\n\n" +
@@ -118,7 +121,7 @@ func newSearchRunCmd(s *appState) *cobra.Command {
 			if size > constants.MaxSearchLimit {
 				size = constants.MaxSearchLimit
 			}
-			resp, err := client.Search(ctx, s.org(), apiclient.SearchRequest{
+			req := apiclient.SearchRequest{
 				Query: apiclient.SearchQuery{
 					SQL:       query,
 					StartTime: start,
@@ -126,13 +129,18 @@ func newSearchRunCmd(s *appState) *cobra.Command {
 					From:      offset,
 					Size:      size,
 				},
-			})
+			}
+			resp, err := client.Search(ctx, s.org(), req)
 			if err != nil {
 				return err
 			}
 			// ndjson streams the raw hits, one per line — ideal for piping.
 			if s.cfg().Defaults.Format == "ndjson" {
-				return s.emitList(resp.Hits, pageInfo{})
+				info, err := searchContinuation(ctx, client, s.org(), req, resp)
+				if err != nil {
+					return err
+				}
+				return s.emitList(resp.Hits, info)
 			}
 			return s.emit(map[string]any{
 				"sql":          query,
@@ -158,6 +166,35 @@ func newSearchRunCmd(s *appState) *cobra.Command {
 	addTimeFlags(cmd, &tf)
 	enumComplete(cmd, "order", "desc", "asc")
 	return cmd
+}
+
+// searchContinuation verifies whether a single page has more rows. Without
+// track_total_hits the backend total may describe only this page. A full page
+// with no larger total therefore needs one bounded lookahead, not a full count.
+// Keep the original request's SQL and absolute time window for that lookup.
+func searchContinuation(ctx context.Context, client apiclient.Client, org string, req apiclient.SearchRequest, resp *apiclient.SearchResponse) (pageInfo, error) {
+	count := len(resp.Hits)
+	next := req.Query.From + count
+	if count == 0 || next <= req.Query.From {
+		return pageInfo{}, nil
+	}
+	info := pageInfo{Next: strconv.Itoa(next), HasMore: true}
+	if int64(next) < resp.Total {
+		return info, nil
+	}
+	if count < req.Query.Size {
+		return pageInfo{}, nil
+	}
+	req.Query.From = next
+	req.Query.Size = 1
+	probe, err := client.Search(ctx, org, req)
+	if err != nil {
+		return pageInfo{}, err
+	}
+	if len(probe.Hits) == 0 {
+		return pageInfo{}, nil
+	}
+	return info, nil
 }
 
 // runSearchAll pages through every matching row, streaming each page as ndjson.

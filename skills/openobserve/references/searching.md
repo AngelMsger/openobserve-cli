@@ -47,7 +47,16 @@ Output (JSON) is a summary plus the hits:
 ```
 
 `--format ndjson` instead streams the raw hits one per line — ideal for
-`| jq` / `| grep`.
+`| jq` / `| grep`. When more rows exist, stderr includes
+`{"_notice":{"pagination":{"next":"20","has_more":true},"next_steps":["Pass next as --offset to retrieve the next page."]}}`.
+Read `_notice.pagination.next` and pass it as `--offset`; retain the same query
+and fixed absolute `--from` **and** `--to` values on each invocation. Repeating
+`--since` recalculates the window and can duplicate or skip rows. The server's
+`total` may describe only the returned page. A full page without a larger total
+therefore requires at most one extra single-row read at the next offset to
+verify continuation; the CLI reuses the same SQL and resolved window and never
+enables a full-count scan. A failed verification fails the command without
+reporting the page as complete. JSON output remains the summary shown above.
 
 `--all` requests every page and always emits NDJSON; use it only when the task
 needs complete rows and supply `--max` as a budget. With `--all`, `--limit` is
