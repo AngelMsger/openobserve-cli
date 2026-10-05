@@ -126,3 +126,14 @@ verify native credentials before associating missing identity, and retain operat
 failures. Never copy secrets, infer identity from environment variables or activate
 a context. Cover dry-run, ambiguity, scope mismatch, concurrent edits and fresh-load
 credential resolution. Native self-configuration follows the existing read-only exception.
+
+## Stored credential lifetime
+
+A stored secret is keyed by the server URL's host and the auth scheme
+(`auth.AccountKey`), so contexts on one host resolve the same entry regardless of
+organization, path or trailing slash. `config init` only saves and no command
+removes a context; `auth logout` is the one deliberate removal. A change that
+deletes or re-homes a context must compare credential keys, not URL strings, and
+keep an entry another context still resolves — including the one it has just
+saved. Cover it with a fresh-load resolution test
+(`internal/app/config_credentials_test.go`).
