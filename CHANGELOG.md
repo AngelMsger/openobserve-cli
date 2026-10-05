@@ -28,6 +28,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   streaming/cap notices remain unchanged.
 - Update the companion Skill to `0.3.8`, including fixed absolute windows for
   manual offset continuation and the time-window flag rules.
+- List all seven sibling CLIs in the README and on the landing page, and name
+  the thirteen coding agents `skill install` detects on the landing page.
 
 ## [0.14.0] - 2026-09-24
 ### Added
