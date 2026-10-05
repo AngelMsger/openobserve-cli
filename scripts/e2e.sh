@@ -64,6 +64,26 @@ check "search run"      '"hits"'         -- run search run --stream app --since 
 check "search ndjson"   '"level":"ERROR"' -- run --format ndjson search run --stream app --since 1h
 check "histogram"       '"buckets"'      -- run search histogram --stream app --since 1h --interval 5m
 
+# NDJSON keeps rows on stdout and reports continuation on stderr. The notice's
+# next value resumes the listing with --offset over the same fixed window.
+WINDOW=(--from 2026-09-01T00:00:00Z --to 2026-09-01T01:00:00Z)
+page_one="$(run --format ndjson search run --stream app "${WINDOW[@]}" --limit 1 2>"$TMP/page-one.err" || true)"
+next_offset="$(sed -n 's/.*"pagination":{[^}]*"next":"\([0-9]*\)".*/\1/p' "$TMP/page-one.err")"
+if [[ "$page_one" == *'"log":"boom"'* && "$page_one" != *_notice* && "$next_offset" == "1" ]] \
+   && grep -q 'Pass next as --offset' "$TMP/page-one.err"; then
+  echo "ok   - ndjson continuation notice goes to stderr"
+  pass=$((pass + 1))
+else
+  echo "FAIL - ndjson continuation notice goes to stderr"; cat "$TMP/page-one.err" | head -5; exit 1
+fi
+page_two="$(run --format ndjson search run --stream app "${WINDOW[@]}" --limit 1 --offset "$next_offset" 2>"$TMP/page-two.err" || true)"
+if [[ "$page_two" == *'"log":"recovered"'* ]] && ! grep -q '"pagination"' "$TMP/page-two.err"; then
+  echo "ok   - ndjson resumes with --offset and ends without a notice"
+  pass=$((pass + 1))
+else
+  echo "FAIL - ndjson resumes with --offset and ends without a notice"; cat "$TMP/page-two.err" | head -5; exit 1
+fi
+
 # --sql @file: read a query from a file rather than the command line.
 echo 'SELECT * FROM "app"' >"$TMP/q.sql"
 check "search --sql @file" '"hits"'      -- run search run --sql "@$TMP/q.sql" --since 1h

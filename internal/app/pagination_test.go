@@ -265,3 +265,90 @@ func TestSearchAllKeepsStreamingAndCapNotice(t *testing.T) {
 		})
 	}
 }
+
+// Discovery endpoints are unpaginated: their NDJSON output is rows only, with
+// no fabricated continuation.
+func TestUnpaginatedListingsEmitNoContinuation(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case strings.HasSuffix(r.URL.Path, "/streams"):
+			_ = json.NewEncoder(w).Encode(map[string]any{"list": []map[string]any{
+				{"name": "app", "stream_type": "logs"}, {"name": "web", "stream_type": "logs"},
+			}})
+		case r.URL.Path == "/api/organizations":
+			_ = json.NewEncoder(w).Encode(map[string]any{"data": []map[string]any{
+				{"identifier": "default", "name": "Default"}, {"identifier": "team-a", "name": "Team A"},
+			}})
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer server.Close()
+	paginationEnvironment(t, server.URL)
+	for _, args := range [][]string{{"stream", "list"}, {"org", "list"}} {
+		out, notice, err := capturePaginationCommand(t, append([]string{"--format", "ndjson"}, args...)...)
+		if err != nil || strings.Count(out, "\n") != 2 || notice != "" {
+			t.Fatalf("%v: error=%v stdout=%s stderr=%s", args, err, out, notice)
+		}
+	}
+}
+
+// Trace search computes continuation independently of the output format, so
+// JSON carries it in the envelope and the table footer names --offset.
+func TestTraceContinuationInJSONAndTable(t *testing.T) {
+	var windows []string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		windows = append(windows, r.URL.Query().Get("start_time")+"/"+r.URL.Query().Get("end_time"))
+		_ = json.NewEncoder(w).Encode(map[string]any{"total": 3, "hits": []map[string]any{{"trace_id": "a", "duration": 50}}})
+	}))
+	defer server.Close()
+	paginationEnvironment(t, server.URL)
+	args := []string{"trace", "search", "--stream", "traces", "--limit", "1", "--from", "2026-09-01T00:00:00Z", "--to", "2026-09-01T01:00:00Z", "--offset", "1"}
+	out, notice, err := capturePaginationCommand(t, append([]string{"--format", "json"}, args...)...)
+	var envelope struct {
+		Items   []map[string]any `json:"items"`
+		Next    string           `json:"next"`
+		HasMore bool             `json:"has_more"`
+	}
+	if err != nil || notice != "" || json.Unmarshal([]byte(out), &envelope) != nil ||
+		len(envelope.Items) != 1 || envelope.Next != "2" || !envelope.HasMore {
+		t.Fatalf("JSON envelope: error=%v stdout=%s stderr=%s", err, out, notice)
+	}
+	out, notice, err = capturePaginationCommand(t, append([]string{"--format", "table"}, args...)...)
+	if err != nil || notice != "" || !strings.Contains(out, "--offset 2") || strings.Contains(out, "--cursor") {
+		t.Fatalf("table footer: error=%v stdout=%s stderr=%s", err, out, notice)
+	}
+	// Fixed absolute bounds resolve to the same window on every invocation.
+	if len(windows) != 2 || windows[0] != windows[1] {
+		t.Fatalf("fixed bounds moved between pages: %v", windows)
+	}
+}
+
+// --all resolves a relative window once, so every page of one traversal reads
+// the same bounds even though --since is measured from the current time.
+func TestSearchAllResolvesARelativeWindowOnce(t *testing.T) {
+	var requests []apiclient.SearchQuery
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var req apiclient.SearchRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			t.Error(err)
+		}
+		requests = append(requests, req.Query)
+		rows := []map[string]any{}
+		for i := req.Query.From; i < 5 && i < req.Query.From+req.Query.Size; i++ {
+			rows = append(rows, map[string]any{"id": i})
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{"total": len(rows), "hits": rows})
+	}))
+	defer server.Close()
+	paginationEnvironment(t, server.URL)
+	out, notice, err := capturePaginationCommand(t, "search", "run", "--stream", "app", "--since", "1h", "--all", "--limit", "2")
+	if err != nil || strings.Count(out, "\n") != 5 || notice != "" || len(requests) != 3 {
+		t.Fatalf("error=%v stdout=%s stderr=%s requests=%d", err, out, notice, len(requests))
+	}
+	for _, req := range requests {
+		if req.StartTime != requests[0].StartTime || req.EndTime != requests[0].EndTime || req.EndTime <= req.StartTime {
+			t.Fatalf("--all re-resolved its window between pages: %+v", requests)
+		}
+	}
+}

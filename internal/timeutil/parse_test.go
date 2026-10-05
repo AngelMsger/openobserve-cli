@@ -1,6 +1,7 @@
 package timeutil
 
 import (
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -141,5 +142,20 @@ func TestRangeResolveRejectsAmbiguousOrUnusableWindows(t *testing.T) {
 		if err == nil || !strings.Contains(err.Error(), tc.want) {
 			t.Errorf("%s: Resolve error = %v, want it to contain %q", tc.name, err, tc.want)
 		}
+	}
+}
+
+// A resolved window can be handed back as --from/--to unchanged: the JSON
+// search summary reports start_micros and end_micros, and reusing them is how a
+// relative --since window becomes the fixed one that offset paging needs.
+func TestResolvedBoundsRoundTripAsAbsoluteWindow(t *testing.T) {
+	start, end, err := Range{Since: "1h", Now: fixedNow.Add(123456 * time.Microsecond)}.Resolve()
+	if err != nil {
+		t.Fatal(err)
+	}
+	again := Range{From: strconv.FormatInt(start, 10), To: strconv.FormatInt(end, 10), Now: fixedNow.Add(time.Hour)}
+	gotStart, gotEnd, err := again.Resolve()
+	if err != nil || gotStart != start || gotEnd != end {
+		t.Fatalf("round trip = (%d, %d, %v), want (%d, %d)", gotStart, gotEnd, err, start, end)
 	}
 }

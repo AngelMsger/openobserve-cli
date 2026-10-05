@@ -63,7 +63,9 @@ func main() {
 		raw, _ := io.ReadAll(r.Body)
 		var req struct {
 			Query struct {
-				SQL string `json:"sql"`
+				SQL  string `json:"sql"`
+				From int    `json:"from"`
+				Size int    `json:"size"`
 			} `json:"query"`
 		}
 		_ = json.Unmarshal(raw, &req)
@@ -96,12 +98,19 @@ func main() {
 			})
 			return
 		}
-		writeJSON(w, map[string]any{
-			"took": 5, "total": 1, "scan_size": 1.5,
-			"hits": []map[string]any{
-				{"_timestamp": 1700000000000000, "level": "ERROR", "log": "boom"},
-			},
-		})
+		// Log rows page by from/size. As with track_total_hits off, total counts
+		// only the returned page, so a full page does not reveal whether more
+		// rows follow.
+		rows := []map[string]any{
+			{"_timestamp": 1700000000000000, "level": "ERROR", "log": "boom"},
+			{"_timestamp": 1700000060000000, "level": "INFO", "log": "recovered"},
+		}
+		from := min(max(req.Query.From, 0), len(rows))
+		page := rows[from:]
+		if req.Query.Size > 0 && req.Query.Size < len(page) {
+			page = page[:req.Query.Size]
+		}
+		writeJSON(w, map[string]any{"took": 5, "total": len(page), "scan_size": 1.5, "hits": page})
 	})
 
 	// PromQL instant + range (Prometheus-compatible envelope).

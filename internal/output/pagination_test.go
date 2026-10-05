@@ -112,3 +112,19 @@ func TestPaginationContinuationFlag(t *testing.T) {
 		})
 	}
 }
+
+// The notice is one compact JSON line, so a consumer can split stderr by line,
+// and next is passed through byte for byte: no HTML escaping, no colour.
+func TestPaginationNoticeIsOneCompactLine(t *testing.T) {
+	const next = "a<b>&c=d"
+	var data, notices bytes.Buffer
+	if err := EmitList([]map[string]any{{"name": "a"}}, next, true, Options{
+		Format: FormatNDJSON, Writer: &data, NoticeWriter: &notices, Pretty: true,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Count(notices.String(), "\n") != 1 || !strings.HasSuffix(notices.String(), "\n") ||
+		!strings.Contains(notices.String(), `"next":"`+next+`"`) || strings.Contains(notices.String(), "\x1b") {
+		t.Fatalf("notice is not one compact unescaped line: %q", notices.String())
+	}
+}
