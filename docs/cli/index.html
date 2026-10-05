@@ -357,9 +357,9 @@ required (--since or --from/--to).</p>
         <tbody>
         <tr><td><code>--from</code></td><td></td><td>range start: RFC3339, an epoch, 2006-01-02, or now-1h</td></tr>
         <tr><td><code>--query</code></td><td></td><td>PromQL expression (or @file / @- for stdin)</td></tr>
-        <tr><td><code>--since</code></td><td></td><td>look back this far from now, e.g. 15m, 1h, 24h, 7d</td></tr>
+        <tr><td><code>--since</code></td><td></td><td>look back this far from now, e.g. 15m, 1h, 24h, 7d (not with --from/--to)</td></tr>
         <tr><td><code>--step</code></td><td></td><td>evaluation step / resolution, e.g. 30s, 1m, 5m (required)</td></tr>
-        <tr><td><code>--to</code></td><td></td><td>range end (default now)</td></tr>
+        <tr><td><code>--to</code></td><td></td><td>range end, same forms (default now); requires --from</td></tr>
         </tbody>
       </table>
       <h3>Examples</h3><pre><span class="c">  # error rate over the last hour at 1-minute resolution</span>
@@ -422,9 +422,9 @@ deciding which window to pull raw rows from with `search run`.</p>
         <tbody>
         <tr><td><code>--from</code></td><td></td><td>range start: RFC3339, an epoch, 2006-01-02, or now-1h</td></tr>
         <tr><td><code>--interval</code></td><td><code>1m</code></td><td>bucket width: 30s, 1m, 5m, 1h, 1d</td></tr>
-        <tr><td><code>--since</code></td><td></td><td>look back this far from now, e.g. 15m, 1h, 24h, 7d</td></tr>
+        <tr><td><code>--since</code></td><td></td><td>look back this far from now, e.g. 15m, 1h, 24h, 7d (not with --from/--to)</td></tr>
         <tr><td><code>--stream</code></td><td></td><td>stream to aggregate (required)</td></tr>
-        <tr><td><code>--to</code></td><td></td><td>range end (default now)</td></tr>
+        <tr><td><code>--to</code></td><td></td><td>range end, same forms (default now); requires --from</td></tr>
         <tr><td><code>--where</code></td><td></td><td>WHERE clause to filter, e.g. &#34;level = &#39;ERROR&#39;&#34;</td></tr>
         </tbody>
       </table>
@@ -454,10 +454,10 @@ page through every matching row as ndjson (bound it with --max).</p>
         <tr><td><code>--max</code></td><td><code>0</code></td><td>with --all, stop after this many rows (0 = no cap); a cap is reported on stderr</td></tr>
         <tr><td><code>--offset</code></td><td><code>0</code></td><td>row offset for pagination (maps to the search &#39;from&#39;)</td></tr>
         <tr><td><code>--order</code></td><td><code>desc</code></td><td>_timestamp ordering for the auto-built query: desc or asc</td></tr>
-        <tr><td><code>--since</code></td><td></td><td>look back this far from now, e.g. 15m, 1h, 24h, 7d</td></tr>
+        <tr><td><code>--since</code></td><td></td><td>look back this far from now, e.g. 15m, 1h, 24h, 7d (not with --from/--to)</td></tr>
         <tr><td><code>--sql</code></td><td></td><td>full SQL query (overrides --stream/--where/--order)</td></tr>
         <tr><td><code>--stream</code></td><td></td><td>stream to query (builds SELECT * FROM &#34;&lt;stream&gt;&#34;)</td></tr>
-        <tr><td><code>--to</code></td><td></td><td>range end (default now)</td></tr>
+        <tr><td><code>--to</code></td><td></td><td>range end, same forms (default now); requires --from</td></tr>
         <tr><td><code>--where</code></td><td></td><td>WHERE clause to filter the auto-built query, e.g. &#34;level = &#39;ERROR&#39;&#34;</td></tr>
         </tbody>
       </table>
@@ -686,9 +686,9 @@ flat, one per line. The time range must contain the trace.</p>
         <thead><tr><th>Flag</th><th>Default</th><th>Description</th></tr></thead>
         <tbody>
         <tr><td><code>--from</code></td><td></td><td>range start: RFC3339, an epoch, 2006-01-02, or now-1h</td></tr>
-        <tr><td><code>--since</code></td><td></td><td>look back this far from now, e.g. 15m, 1h, 24h, 7d</td></tr>
+        <tr><td><code>--since</code></td><td></td><td>look back this far from now, e.g. 15m, 1h, 24h, 7d (not with --from/--to)</td></tr>
         <tr><td><code>--stream</code></td><td></td><td>trace stream the trace lives in (required)</td></tr>
-        <tr><td><code>--to</code></td><td></td><td>range end (default now)</td></tr>
+        <tr><td><code>--to</code></td><td></td><td>range end, same forms (default now); requires --from</td></tr>
         </tbody>
       </table>
       <h3>Examples</h3><pre>  openobserve-cli trace get 7be29a... --stream default --since 1h</pre>
@@ -712,9 +712,9 @@ moves the window. NDJSON continuation notices go to stderr.</p>
         <tr><td><code>--from</code></td><td></td><td>range start: RFC3339, an epoch, 2006-01-02, or now-1h</td></tr>
         <tr><td><code>--limit</code></td><td><code>0</code></td><td>max traces to return (default 50)</td></tr>
         <tr><td><code>--offset</code></td><td><code>0</code></td><td>trace offset for pagination (maps to &#39;from&#39;)</td></tr>
-        <tr><td><code>--since</code></td><td></td><td>look back this far from now, e.g. 15m, 1h, 24h, 7d</td></tr>
+        <tr><td><code>--since</code></td><td></td><td>look back this far from now, e.g. 15m, 1h, 24h, 7d (not with --from/--to)</td></tr>
         <tr><td><code>--stream</code></td><td></td><td>trace stream to search (required)</td></tr>
-        <tr><td><code>--to</code></td><td></td><td>range end (default now)</td></tr>
+        <tr><td><code>--to</code></td><td></td><td>range end, same forms (default now); requires --from</td></tr>
         </tbody>
       </table>
       <h3>Examples</h3><pre><span class="c">  # slowest-first triage is done client-side; here, last hour of traces</span>

@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Enforce the family time-window contract on every command that takes
+  `--since`/`--from`/`--to` (`search run`, `search histogram`, `trace search`,
+  `trace get` and `metrics query-range`): `--since` can no longer be combined
+  with `--from` or `--to`, and `--to` requires `--from`. Such a window now
+  fails with a `BAD_TIME_RANGE` usage error (exit 2) before any request.
+  Previously `--since` silently took precedence and `--to` on its own was
+  reported as a missing time range.
+
 ### Fixed
 
 - Preserve NDJSON continuation metadata on stderr, including projected and
@@ -17,7 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   read using the same SQL and resolved time window. JSON summaries and `--all`
   streaming/cap notices remain unchanged.
 - Update the companion Skill to `0.3.8`, including fixed absolute windows for
-  manual offset continuation.
+  manual offset continuation and the time-window flag rules.
 
 ## [0.14.0] - 2026-09-24
 ### Added

@@ -95,7 +95,9 @@ Never hand-compute microsecond epochs — the CLI does it. Accepted forms:
 - `--from` / `--to` each accept: RFC3339 (`2025-06-16T14:00:00Z`), a bare date
   (`2025-06-16`, UTC midnight), an epoch in seconds/millis/micros (auto-detected),
   `now`, or `now-30m` / `now+1h`. A bare duration like `2h` means "2h ago".
-- `--to` defaults to now when omitted.
+- `--to` defaults to now when omitted, and requires `--from`.
+- `--since` cannot be combined with `--from` or `--to`. Choose one form; a
+  conflicting window fails with `BAD_TIME_RANGE` before any request.
 
 ## Tips
 

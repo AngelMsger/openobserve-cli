@@ -106,7 +106,9 @@ fi
   credential but could not delete
   `~/.angelmsger/openobserve/browser-profile`. The credential is gone; delete
   that directory by hand to clear the remembered browser session.
-- **`BAD_TIME_RANGE` (usage/2)** — pass `--since 1h` or `--from`/`--to`.
+- **`BAD_TIME_RANGE` (usage/2)** — pass either `--since 1h` or `--from` with an
+  optional `--to`. `--since` cannot be combined with `--from`/`--to`, `--to`
+  requires `--from`, and the end must be later than the start.
 - **`STREAM_NOT_FOUND` (not_found/6)** — run `stream list`; names are
   case-sensitive.
 - **`PROMQL_ERROR` (usage/2)** — a `metrics query` expression was rejected

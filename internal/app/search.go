@@ -33,7 +33,10 @@ func newSearchCmd(s *appState) *cobra.Command {
 	return cmd
 }
 
-// timeFlags holds the shared time-range flags.
+// timeFlags holds the shared time-range flags. Every command that takes a
+// window (search run/histogram, trace search/get, metrics query-range) resolves
+// it here, so the family's time-window contract is enforced in one place:
+// --since excludes --from/--to, and --to requires --from.
 type timeFlags struct {
 	since string
 	from  string
@@ -42,9 +45,9 @@ type timeFlags struct {
 
 func addTimeFlags(cmd *cobra.Command, t *timeFlags) {
 	f := cmd.Flags()
-	f.StringVar(&t.since, "since", "", "look back this far from now, e.g. 15m, 1h, 24h, 7d")
+	f.StringVar(&t.since, "since", "", "look back this far from now, e.g. 15m, 1h, 24h, 7d (not with --from/--to)")
 	f.StringVar(&t.from, "from", "", "range start: RFC3339, an epoch, 2006-01-02, or now-1h")
-	f.StringVar(&t.to, "to", "", "range end (default now)")
+	f.StringVar(&t.to, "to", "", "range end, same forms (default now); requires --from")
 }
 
 func (t timeFlags) resolve() (start, end int64, err error) {
@@ -52,8 +55,10 @@ func (t timeFlags) resolve() (start, end int64, err error) {
 	start, end, rerr := r.Resolve()
 	if rerr != nil {
 		return 0, 0, cerrors.Wrap(rerr, cerrors.CategoryUsage, "BAD_TIME_RANGE", rerr.Error()).
-			WithHint("Pass --since (e.g. 1h) or --from/--to.").
-			WithNextSteps("openobserve-cli search run --stream <name> --since 1h --limit 10")
+			WithHint("Pass either --since <duration> (a look-back ending now) or --from with an optional --to. "+
+				"--since cannot be combined with --from or --to, and --to requires --from.").
+			WithNextSteps("openobserve-cli search run --stream <name> --since 1h --limit 10",
+				"openobserve-cli search run --stream <name> --from 2026-01-02T15:00:00Z --to 2026-01-02T16:00:00Z --limit 10")
 	}
 	return start, end, nil
 }

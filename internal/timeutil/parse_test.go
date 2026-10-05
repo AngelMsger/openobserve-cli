@@ -1,6 +1,7 @@
 package timeutil
 
 import (
+	"strings"
 	"testing"
 	"time"
 )
@@ -110,4 +111,35 @@ func TestRangeResolve(t *testing.T) {
 			t.Error("expected error for end before start")
 		}
 	})
+}
+
+// The family's time-window contract: --since excludes --from and --to, and
+// --to requires --from. A window that breaks either rule is rejected instead of
+// letting one flag silently win.
+func TestRangeResolveRejectsAmbiguousOrUnusableWindows(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		r    Range
+		want string
+	}{
+		{"since with from", Range{Since: "24h", From: "2026-06-15"}, "--since cannot be combined"},
+		{"since with to", Range{Since: "24h", To: "2026-06-16"}, "--since cannot be combined"},
+		{"since with from and to", Range{Since: "24h", From: "2026-06-15", To: "2026-06-16"}, "--since cannot be combined"},
+		{"to without from", Range{To: "2026-06-16"}, "--to requires --from"},
+		{"no bound", Range{}, "no time range given"},
+		{"reversed", Range{From: "now", To: "now-1h"}, "empty time range"},
+		{"empty", Range{From: "2026-06-15", To: "2026-06-15"}, "empty time range"},
+		{"zero since", Range{Since: "0s"}, "invalid --since"},
+		{"negative since", Range{Since: "-1h"}, "invalid --since"},
+		{"date as since", Range{Since: "2026-06-15"}, "invalid --since"},
+		{"bad from", Range{From: "soon"}, "invalid --from"},
+		{"bad to", Range{From: "2026-06-15", To: "later"}, "invalid --to"},
+		{"from past the default end", Range{From: "now+1h"}, "empty time range"},
+	} {
+		tc.r.Now = fixedNow
+		_, _, err := tc.r.Resolve()
+		if err == nil || !strings.Contains(err.Error(), tc.want) {
+			t.Errorf("%s: Resolve error = %v, want it to contain %q", tc.name, err, tc.want)
+		}
+	}
 }

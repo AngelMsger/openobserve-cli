@@ -118,6 +118,19 @@ fi
 echo "ok   - missing-time-range exits 2"
 pass=$((pass + 1))
 
+# Time-window contract: --since excludes --from/--to, and --to requires --from.
+for window in "--since 1h --from 2026-09-01T00:00:00Z" "--to 2026-09-01T01:00:00Z"; do
+  set +e
+  # shellcheck disable=SC2086 # the window is a list of flags
+  run search run --stream app $window >"$TMP/window.out" 2>"$TMP/window.err"; code=$?
+  set -e
+  if [[ "$code" -ne 2 || -s "$TMP/window.out" ]] || ! grep -q '"BAD_TIME_RANGE"' "$TMP/window.err"; then
+    echo "FAIL - '$window' should be a BAD_TIME_RANGE usage error, got exit $code"; head -5 "$TMP/window.err"; exit 1
+  fi
+done
+echo "ok   - ambiguous time windows exit 2 with BAD_TIME_RANGE"
+pass=$((pass + 1))
+
 # config init: a fresh setup, then a re-run that must announce the existing
 # config and ask edit/add/replace — here driving the "add" path to a 2nd context.
 CFG="$(mktemp -d)"

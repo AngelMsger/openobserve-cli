@@ -5,6 +5,11 @@
 // microsecond epochs is the single most error-prone part of calling the search
 // API, so the CLI owns it and accepts forgiving inputs (--since 1h, RFC3339,
 // bare dates, epoch seconds/millis/micros, and now±duration expressions).
+//
+// The flag vocabulary is the shared contract of the agent-facing CLI family:
+// --since is a look-back ending now, --from is the lower bound and --to the
+// upper bound (now when omitted), --since excludes --from/--to, and --to
+// requires --from.
 package timeutil
 
 import (
@@ -15,8 +20,8 @@ import (
 	"time"
 )
 
-// Range is an unresolved time window described by flags. Exactly one of Since
-// or (From/To) is normally provided. Now, when zero, defaults to time.Now() —
+// Range is an unresolved time window described by flags. Either Since or From
+// (optionally with To) is provided. Now, when zero, defaults to time.Now() —
 // tests set it for determinism.
 type Range struct {
 	Since string
@@ -25,9 +30,17 @@ type Range struct {
 	Now   time.Time
 }
 
-// Resolve turns the Range into start/end microsecond timestamps. The window is
-// validated to be non-empty and correctly ordered.
+// Resolve turns the Range into start/end microsecond timestamps. It enforces
+// the flag exclusivity rules and rejects an empty or reversed window. Since
+// combined with From or To is an error rather than a silent preference: the
+// caller asked for two different windows and only one could be honored.
 func (r Range) Resolve() (startMicros, endMicros int64, err error) {
+	if r.Since != "" && (r.From != "" || r.To != "") {
+		return 0, 0, fmt.Errorf("--since cannot be combined with --from or --to")
+	}
+	if r.To != "" && r.From == "" {
+		return 0, 0, fmt.Errorf("--to requires --from")
+	}
 	now := r.Now
 	if now.IsZero() {
 		now = time.Now()

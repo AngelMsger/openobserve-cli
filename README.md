@@ -225,7 +225,9 @@ unchanged.
 
 Time ranges accept `--since 15m|1h|24h|7d`, or `--from`/`--to` as RFC3339, a date,
 an epoch (seconds/millis/micros), or `now-30m`; the CLI converts to the
-microsecond timestamps the search API requires.
+microsecond timestamps the search API requires. `--since` cannot be combined
+with `--from` or `--to`, and `--to` requires `--from` (it defaults to now); a
+conflicting window is a `BAD_TIME_RANGE` usage error.
 
 ### Multiple servers (contexts)
 

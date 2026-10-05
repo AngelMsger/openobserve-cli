@@ -28,7 +28,8 @@ microsecond timestamp**. Don't. The CLI gives you discovery commands for each:
    full-text-search keys, so your SQL `WHERE`/`SELECT` reference real columns.
 4. **Time** — never compute epochs by hand. Use `--since 1h` (or `--from`/`--to`
    with RFC3339, a date, or `now-30m`); the CLI converts to the microseconds the
-   API needs.
+   API needs. Use one form: `--since` cannot be combined with `--from`/`--to`,
+   and `--to` requires `--from`.
 
 Reuse discovery results within the same context. Prefer per-command `--org` and
 `--use-context`; persist a different default only when the user asks for it.

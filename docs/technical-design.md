@@ -182,6 +182,14 @@ timestamps, accepting durations (`15m`, `1h`, `7d`), `now±duration`, RFC3339,
 bare dates, and magnitude-detected epochs (s / ms / µs). It validates that the
 window is non-empty and correctly ordered.
 
+It also enforces the family's time-window contract: `--since` is mutually
+exclusive with `--from` and `--to`, and `--to` requires `--from`. Every command
+that takes a window — `search run`, `search histogram`, `trace search`,
+`trace get` and `metrics query-range` — resolves it through the one
+`timeFlags.resolve` adapter in `internal/app`, which reports a violation as a
+`BAD_TIME_RANGE` usage error before any request. `search tail --since` is a
+backfill look-back with no `--from`/`--to` and uses the same parser.
+
 ## Skill embedding (`assets.go`)
 
 The companion Skill is embedded with `//go:embed all:skills/openobserve`, so a

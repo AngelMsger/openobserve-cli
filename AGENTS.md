@@ -69,6 +69,10 @@ it directly, so `openobserve-cli` is the family's reference for how a sibling CL
   pages never supply continuation. SQL search may make one single-row lookahead
   for a full page with a page-local total, preserving its SQL and resolved time
   window. Keep JSON summaries and `--all` streaming/cap notices unchanged.
+- Time-window flags follow the family contract: `--since` excludes `--from` and
+  `--to`, and `--to` requires `--from`. Enforce it in `internal/timeutil`
+  (`Range.Resolve`) so every command shares one rule; never let one flag
+  silently win, and add a new time-filtered command through `timeFlags`.
 - Keep query and monitoring guidance in the companion Skill: reuse verified
   identifiers, bound retrieval and follow loops, and report evidence with its
   time window. Execute shell recovery examples with failing stubs when editing them.
