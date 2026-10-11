@@ -9,9 +9,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/angelmsger/agent-cli-kit/output"
 	"github.com/angelmsger/openobserve-cli/internal/auth"
 	"github.com/angelmsger/openobserve-cli/internal/config"
-	"github.com/angelmsger/openobserve-cli/internal/output"
 	"github.com/angelmsger/openobserve-cli/pkg/apiclient"
 	cerrors "github.com/angelmsger/openobserve-cli/pkg/errors"
 	"github.com/angelmsger/openobserve-cli/pkg/transport"

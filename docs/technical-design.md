@@ -23,7 +23,12 @@ cmd/openobserve-cli  →  internal/app  →  pkg/apiclient  →  pkg/transport
 - `pkg/transport` is a flavor-agnostic retrying HTTP client.
 
 Cross-cutting packages — `errors`, `output`, `config`, `auth`, `timeutil`,
-`cliflags`, `constants` — are used across the layers.
+`cliflags`, `constants` — are used across the layers. `output`, `cliflags`,
+`update`, and the code behind `pkg/credstore`, `pkg/errors` and
+`pkg/transport` come from
+[agent-cli-kit](https://github.com/AngelMsger/agent-cli-kit), shared by every
+CLI in the family; openobserve-cli supplies its own hints, User-Agent, keychain
+service name and release repository.
 
 ## Command layer (`internal/app`)
 
@@ -51,7 +56,7 @@ query; it also hosts `search tail` (poll-and-stream) and `--all` paging.
 `metrics.go` queries the Prometheus-compatible PromQL endpoints (times in
 **seconds**, not microseconds — `metrics.go` owns that conversion); `trace.go`
 lists traces and reassembles a trace's spans into a parent/child waterfall.
-`notify.go` emits the post-run update notice (`internal/update`).
+`notify.go` emits the post-run update notice (agent-cli-kit `update`).
 
 ## API client (`pkg/apiclient`)
 
@@ -76,17 +81,20 @@ and the CLI never asks an agent to compute epochs.
 
 ## Transport (`pkg/transport`)
 
-A thin `Client` that applies request decorators (auth, user-agent) and retries
-transient failures. Retries are limited to idempotent methods (GET/HEAD); a
-`Retry-After` header on 429/503 takes precedence over linear backoff. `Doer` is
-an interface so tests inject fakes.
+A re-export of agent-cli-kit's `transport` whose `New` defaults the User-Agent
+to `openobserve-cli/<version>`. A thin `Client` that applies request decorators
+(auth, user-agent) and retries transient failures. Retries are limited to
+idempotent methods (GET/HEAD); a `Retry-After` header on 429/503 takes
+precedence over linear backoff. `Doer` is an interface so tests inject fakes.
 
 ## Error model (`pkg/errors`)
 
+A re-export of agent-cli-kit's `errors`; `hints.go` holds openobserve-cli's
+default guidance and is installed with `SetGuidance` when the package loads.
 Every failure is a `*CLIError` with `Category`, a stable `Code`, `Message`,
 `Hint`, `NextSteps`, `Retryable`, `HTTPStatus` and an optional structured
 `Recovery`. The category drives two
-deterministic mappings: the **exit code** (`codes.go`, 0–11) and the **default
+deterministic mappings: the **exit code** (0–11) and the **default
 guidance** (`hints.go`). `FromHTTPStatus` classifies HTTP statuses. The JSON
 `Payload` is what's written to stderr. This is the "errors as navigation"
 contract — every failure tells an agent the next command to run. `Recovery`
@@ -95,7 +103,7 @@ scope; it is deliberately separate from `Retryable`, which means a retry in the
 current environment may work. `doctor` exposes the same distinction through
 per-check `status` and optional `recovery_scope`.
 
-## Output (`internal/output`)
+## Output (agent-cli-kit `output`)
 
 `Emit` and `EmitList` render any value as `json` (default), `table`, or `ndjson`.
 JSON lists use the `{items, next, has_more}` envelope. NDJSON writes only rows
@@ -147,9 +155,14 @@ cookies with an optional Authorization fallback, established by `auth login
 --browser` here or by o3's native sign-in — both write the same keychain
 entry). The config/keychain-coupled resolution stays in `internal/auth`: `Resolve`
 produces a validated `Credential` from config + secrets, loading the secret from
-the keychain when not supplied via flags/env; the `Store` prefers the OS keychain
-(`go-keyring`) and falls back to a per-user DPAPI-encrypted file on Windows or
-a `0600` JSON file on macOS/Linux. `internal/auth` re-exports
+the keychain when not supplied via flags/env. The `Store` lives in the public
+**`pkg/credstore`** so the o3 desktop app keeps secrets in the same place; it is
+agent-cli-kit's `credstore` under the `openobserve-cli` keychain service. It
+prefers the OS keychain (`go-keyring`) and falls back to a per-user
+DPAPI-encrypted file on Windows or a `0600` JSON file on macOS/Linux. On macOS
+`NewStore` first checks for a default keychain, so a sandbox without one never
+raises the "Reset To Defaults" dialog; `NewStoreWithBackend`, which takes a
+caller-supplied backend, skips that check. `internal/auth` re-exports
 the moved symbols so existing callers compile unchanged. Store access errors are
 preserved rather than collapsed into "missing":
 `CREDENTIAL_STORE_INACCESSIBLE` and `CREDENTIAL_NOT_VISIBLE_OR_MISSING` carry a
@@ -218,9 +231,10 @@ from `--help`; CI fails if the committed output is stale.
 
 ## Testing
 
-- Unit tests cover `timeutil`, the error mappings, output projection, the
-  search SQL builders, and the API client against an `httptest` server
-  (including the lenient org decode and the 403 RBAC guidance).
+- Unit tests cover `timeutil`, openobserve-cli's error guidance, the search SQL
+  builders, and the API client against an `httptest` server (including the
+  lenient org decode and the 403 RBAC guidance). The error mappings, output
+  projection and credential store are tested in agent-cli-kit.
 - `scripts/e2e.sh` runs the built binary against `test/mockserver` and asserts
   the agent-facing contract (JSON output, structured errors, exit codes) with no
   real credentials.
