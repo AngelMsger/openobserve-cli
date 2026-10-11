@@ -37,12 +37,14 @@ mirrors the architecture of the sibling `confluence-cli` / `bitbucket-cli`.
 - `pkg/auth`, `pkg/config` — the public credential model and on-disk YAML
   config model, shared with external consumers (see the rule below). `pkg/auth`
   declares openobserve-cli's auth schemes and recovery wording on top of the
-  shared credential model.
+  shared credential model. `pkg/config` registers openobserve-cli's settings,
+  file location and wording with the shared config engine (`schema.go`) and
+  keeps the YAML shape of `config.yaml`.
 - `internal/config`, `internal/auth` — CLI-only layered loader + keychain
   resolution, built over `pkg/config` / `pkg/auth` (which they re-export);
   `internal/auth` maps config onto the shared resolver.
-- Output rendering, argv correction, the update check, the credential store and
-  credential resolution come from [agent-cli-kit](https://github.com/AngelMsger/agent-cli-kit), shared
+- Output rendering, argv correction, the update check, the credential store,
+  credential resolution and the configuration engine come from [agent-cli-kit](https://github.com/AngelMsger/agent-cli-kit), shared
   by every CLI in the family. Fix bugs in those there, not here.
 - `internal/timeutil` — human time ranges → microsecond epochs (the search API).
 - `skills/openobserve` — the companion Skill, embedded into the binary.

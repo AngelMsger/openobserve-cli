@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Layered configuration, context selection, the config file write and
+  `config set-context` planning now come from agent-cli-kit's `config`
+  package. Commands, output, error codes, hints and the `config.yaml` format
+  are unchanged. `pkg/config` keeps its exported names and registers
+  openobserve-cli's settings with the kit when it is imported;
+  `pkg/config.File` is now an alias of the kit's `File[NamedContext, Defaults]`
+  with the same fields and methods.
 - Credential validation, header encoding, keychain lookup and the credential
   recovery errors now come from agent-cli-kit's `auth` package. Messages, error
   codes and stored credentials are unchanged, and `pkg/auth` keeps its exported

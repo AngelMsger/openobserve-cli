@@ -4,10 +4,10 @@ import (
 	pkgcfg "github.com/angelmsger/openobserve-cli/pkg/config"
 )
 
-// The persistent config-file model moved to the public pkg/config so the
-// desktop GUI can read/write the same file. These aliases keep the existing
-// internal callers (loader.go, internal/app) compiling unchanged. The layered
-// loader (flags/env/file) stays in this package.
+// The persistent config-file model lives in the public pkg/config so the
+// desktop GUI can read/write the same file; importing it registers
+// openobserve-cli's settings with agent-cli-kit/config. These aliases keep the
+// existing internal callers (loader.go, internal/app) compiling unchanged.
 type (
 	File         = pkgcfg.File
 	NamedContext = pkgcfg.NamedContext

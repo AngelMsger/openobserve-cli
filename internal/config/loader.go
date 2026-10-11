@@ -1,41 +1,18 @@
 package config
 
 import (
-	"fmt"
-	"os"
-	"strconv"
-	"strings"
-
-	cerrors "github.com/angelmsger/openobserve-cli/pkg/errors"
+	kit "github.com/angelmsger/agent-cli-kit/config"
 )
-
-// put inserts val into m at key only when val is non-empty.
-func put(m map[string]string, key, val string) {
-	if val != "" {
-		m[key] = val
-	}
-}
 
 // FlagValues carries the global CLI flags that override configuration. Empty
 // fields are ignored (not treated as overrides).
 type FlagValues struct {
-	AuthScheme    string
-	CredentialURL string
-	BaseURL       string
-	Org           string
-	Format        string
-	Timeout       string
-}
-
-func (f FlagValues) layer() map[string]string {
-	m := map[string]string{}
-	put(m, fieldServer, f.BaseURL)
-	put(m, fieldAuthScheme, f.AuthScheme)
-	put(m, fieldCredentialURL, f.CredentialURL)
-	put(m, fieldOrg, f.Org)
-	put(m, fieldFormat, f.Format)
-	put(m, fieldTimeout, f.Timeout)
-	return m
+	AuthScheme    string `config:"auth.scheme"`
+	CredentialURL string `config:"auth.credential_url"`
+	BaseURL       string `config:"server"`
+	Org           string `config:"org"`
+	Format        string `config:"defaults.format"`
+	Timeout       string `config:"defaults.timeout"`
 }
 
 // LoadOptions controls where configuration is read from. All fields are
@@ -55,90 +32,11 @@ type LoadOptions struct {
 	Context string
 }
 
-type namedLayer struct {
-	name string
-	data map[string]string
-}
-
-// selectContext picks the active context name for f, plus the source that
-// decided it (one of the ContextSource* constants). Precedence: the flag, the
-// OPENOBSERVE_CONTEXT env var, the file's current_context, the sole context,
-// then a context literally named "default". It returns "" (source
-// ContextSourceNone, no error) when no context can or need be selected. An
-// override naming a context that does not exist is an error.
-func selectContext(f File, flagCtx, envCtx string) (string, string, error) {
-	pick := func(name, src, source string) (string, string, error) {
-		if c, ok := f.Context(name); ok {
-			return c.Name, source, nil
-		}
-		return "", "", cerrors.Newf(cerrors.CategoryConfig, "UNKNOWN_CONTEXT",
-			"context %q (from %s) is not defined in the config file", name, src).
-			WithHint(unknownContextHint(name, f.ContextNames())).
-			WithNextSteps("openobserve-cli config contexts")
-	}
-	switch {
-	case flagCtx != "":
-		return pick(flagCtx, "--use-context", ContextSourceFlag)
-	case envCtx != "":
-		return pick(envCtx, "OPENOBSERVE_CONTEXT", ContextSourceEnv)
-	case f.CurrentContext != "":
-		return pick(f.CurrentContext, "current_context", ContextSourceCurrent)
-	case len(f.Contexts) == 1:
-		return f.Contexts[0].Name, ContextSourceSingle, nil
-	default:
-		if _, ok := f.Context(DefaultContextName); ok {
-			return DefaultContextName, ContextSourceDefault, nil
-		}
-		return "", ContextSourceNone, nil
-	}
-}
-
-// UnknownContextHint builds the hint shown when a context override names a
-// context that does not exist.
-func UnknownContextHint(name string, available []string) string {
-	return unknownContextHint(name, available)
-}
-
-func unknownContextHint(name string, available []string) string {
-	for _, a := range available {
-		if strings.EqualFold(a, name) && a != name {
-			return fmt.Sprintf("Did you mean %q? Context names are case-sensitive.", a)
-		}
-	}
-	if len(available) > 0 {
-		return fmt.Sprintf("Available contexts: %s.", strings.Join(available, ", "))
-	}
-	return "Run `openobserve-cli config contexts` to list defined contexts."
-}
-
-// buildFileLayer flattens the active context's fields plus the shared runtime
-// defaults into a layer map. An empty ctxName yields just the defaults.
-func buildFileLayer(f File, ctxName string) map[string]string {
-	m := map[string]string{}
-	if ctxName != "" {
-		if c, ok := f.Context(ctxName); ok {
-			put(m, fieldServer, c.BaseURL)
-			put(m, fieldOrg, c.Org)
-			put(m, fieldAuthScheme, c.Auth.Scheme)
-			put(m, fieldAuthUsername, c.Auth.Username)
-			put(m, fieldCredentialURL, c.Auth.CredentialURL)
-		}
-	}
-	put(m, fieldFormat, f.Defaults.Format)
-	if f.Defaults.Timeout > 0 {
-		m[fieldTimeout] = f.Defaults.Timeout.String()
-	}
-	if f.Defaults.MaxRetries > 0 {
-		m[fieldMaxRetries] = strconv.Itoa(f.Defaults.MaxRetries)
-	}
-	if f.Defaults.ReadOnly {
-		m[fieldReadOnly] = "true"
-	}
-	return m
-}
-
 // Load resolves configuration from all sources and returns the merged result
-// with per-field provenance.
+// with per-field provenance. Context selection is the flag,
+// OPENOBSERVE_CONTEXT, the file's current_context, the sole context, then a
+// context literally named "default"; naming a context that does not exist is
+// UNKNOWN_CONTEXT.
 func Load(opt LoadOptions) (*Resolved, error) {
 	dir := opt.ConfigDir
 	if dir == "" {
@@ -152,64 +50,57 @@ func Load(opt LoadOptions) (*Resolved, error) {
 	if err != nil {
 		return nil, err
 	}
-	ctxName, ctxSource := opt.Context, ContextSourceFlag
-	if opt.Setup {
-		if c, ok := file.Context(ctxName); ok {
-			ctxName = c.Name
-		}
-	} else {
-		ctxName, ctxSource, err = selectContext(file, opt.Context, os.Getenv("OPENOBSERVE_CONTEXT"))
-		if err != nil {
-			return nil, err
-		}
-	}
-	fileLayer := buildFileLayer(file, ctxName)
-
-	dotenvPath := opt.DotenvPath
-	if dotenvPath == "" {
-		dotenvPath = ".env"
-	}
-	dotLayer, err := dotenvLayer(dotenvPath, opt.Setup)
+	r, err := kit.Load(file, kit.LoadOptions{
+		Setup:      opt.Setup,
+		DotenvPath: opt.DotenvPath,
+		Flags:      kit.Encode(opt.Flags),
+		Context:    opt.Context,
+	})
 	if err != nil {
 		return nil, err
 	}
-
-	// Lowest precedence first.
-	layers := []namedLayer{
-		{"default", defaultLayer()},
-		{"file", fileLayer},
-		{"dotenv", dotLayer},
-		{"env", envLayer(opt.Setup)},
-		{"flag", opt.Flags.layer()},
+	out := &Resolved{
+		Sources:       r.Sources,
+		ActiveContext: r.ActiveContext,
+		ContextSource: r.ContextSource,
+		ContextNames:  r.ContextNames,
 	}
+	kit.Decode(r.Values, &out.Config)
+	kit.Decode(r.Values, &out.Secrets)
+	out.Config.CredentialBaseURL = r.StoredServer
+	return out, nil
+}
 
-	merged := map[string]string{}
-	sources := map[string]string{}
-	for _, l := range layers {
-		for k, v := range l.data {
-			merged[k] = v
-			sources[k] = l.name
-		}
-	}
-
-	resolveAuthDefaults(merged, sources)
-	return &Resolved{
-		Config: preserveCredentialLookup(configFromMap(merged), file, ctxName),
-		Secrets: Secrets{
-			Password: merged[fieldPassword],
-			Token:    merged[fieldToken],
-		},
-		Sources:       sources,
-		ActiveContext: ctxName,
-		ContextSource: ctxSource,
-		ContextNames:  file.ContextNames(),
-	}, nil
+// StoredContext resolves only persisted context data and built-in defaults.
+// Credential reuse must not inherit another context's environment or .env identity.
+func StoredContext(context NamedContext, defaults Defaults) Config {
+	var cfg Config
+	kit.Decode(kit.StoredContext(context, defaults), &cfg)
+	return cfg
 }
 
 // ExplainField returns a human-readable provenance label for a field key.
 func ExplainField(sources map[string]string, field string) string {
-	if s, ok := sources[field]; ok {
-		return s
-	}
-	return "default"
+	return kit.ExplainField(sources, field)
+}
+
+// UnknownContextHint builds the hint shown when a context override names a
+// context that does not exist.
+func UnknownContextHint(name string, available []string) string {
+	return kit.UnknownContextHint(name, available)
+}
+
+// EnvNoContextHint opts out of the runtime multi-context notice. pkg/config
+// registers the same name with the kit, which prints it in the notice.
+const EnvNoContextHint = "OPENOBSERVE_CLI_NO_CONTEXT_HINT"
+
+// ReminderBlock is the --help block shown when several contexts exist.
+func ReminderBlock(active, source string, names []string) string {
+	return kit.ReminderBlock(active, source, names)
+}
+
+// ContextNotice is the _notice payload for a command that runs against one of
+// several contexts chosen implicitly.
+func ContextNotice(active, source string, names []string) map[string]any {
+	return kit.ContextNotice(active, source, names)
 }

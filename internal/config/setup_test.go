@@ -11,12 +11,16 @@ import (
 	cerrors "github.com/angelmsger/openobserve-cli/pkg/errors"
 )
 
+// envNames lists every variable the schema binds, plus the context selector.
+var envNames = []string{"OPENOBSERVE_URL", "OPENOBSERVE_ORG", "OPENOBSERVE_CREDENTIAL_URL", "OPENOBSERVE_AUTH_SCHEME",
+	"OPENOBSERVE_EMAIL", "OPENOBSERVE_FORMAT", "OPENOBSERVE_CLI_READ_ONLY", "OPENOBSERVE_TOKEN", "OPENOBSERVE_PASSWORD",
+	"OPENOBSERVE_CONTEXT"}
+
 func cleanSetupEnv(t *testing.T) {
 	t.Helper()
-	for key := range envBindings {
+	for _, key := range envNames {
 		t.Setenv(key, "")
 	}
-	t.Setenv("OPENOBSERVE_CONTEXT", "")
 }
 func setupFixture() NamedContext {
 	return NamedContext{Name: "team", BaseURL: "https://service.example.test/deploy", Auth: AuthConfig{Scheme: "token", Username: "PersonalUser", CredentialURL: "https://help.example.test/tokens"}, Org: "team-org"}
