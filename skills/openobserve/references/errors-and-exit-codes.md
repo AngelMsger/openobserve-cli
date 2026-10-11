@@ -59,9 +59,9 @@ fi
   (config/3)** — when `recovery.scope` is `host`, request host access and retry
   the same invocation once. Repeating it in the same sandbox will not help.
   Only configure credentials when the host retry also reports them missing; for
-  a browser session, run `openobserve-cli auth login --browser` on the host (or
-  sign in through o3) rather than running `config init` — `--browser` needs a
-  graphical session, so sandboxes still use `OPENOBSERVE_EMAIL`/
+  a browser session, run `openobserve-cli auth login --browser` on the host
+  rather than running `config init` — `--browser` needs a graphical session, so
+  sandboxes still use `OPENOBSERVE_EMAIL`/
   `OPENOBSERVE_PASSWORD` or `OPENOBSERVE_TOKEN`.
 - **`NO_BASE_URL` (config/3)** — no server configured. Run `config init` or set
   `OPENOBSERVE_URL`.
@@ -69,11 +69,10 @@ fi
   terminal. In CI/agents set `OPENOBSERVE_EMAIL`+`OPENOBSERVE_PASSWORD` (or
   `OPENOBSERVE_TOKEN`).
 - **`AUTH_BAD_SESSION` (config/3)** — the browser-captured session is malformed
-  or contains no cookies. Sign in again with `auth login --browser`, or through
-  o3, to replace it — both write the same keychain entry.
+  or contains no cookies. Sign in again with `auth login --browser` to replace it.
 - **`SESSION_BROWSER_MANAGED` (usage/2)** — `config init` or plain `auth login`
   (without `--browser`) was used on a session context. Refresh it with
-  `openobserve-cli auth login --browser`, here or in o3; the CLI can also
+  `openobserve-cli auth login --browser`; the CLI can also
   consume, inspect, switch, and log out of a session context without
   re-establishing it.
 - **`BROWSER_NOT_FOUND` (config/3)** — `auth login --browser` found no

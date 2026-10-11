@@ -4,11 +4,8 @@ import (
 	"github.com/angelmsger/openobserve-cli/pkg/credstore"
 )
 
-// The credential store moved to pkg/credstore so the o3 desktop app can use the
-// exact same implementation: both tools share one keychain service name and one
-// fallback file, and a second implementation would let them drift apart on hosts
-// without a usable keychain. These aliases keep the internal call sites — and
-// their error handling — unchanged.
+// The credential store lives in pkg/credstore, part of the public library. These
+// aliases keep the internal call sites — and their error handling — unchanged.
 type (
 	// Store persists secrets, preferring the OS keychain over a protected file.
 	Store = credstore.Store

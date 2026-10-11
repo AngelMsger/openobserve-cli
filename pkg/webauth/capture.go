@@ -14,7 +14,7 @@ import (
 // back to the pure cookie/URL heuristic (used off-darwin and in unit tests).
 type VerifyFunc func(pkgauth.Session) bool
 
-// Replayable reports whether a captured state carries anything o3 could replay,
+// Replayable reports whether a captured state carries anything worth replaying,
 // and so is worth handing to the verifier.
 //
 // Cookies are the usual authenticator, but they are NOT universal: an instance

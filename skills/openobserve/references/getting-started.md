@@ -4,7 +4,7 @@
 `http://localhost:5080`) or OpenObserve Cloud (`https://api.openobserve.ai`).
 Authentication is HTTP Basic — email + password — or a pre-generated token.
 A context can instead carry a browser-captured session, established by `auth
-login --browser` here or by the o3 desktop's native sign-in.
+login --browser`.
 
 ## Interactive setup (humans, on a terminal)
 
@@ -91,11 +91,9 @@ The capture script is scoped to the instance's own hostname, so an identity
 provider on another origin — full-page or in an iframe — never has its
 `Authorization` header captured.
 
-The captured session uses the same keychain entry the o3 desktop app writes,
-so signing in through either client authenticates both; sign in again through
-either one when a session expires. A malformed or cookie-less captured session
-is rejected as `AUTH_BAD_SESSION` instead of being sent as an unauthenticated
-request.
+Sign in again when a session expires. A malformed or cookie-less captured
+session is rejected as `AUTH_BAD_SESSION` instead of being sent as an
+unauthenticated request.
 
 ## SSO / OAuth (dex, Authentik, Okta, Azure…): use a Service Account
 

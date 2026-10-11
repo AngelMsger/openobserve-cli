@@ -33,7 +33,7 @@ mirrors the architecture of the sibling `confluence-cli` / `bitbucket-cli`.
 - `pkg/transport` — re-exports the shared retrying HTTP client with
   openobserve-cli's User-Agent.
 - `pkg/credstore` — re-exports the shared credential store under the
-  `openobserve-cli` keychain service, for the CLI and the o3 desktop app.
+  `openobserve-cli` keychain service.
 - `pkg/auth`, `pkg/config` — the public credential model and on-disk YAML
   config model, shared with external consumers (see the rule below).
 - `internal/config`, `internal/auth` — CLI-only layered loader + keychain
@@ -47,14 +47,14 @@ mirrors the architecture of the sibling `confluence-cli` / `bitbucket-cli`.
 ## `pkg/` is a public library — the family reference for GUI reuse
 
 Everything under `pkg/` is an importable Go library with a **stable exported
-contract**, not just CLI internals. The o3 desktop (OpenObserve desktop) imports
-it directly, so `openobserve-cli` is the family's reference for how a sibling CLI
-(`bitbucket-cli` / `confluence-cli` / `jenkins-cli`) exposes itself to a GUI:
+contract**, not just CLI internals. `openobserve-cli` is the family's reference
+for how a sibling CLI (`bitbucket-cli` / `confluence-cli` / `jenkins-cli`)
+exposes itself to a GUI:
 
 - `pkg/apiclient` (the `Client` interface, `Build` factory, normalized models),
   `pkg/transport`, `pkg/errors`, `pkg/constants` mirror the siblings exactly.
 - `pkg/auth` (credential model → `transport.Decorator`) and `pkg/config` (the
-  config-file model + IO) are **additions** the GUI needs. They hold the pure,
+  config-file model + IO) are **additions** a GUI needs. They hold the pure,
   dependency-light core; the CLI-only loader/keychain wiring stays in `internal/`
   and re-exports the moved symbols so call sites never change. When a sibling
   grows a GUI, replicate this split here — do not invent a different shape.

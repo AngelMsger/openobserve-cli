@@ -1,12 +1,10 @@
-// Package webauth holds the browser sign-in capture core shared by
-// openobserve-cli and the o3 desktop app: cookie shaping, the login-success
-// heuristic, the injected capture script, and the policy deciding when a
-// captured state counts as a completed login.
+// Package webauth holds the browser sign-in capture core: cookie shaping, the
+// login-success heuristic, the injected capture script, and the policy deciding
+// when a captured state counts as a completed login.
 //
 // It is pure and dependency-light — it imports only the standard library and
-// pkg/auth — so both a CLI driving a browser over the DevTools Protocol and a
-// desktop app driving a native WebView can share it. Transport-specific code
-// lives with its client (see pkg/webauth/cdp for the CLI's).
+// pkg/auth. The browser transport lives behind the Driver interface (see
+// pkg/webauth/cdp).
 package webauth
 
 import (

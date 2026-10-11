@@ -10,10 +10,10 @@ import (
 // {authorization} or {email} key as it observes them.
 //
 // host scopes the script to the OpenObserve instance. This is a security
-// boundary, not a nicety: the injection mechanisms both callers use (the CDP
-// Page.addScriptToEvaluateOnNewDocument, and o3's WKUserScript) evaluate the
-// script in EVERY document, including a full-page or iframed identity provider
-// on a completely different origin. An IdP that sends its own Authorization
+// boundary, not a nicety: the injection mechanism (the CDP
+// Page.addScriptToEvaluateOnNewDocument) evaluates the script in EVERY
+// document, including a full-page or iframed identity provider on a completely
+// different origin. An IdP that sends its own Authorization
 // header over XHR or fetch would otherwise have that header captured, written
 // to the user's keychain, and replayed on every request to the OpenObserve
 // instance — a third party's bearer token handed to a different server. So the

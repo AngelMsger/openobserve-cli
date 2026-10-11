@@ -136,9 +136,9 @@ downgraded to plain JSON off a TTY, so `--pretty | jq` still works).
 
 The on-disk YAML model — the file schema (named contexts + `current_context` +
 shared defaults), file IO, and context helpers — lives in the public
-**`pkg/config`** so external consumers (e.g. the o3 desktop GUI) read and write
-the same file. The CLI-only **layered loader** stays in `internal/config`:
-resolution runs highest precedence first — **flags → env (`OPENOBSERVE_*`) →
+**`pkg/config`** so external consumers read and write the same file. The
+CLI-only **layered loader** stays in `internal/config`: resolution runs highest
+precedence first — **flags → env (`OPENOBSERVE_*`) →
 `.env` → YAML config file → built-in defaults** — and each field's provenance is
 tracked so `config show` can report where a value came from. Secrets
 (passwords, tokens) are never written to the YAML file. Contexts are
@@ -152,13 +152,11 @@ The pure, dependency-light credential model lives in the public **`pkg/auth`**:
 password → `Authorization: Basic base64(email:pw)`), `token` (a pre-generated
 credential sent verbatim, or wrapped as `Basic`), and `session` (browser-captured
 cookies with an optional Authorization fallback, established by `auth login
---browser` here or by o3's native sign-in — both write the same keychain
-entry). The config/keychain-coupled resolution stays in `internal/auth`: `Resolve`
-produces a validated `Credential` from config + secrets, loading the secret from
+--browser`). The config/keychain-coupled resolution stays in `internal/auth`:
+`Resolve` produces a validated `Credential` from config + secrets, loading the secret from
 the keychain when not supplied via flags/env. The `Store` lives in the public
-**`pkg/credstore`** so the o3 desktop app keeps secrets in the same place; it is
-agent-cli-kit's `credstore` under the `openobserve-cli` keychain service. It
-prefers the OS keychain (`go-keyring`) and falls back to a per-user
+**`pkg/credstore`**; it is agent-cli-kit's `credstore` under the
+`openobserve-cli` keychain service. It prefers the OS keychain (`go-keyring`) and falls back to a per-user
 DPAPI-encrypted file on Windows or a `0600` JSON file on macOS/Linux. On macOS
 `NewStore` first checks for a default keychain, so a sandbox without one never
 raises the "Reset To Defaults" dialog; `NewStoreWithBackend`, which takes a
@@ -174,14 +172,11 @@ user to reconfigure credentials.
 The pure capture core lives in **`pkg/webauth`**: cookie shaping and host
 scoping, the `LoginSucceeded` heuristic, the injected capture script
 (`ProbeJS`), and the `Tracker` that decides when a captured state counts as a
-completed login. It imports only the standard library and `pkg/auth`, so the o3
-desktop app shares it.
+completed login. It imports only the standard library and `pkg/auth`.
 
 The transport is the `Driver` seam. **`pkg/webauth/cdp`** implements it by
 launching a Chromium-family browser with `--remote-debugging-port=0` and
-speaking a small subset of the DevTools Protocol over one WebSocket; o3 keeps a
-second implementation over a native WKWebView on macOS and uses the CDP driver
-elsewhere.
+speaking a small subset of the DevTools Protocol over one WebSocket.
 
 An authenticated API request is the sole success signal
 (`webauth.PingVerifier`): only a real authenticated response distinguishes a

@@ -18,8 +18,7 @@ import (
 )
 
 // runBrowserLogin signs in through a real browser and stores the captured
-// session under the active context, in the same keychain entry the o3 desktop
-// app uses — so signing in through either client authenticates both.
+// session in the keychain under the active context.
 func runBrowserLogin(s *appState, freshProfile bool) error {
 	// Only the real driver launches a browser that needs somewhere to draw, so
 	// the display check belongs here rather than in runBrowserLoginWith: that

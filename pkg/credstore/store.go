@@ -2,12 +2,6 @@
 // OS keychain and transparently falls back to a protected file under the config
 // directory when no keychain is available.
 //
-// It lives in pkg/ because the CLI and the o3 desktop app must agree byte for
-// byte on where a credential is kept: they share one keychain service name and
-// one fallback file, so a credential saved by either is found by the other. o3
-// previously called the keychain directly with no fallback, which let the two
-// diverge on hosts without a usable keychain.
-//
 // The store itself lives in github.com/angelmsger/agent-cli-kit/credstore,
 // shared by every CLI in the family; this package re-exports it under
 // openobserve-cli's keychain service name (constants.KeychainService).

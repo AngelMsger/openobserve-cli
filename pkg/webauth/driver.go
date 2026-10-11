@@ -12,9 +12,8 @@ import (
 // there. host scopes which cookies are kept. Implementations block until login
 // is verified, the user gives up, or a timeout elapses.
 //
-// Two implementations exist: pkg/webauth/cdp drives a Chromium-family browser
-// over the DevTools Protocol (used by the CLI, and by o3 off macOS), and o3's
-// own darwin shell drives a native WKWebView.
+// pkg/webauth/cdp implements it by driving a Chromium-family browser over the
+// DevTools Protocol.
 type Driver interface {
 	Capture(loginURL, host string, verify VerifyFunc) (pkgauth.Session, error)
 }
