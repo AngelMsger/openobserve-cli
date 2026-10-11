@@ -10,6 +10,8 @@ import (
 	"github.com/zalando/go-keyring"
 )
 
+// failingKeyring is a keychain backend whose every call fails with err. The
+// store's own behavior is tested in agent-cli-kit/credstore.
 type failingKeyring struct{ err error }
 
 func (f failingKeyring) Get(string, string) (string, error) { return "", f.err }
@@ -56,32 +58,6 @@ func TestResolveRejectsInvalidStoredBrowserSession(t *testing.T) {
 	}, config.Secrets{}, store)
 	if err == nil {
 		t.Fatal("Resolve() error = nil, want invalid-session error")
-	}
-}
-
-func TestStoreDistinguishesInaccessibleFromMissing(t *testing.T) {
-	t.Parallel()
-	accessErr := errors.New("keychain interaction is not allowed")
-	s := NewStoreWithBackend(t.TempDir(), failingKeyring{err: accessErr})
-	_, err := s.Load("acct")
-	var storeErr *StoreAccessError
-	if !errors.As(err, &storeErr) || storeErr.Backend != BackendKeychain {
-		t.Fatalf("Load() error = %v, want keychain StoreAccessError", err)
-	}
-	if !errors.Is(err, accessErr) {
-		t.Fatalf("Load() should preserve keychain cause: %v", err)
-	}
-}
-
-func TestStoreUsesFileWhenKeychainIsInaccessible(t *testing.T) {
-	t.Parallel()
-	s := NewStoreWithBackend(t.TempDir(), failingKeyring{err: errors.New("locked")})
-	if _, err := s.Save("acct", "fallback-secret"); err != nil {
-		t.Fatal(err)
-	}
-	got, err := s.Load("acct")
-	if err != nil || got != "fallback-secret" {
-		t.Fatalf("Load() = %q, %v; want file fallback", got, err)
 	}
 }
 

@@ -28,12 +28,19 @@ mirrors the architecture of the sibling `confluence-cli` / `bitbucket-cli`.
 - `internal/app` — one file per noun (org, stream, search, auth, config, doctor,
   skill); `root.go` assembles the tree; `context.go` holds the shared `appState`.
 - `pkg/apiclient` — the OpenObserve HTTP surface and models.
-- `pkg/errors` — the `CLIError` model + exit-code map (0–11).
+- `pkg/errors` — re-exports the shared `CLIError` model and exit-code map (0–11)
+  and installs openobserve-cli's hints (`hints.go`).
+- `pkg/transport` — re-exports the shared retrying HTTP client with
+  openobserve-cli's User-Agent.
+- `pkg/credstore` — re-exports the shared credential store under the
+  `openobserve-cli` keychain service, for the CLI and the o3 desktop app.
 - `pkg/auth`, `pkg/config` — the public credential model and on-disk YAML
   config model, shared with external consumers (see the rule below).
-- `internal/output` — JSON / table / ndjson rendering, `{items,next,has_more}`.
 - `internal/config`, `internal/auth` — CLI-only layered loader + keychain
   resolution, built over `pkg/config` / `pkg/auth` (which they re-export).
+- Output rendering, argv correction, the update check and the credential store
+  come from [agent-cli-kit](https://github.com/AngelMsger/agent-cli-kit), shared
+  by every CLI in the family. Fix bugs in those there, not here.
 - `internal/timeutil` — human time ranges → microsecond epochs (the search API).
 - `skills/openobserve` — the companion Skill, embedded into the binary.
 
@@ -57,9 +64,10 @@ it directly, so `openobserve-cli` is the family's reference for how a sibling CL
 ## Ground rules
 
 - Run `make test` and `make build` before claiming a change is complete.
-- Credential fallback tests assert `0600` only on non-Windows platforms.
-  Windows tests must verify DPAPI-encrypted on-disk data and a store round trip;
-  Windows `FileMode` does not represent POSIX access permissions.
+- Credential fallback tests (in agent-cli-kit's `credstore`) assert `0600` only
+  on non-Windows platforms. Windows tests must verify DPAPI-encrypted on-disk
+  data and a store round trip; Windows `FileMode` does not represent POSIX
+  access permissions.
 - stdout is data only; errors / notices / `--verbose` go to stderr.
 - Keep paginated NDJSON rows on stdout and continuation in a structured
   `_notice.pagination` record on stderr after successful rendering, including

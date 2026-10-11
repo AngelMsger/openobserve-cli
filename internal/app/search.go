@@ -11,7 +11,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/angelmsger/openobserve-cli/internal/output"
+	"github.com/angelmsger/agent-cli-kit/output"
 	"github.com/angelmsger/openobserve-cli/internal/timeutil"
 	"github.com/angelmsger/openobserve-cli/pkg/apiclient"
 	"github.com/angelmsger/openobserve-cli/pkg/constants"

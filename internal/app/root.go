@@ -6,8 +6,8 @@ import (
 	"os"
 	"strings"
 
-	"github.com/angelmsger/openobserve-cli/internal/cliflags"
-	"github.com/angelmsger/openobserve-cli/internal/output"
+	"github.com/angelmsger/agent-cli-kit/cliflags"
+	"github.com/angelmsger/agent-cli-kit/output"
 	"github.com/angelmsger/openobserve-cli/pkg/constants"
 	cerrors "github.com/angelmsger/openobserve-cli/pkg/errors"
 	"github.com/spf13/cobra"

@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Output rendering, argv correction, the release check, and the code behind
+  `pkg/credstore`, `pkg/errors` and `pkg/transport` now come from the shared
+  [agent-cli-kit](https://github.com/AngelMsger/agent-cli-kit) module. Commands,
+  output, exit codes, hints and stored credentials are unchanged, and
+  `pkg/credstore`, `pkg/errors` and `pkg/transport` keep their exported names.
+  `credstore.NewStoreWithBackend` no longer runs the macOS default-keychain
+  probe: a store over a caller-supplied backend always attempts that backend.
+  `credstore.NewStore`, which uses the system keychain, still probes first.
+
 ## [0.15.0] - 2026-10-06
 
 ### Changed

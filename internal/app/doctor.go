@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/angelmsger/openobserve-cli/internal/update"
 	"github.com/angelmsger/openobserve-cli/pkg/apiclient"
 	"github.com/angelmsger/openobserve-cli/pkg/constants"
 	cerrors "github.com/angelmsger/openobserve-cli/pkg/errors"
@@ -85,7 +84,7 @@ func newDoctorCmd(s *appState) *cobra.Command {
 			if !skipUpdate {
 				ctx, cancel := updateContext(s)
 				defer cancel()
-				st := update.Check(ctx, &http.Client{Timeout: updateCheckTimeout}, constants.Version)
+				st := releaseChecker.Check(ctx, &http.Client{Timeout: updateCheckTimeout}, constants.Version)
 				report["update"] = st
 			}
 			return s.emit(report)
