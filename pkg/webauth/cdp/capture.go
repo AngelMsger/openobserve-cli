@@ -24,7 +24,7 @@ var (
 	ErrTimeout = errors.New("browser sign-in timed out")
 )
 
-// defaultTimeout bounds a whole sign-in, matching o3's native window.
+// defaultTimeout bounds a whole sign-in.
 const defaultTimeout = 10 * time.Minute
 
 // pollInterval is how often the browser state is sampled. The Tracker makes

@@ -7,8 +7,8 @@ import (
 )
 
 // Tracker decides when an observed browser state counts as a completed login.
-// It is shared by every transport so the CLI and o3 cannot drift on the
-// question of when sign-in has actually finished.
+// It is shared by every Driver so they cannot drift on the question of when
+// sign-in has actually finished.
 //
 // The policy, in order:
 //

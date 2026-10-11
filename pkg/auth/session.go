@@ -9,7 +9,7 @@ import (
 
 // Session is the decoded form of a SchemeSession credential Secret. It is
 // captured when a user signs in through their instance's own web login page
-// (o3's browser sign-in) and replayed on every request. Cookies is the primary
+// (`auth login --browser`) and replayed on every request. Cookies is the primary
 // authenticator; Authorization is a fallback for instances whose REST API
 // rejects the browser cookie and expects the header the SPA sends. Email and
 // ExpiresAt are display-only metadata for the connection UI.

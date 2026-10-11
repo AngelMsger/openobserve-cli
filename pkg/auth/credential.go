@@ -20,8 +20,8 @@ const (
 	SchemeToken = "token"
 	// SchemeSession is a browser-captured session: the Secret is a session
 	// envelope (see session.go) carrying the instance cookies replayed on every
-	// request, plus an optional Authorization fallback. Established via o3's
-	// browser sign-in; no service account required.
+	// request, plus an optional Authorization fallback. Established by
+	// `auth login --browser`; no service account required.
 	SchemeSession = "session"
 )
 

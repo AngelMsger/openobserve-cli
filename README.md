@@ -179,9 +179,7 @@ openobserve-cli auth login --browser
 
 A browser window opens on your instance's login page; once you are signed in
 the CLI captures the session, verifies it with an authenticated request, and
-stores it in the OS keychain. The captured session is the same one the
-[o3](https://github.com/angelmsger/o3) desktop app uses, so signing in through
-either leaves the other authenticated.
+stores it in the OS keychain.
 
 Requires a Chromium-family browser (Chrome, Chromium, Edge or Brave) and a
 graphical session. Set `OPENOBSERVE_BROWSER` to choose a specific one. The

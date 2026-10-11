@@ -145,12 +145,11 @@ func newConfigInitCmd(s *appState) *cobra.Command {
 // browserManagedSessionError is returned when a context authenticates with a
 // browser-captured session and the caller tried to edit it through a flow that
 // prompts for a password or token. Such a session can only be re-established by
-// signing in through a browser again — now possible in the CLI itself, so this
-// no longer sends the user to the o3 desktop app.
+// signing in through a browser again, which `auth login --browser` does.
 func browserManagedSessionError(contextName string) error {
 	return cerrors.Newf(cerrors.CategoryUsage, "SESSION_BROWSER_MANAGED",
 		"context %q authenticates with a browser-captured session", contextName).
-		WithHint("Sign in through the browser again to refresh it, here or in o3.").
+		WithHint("Sign in through the browser again to refresh it.").
 		WithNextSteps("openobserve-cli auth login --browser",
 			"openobserve-cli auth status")
 }

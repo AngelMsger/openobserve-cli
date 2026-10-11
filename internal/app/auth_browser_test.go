@@ -47,8 +47,8 @@ func TestBrowserCaptureErrorUnwraps(t *testing.T) {
 	}
 }
 
-// The old error told users to go and use o3. Now that the CLI can sign in
-// itself, it must offer its own command.
+// A browser-managed session can only be refreshed by signing in again, so the
+// error must offer the CLI's own browser sign-in.
 func TestSessionBrowserManagedOffersBrowserLogin(t *testing.T) {
 	ce := cerrors.AsCLIError(browserManagedSessionError("prod"))
 	joined := strings.Join(ce.NextSteps, " ") + " " + ce.Hint

@@ -17,6 +17,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `credstore.NewStoreWithBackend` no longer runs the macOS default-keychain
   probe: a store over a caller-supplied backend always attempts that backend.
   `credstore.NewStore`, which uses the system keychain, still probes first.
+- The o3 desktop app is archived, so the `SESSION_BROWSER_MANAGED` hint, the
+  missing-session recovery step, the README, the docs and the companion Skill
+  no longer point to it. Browser sessions are signed in with `auth login
+  --browser`. The Skill is now `0.3.9`.
 
 ## [0.15.0] - 2026-10-06
 

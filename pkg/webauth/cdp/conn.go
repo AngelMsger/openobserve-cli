@@ -1,7 +1,6 @@
 // Package cdp captures an OpenObserve browser session by driving a
 // Chromium-family browser over the Chrome DevTools Protocol. It implements
-// webauth.Driver for openobserve-cli, and for o3 on platforms with no native
-// WebView shell.
+// webauth.Driver for openobserve-cli.
 package cdp
 
 import (

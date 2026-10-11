@@ -26,7 +26,7 @@ func (r *recordingBackend) Delete(service, _ string) error {
 }
 
 // The store is tested in agent-cli-kit; this checks openobserve-cli's default:
-// its secrets live under the keychain service the o3 desktop app also reads.
+// its secrets live under the openobserve-cli keychain service.
 func TestStoreUsesOpenObserveKeychainService(t *testing.T) {
 	b := &recordingBackend{}
 	s := NewStoreWithBackend(t.TempDir(), b)

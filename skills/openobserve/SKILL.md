@@ -1,6 +1,6 @@
 ---
 name: openobserve
-version: 0.3.8
+version: 0.3.9
 description: "Query OpenObserve (O2) logs, metrics, and traces: discover streams and fields, search SQL logs, inspect histograms, evaluate PromQL, reconstruct traces, and follow live logs. Use for an OpenObserve URL or an investigation whose backend is known to be OpenObserve, including errors, latency, request volume, and stream discovery. Supports self-hosted and Cloud instances. Remote operations are read-only; dashboards, alerts, pipelines, and user management are not supported."
 metadata:
   requires:
@@ -75,8 +75,7 @@ retry also reports them missing. In a sandbox, use `OPENOBSERVE_EMAIL` /
 `OPENOBSERVE_PASSWORD` (or `OPENOBSERVE_TOKEN`) env vars. An instance behind
 SSO has no local password; on the user's own host (never in a sandbox) they
 can run `openobserve-cli auth login --browser` to sign in through a real
-browser window instead of installing the o3 desktop app — it needs a display,
-so it only works where there is one. See
+browser window. It needs a display, so it only works where there is one. See
 [getting-started.md](references/getting-started.md).
 
 ## Guardrails
@@ -127,7 +126,7 @@ current context.
 
 ## Agent-facing conventions
 
-- **Skill handshake — set `OPENOBSERVE_CLI_SKILL=0.3.8`.** Once you have
+- **Skill handshake — set `OPENOBSERVE_CLI_SKILL=0.3.9`.** Once you have
   loaded this Skill, export that exact value in the environment used to run the
   CLI. The CLI compares it with the embedded Skill version and emits a
   structured stderr notice when the Skill is missing, old, or uses the legacy
