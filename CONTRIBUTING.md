@@ -35,18 +35,19 @@ pkg/transport         the shared HTTP client with openobserve-cli's User-Agent
 pkg/errors            the shared CLIError model, plus openobserve-cli's hints
 pkg/credstore         the shared credential store under openobserve-cli's
                       keychain service
-pkg/auth              credential model: header construction, validation, keying
+pkg/auth              openobserve-cli's auth schemes on the shared credential model
 pkg/config            on-disk YAML config model (named contexts) + file IO
 pkg/constants         app name, defaults, build-time version vars
 internal/config       layered loader (flags/env/file) over pkg/config
-internal/auth         credential resolution over pkg/auth; secrets live in
-                      pkg/credstore
+internal/auth         credential resolution over pkg/auth and the shared
+                      resolver; secrets live in pkg/credstore
 internal/timeutil     human time ranges → microsecond epochs
 skills/openobserve    the companion Skill, embedded into the binary
 ```
 
-Output rendering, argv normalization, the release check, and the code behind
-`pkg/credstore`, `pkg/errors` and `pkg/transport` come from
+Output rendering, argv normalization, the release check, credential
+resolution, and the code behind `pkg/credstore`, `pkg/errors` and
+`pkg/transport` come from
 [agent-cli-kit](https://github.com/AngelMsger/agent-cli-kit), which every CLI in
 the family shares. A fix to one of those belongs there; this repo then bumps the
 version in `go.mod`.

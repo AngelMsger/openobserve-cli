@@ -1,8 +1,8 @@
 // Package auth resolves OpenObserve credentials from configuration or secure
-// storage. The pure credential model (header construction, validation, account
-// keying) lives in the public pkg/auth; this package keeps the
-// config/keychain-coupled resolution and re-exports the moved symbols so
-// existing callers keep working unchanged.
+// storage. The credential model, header encoding and recovery errors come from
+// agent-cli-kit/auth; the public pkg/auth registers OpenObserve's schemes and
+// wording with it. This package keeps the config/keychain-coupled resolution
+// and re-exports pkg/auth's symbols so existing callers keep working unchanged.
 package auth
 
 import (

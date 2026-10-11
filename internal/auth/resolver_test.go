@@ -61,30 +61,56 @@ func TestResolveRejectsInvalidStoredBrowserSession(t *testing.T) {
 	}
 }
 
+func TestResolveDefaultsToBasic(t *testing.T) {
+	cred, err := Resolve(config.Config{
+		BaseURL: "https://o2.example.com",
+		Auth:    config.AuthConfig{Username: "alice@example.com"},
+	}, config.Secrets{Password: "pw", Token: "tok"}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cred.Scheme != SchemeBasic || cred.Secret != "pw" {
+		t.Fatalf("Resolve() = %+v, want the basic scheme with the password", cred.Redacted())
+	}
+}
+
 func TestResolveCredentialRecovery(t *testing.T) {
 	t.Parallel()
-	cfg := config.Config{
-		BaseURL: "https://o2.example.com",
-		Auth:    config.AuthConfig{Scheme: SchemeBasic, Username: "alice@example.com"},
-	}
 	tests := []struct {
-		name string
-		err  error
-		code string
+		name     string
+		scheme   string
+		err      error
+		code     string
+		message  string
+		lastStep string
 	}{
-		{"missing", keyring.ErrNotFound, "CREDENTIAL_NOT_VISIBLE_OR_MISSING"},
-		{"inaccessible", errors.New("sandbox denied keychain"), "CREDENTIAL_STORE_INACCESSIBLE"},
+		{"missing", SchemeBasic, keyring.ErrNotFound, "CREDENTIAL_NOT_VISIBLE_OR_MISSING",
+			"stored OpenObserve credentials are missing or not visible in this execution environment",
+			"Only if the host retry also reports missing credentials, run `openobserve-cli config init` in the user's terminal or set OPENOBSERVE_* environment variables."},
+		{"missing session", SchemeSession, keyring.ErrNotFound, "CREDENTIAL_NOT_VISIBLE_OR_MISSING",
+			"stored OpenObserve credentials are missing or not visible in this execution environment",
+			"Only if the host retry also reports a missing browser session, run `openobserve-cli auth login --browser` in the user's graphical session; browser sessions are not created by `config init`."},
+		{"inaccessible", SchemeBasic, errors.New("sandbox denied keychain"), "CREDENTIAL_STORE_INACCESSIBLE",
+			"stored OpenObserve credentials cannot be read in this execution environment",
+			"Do not run `config init` unless the same check also fails in the host environment."},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
+			cfg := config.Config{
+				BaseURL: "https://o2.example.com",
+				Auth:    config.AuthConfig{Scheme: tc.scheme, Username: "alice@example.com"},
+			}
 			s := NewStoreWithBackend(t.TempDir(), failingKeyring{err: tc.err})
 			_, err := Resolve(cfg, config.Secrets{}, s)
 			ce := cerrors.AsCLIError(err)
-			if ce == nil || ce.Code != tc.code {
-				t.Fatalf("Resolve() error = %+v, want code %s", ce, tc.code)
+			if ce == nil || ce.Code != tc.code || ce.Message != tc.message {
+				t.Fatalf("Resolve() error = %+v, want code %s and message %q", ce, tc.code, tc.message)
 			}
 			if ce.Recovery == nil || ce.Recovery.Scope != "host" || ce.Retryable {
 				t.Fatalf("Resolve() recovery = %+v retryable=%v, want host and false", ce.Recovery, ce.Retryable)
+			}
+			if len(ce.NextSteps) < 3 || ce.NextSteps[1] != "openobserve-cli doctor" || ce.NextSteps[2] != tc.lastStep {
+				t.Fatalf("Resolve() next steps = %q, want doctor then %q", ce.NextSteps, tc.lastStep)
 			}
 		})
 	}

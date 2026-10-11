@@ -24,11 +24,11 @@ cmd/openobserve-cli  →  internal/app  →  pkg/apiclient  →  pkg/transport
 
 Cross-cutting packages — `errors`, `output`, `config`, `auth`, `timeutil`,
 `cliflags`, `constants` — are used across the layers. `output`, `cliflags`,
-`update`, and the code behind `pkg/credstore`, `pkg/errors` and
-`pkg/transport` come from
+`update`, credential resolution, and the code behind `pkg/credstore`,
+`pkg/errors` and `pkg/transport` come from
 [agent-cli-kit](https://github.com/AngelMsger/agent-cli-kit), shared by every
 CLI in the family; openobserve-cli supplies its own hints, User-Agent, keychain
-service name and release repository.
+service name, auth schemes and release repository.
 
 ## Command layer (`internal/app`)
 
@@ -152,9 +152,13 @@ The pure, dependency-light credential model lives in the public **`pkg/auth`**:
 password → `Authorization: Basic base64(email:pw)`), `token` (a pre-generated
 credential sent verbatim, or wrapped as `Basic`), and `session` (browser-captured
 cookies with an optional Authorization fallback, established by `auth login
---browser`). The config/keychain-coupled resolution stays in `internal/auth`:
-`Resolve` produces a validated `Credential` from config + secrets, loading the secret from
-the keychain when not supplied via flags/env. The `Store` lives in the public
+--browser`). `pkg/auth` registers them, with openobserve-cli's recovery
+wording, with agent-cli-kit's `auth` package when it is imported, so a library
+consumer gets the same schemes; the kit owns the credential model, the header
+encoding and the recovery errors. The config/keychain-coupled resolution stays
+in `internal/auth`: `Resolve` maps config + secrets onto the kit's resolver and
+produces a validated `Credential`, loading the secret from the keychain when
+not supplied via flags/env. The `Store` lives in the public
 **`pkg/credstore`**; it is agent-cli-kit's `credstore` under the
 `openobserve-cli` keychain service. It prefers the OS keychain (`go-keyring`) and falls back to a per-user
 DPAPI-encrypted file on Windows or a `0600` JSON file on macOS/Linux. On macOS

@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Credential validation, header encoding, keychain lookup and the credential
+  recovery errors now come from agent-cli-kit's `auth` package. Messages, error
+  codes and stored credentials are unchanged, and `pkg/auth` keeps its exported
+  names; `pkg/auth.Credential` is now an alias of the kit's `Credential`.
 - Output rendering, argv correction, the release check, and the code behind
   `pkg/credstore`, `pkg/errors` and `pkg/transport` now come from the shared
   [agent-cli-kit](https://github.com/AngelMsger/agent-cli-kit) module. Commands,

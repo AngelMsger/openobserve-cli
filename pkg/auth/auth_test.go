@@ -1,9 +1,10 @@
 package auth
 
 import (
-	"encoding/base64"
 	"net/http"
 	"testing"
+
+	cerrors "github.com/angelmsger/openobserve-cli/pkg/errors"
 )
 
 func TestHeader(t *testing.T) {
@@ -12,11 +13,6 @@ func TestHeader(t *testing.T) {
 		cred Credential
 		want string
 	}{
-		{
-			name: "basic encodes email:password",
-			cred: Credential{Scheme: SchemeBasic, Username: "ops@x.com", Secret: "pw"},
-			want: "Basic " + base64.StdEncoding.EncodeToString([]byte("ops@x.com:pw")),
-		},
 		{
 			name: "token without prefix gets Basic",
 			cred: Credential{Scheme: SchemeToken, Secret: "abc123"},
@@ -33,8 +29,13 @@ func TestHeader(t *testing.T) {
 			want: "Bearer xyz",
 		},
 		{
-			name: "unknown scheme yields empty",
-			cred: Credential{Scheme: "nope", Secret: "x"},
+			name: "token prefix is case-insensitive and trimmed",
+			cred: Credential{Scheme: SchemeToken, Secret: "  bearer xyz "},
+			want: "bearer xyz",
+		},
+		{
+			name: "session sends no Authorization header of its own",
+			cred: Credential{Scheme: SchemeSession, Secret: `{"cookies":"sid=abc","authorization":"Bearer tok"}`},
 			want: "",
 		},
 	}
@@ -49,29 +50,52 @@ func TestHeader(t *testing.T) {
 
 func TestValidate(t *testing.T) {
 	tests := []struct {
-		name    string
-		cred    Credential
-		wantErr bool
+		name     string
+		cred     Credential
+		wantCode string
 	}{
-		{"basic ok", Credential{Scheme: SchemeBasic, Username: "u", Secret: "p"}, false},
-		{"basic missing secret", Credential{Scheme: SchemeBasic, Username: "u"}, true},
-		{"token ok", Credential{Scheme: SchemeToken, Secret: "t"}, false},
-		{"token missing secret", Credential{Scheme: SchemeToken}, true},
-		{"session ok", Credential{Scheme: SchemeSession, Secret: "sid=abc"}, false},
-		{"session missing secret", Credential{Scheme: SchemeSession}, true},
-		{"session empty envelope", Credential{Scheme: SchemeSession, Secret: "{}"}, true},
-		{"session metadata only", Credential{Scheme: SchemeSession, Secret: `{"email":"ops@example.com"}`}, true},
-		{"session malformed envelope", Credential{Scheme: SchemeSession, Secret: "{not json"}, true},
-		{"session header injection", Credential{Scheme: SchemeSession, Secret: "sid=abc\r\nX-Bad: yes"}, true},
-		{"unknown scheme", Credential{Scheme: "x", Secret: "t"}, true},
+		{"basic ok", Credential{Scheme: SchemeBasic, Username: "u", Secret: "p"}, ""},
+		{"basic missing secret", Credential{Scheme: SchemeBasic, Username: "u"}, "AUTH_NO_BASIC"},
+		{"token ok", Credential{Scheme: SchemeToken, Secret: "t"}, ""},
+		{"token missing secret", Credential{Scheme: SchemeToken}, "AUTH_NO_TOKEN"},
+		{"session ok", Credential{Scheme: SchemeSession, Secret: "sid=abc"}, ""},
+		{"session missing secret", Credential{Scheme: SchemeSession}, "AUTH_BAD_SESSION"},
+		{"session empty envelope", Credential{Scheme: SchemeSession, Secret: "{}"}, "AUTH_BAD_SESSION"},
+		{"session metadata only", Credential{Scheme: SchemeSession, Secret: `{"email":"ops@example.com"}`}, "AUTH_BAD_SESSION"},
+		{"session malformed envelope", Credential{Scheme: SchemeSession, Secret: "{not json"}, "AUTH_BAD_SESSION"},
+		{"session header injection", Credential{Scheme: SchemeSession, Secret: "sid=abc\r\nX-Bad: yes"}, "AUTH_BAD_SESSION"},
+		{"unknown scheme", Credential{Scheme: "x", Secret: "t"}, "AUTH_BAD_SCHEME"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			err := tt.cred.Validate()
-			if (err != nil) != tt.wantErr {
-				t.Fatalf("Validate() err = %v, wantErr = %v", err, tt.wantErr)
+			if tt.wantCode == "" {
+				if err != nil {
+					t.Fatalf("Validate() err = %v, want nil", err)
+				}
+				return
+			}
+			if ce := cerrors.AsCLIError(err); err == nil || ce.Code != tt.wantCode {
+				t.Fatalf("Validate() err = %v, want code %s", err, tt.wantCode)
 			}
 		})
+	}
+}
+
+func TestValidateMessages(t *testing.T) {
+	tests := []struct {
+		cred Credential
+		want string
+	}{
+		{Credential{Scheme: SchemeBasic}, "basic auth requires both an email and a password"},
+		{Credential{Scheme: SchemeToken}, "no token configured"},
+		{Credential{Scheme: SchemeSession}, "captured browser session is invalid; sign in through the browser again"},
+		{Credential{Scheme: "kerberos"}, `unknown auth scheme "kerberos" (want basic, token or session)`},
+	}
+	for _, tt := range tests {
+		if ce := cerrors.AsCLIError(tt.cred.Validate()); ce == nil || ce.Message != tt.want {
+			t.Fatalf("Validate(%q) = %+v, want message %q", tt.cred.Scheme, ce, tt.want)
+		}
 	}
 }
 
@@ -126,13 +150,14 @@ func TestDecoratorSetsCookie(t *testing.T) {
 	})
 }
 
+// OpenObserve keys stored secrets by host alone, even for a path-routed URL;
+// keying by path would orphan every secret already stored.
 func TestAccountKey(t *testing.T) {
 	tests := []struct {
 		baseURL, scheme, want string
 	}{
 		{"http://localhost:5080", "basic", "localhost:5080:basic"},
-		{"https://api.openobserve.ai", "token", "api.openobserve.ai:token"},
-		{"not-a-url", "basic", "not-a-url:basic"},
+		{"https://o2.example.com/deploy/", "session", "o2.example.com:session"},
 	}
 	for _, tt := range tests {
 		if got := AccountKey(tt.baseURL, tt.scheme); got != tt.want {
