@@ -287,3 +287,6 @@ again before writing. See the installation guide for the result and recovery con
 Equivalent service URL overrides preserve the persisted native credential lookup
 key without redirecting requests or copying secrets. Logout removes that same
 entry. A different complete deployment URL cannot use the retained lookup key.
+`config delete-context` removes the deleted context's entry (password, token or
+browser session) only when no remaining context resolves the same host and
+scheme, and only after the config file is written.

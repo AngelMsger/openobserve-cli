@@ -201,7 +201,7 @@ so you are not sent through SSO on every login; `--fresh-profile` opts out, and
 | `metrics query` / `query-range` | evaluate a PromQL expression at an instant, or across a window at `--step` |
 | `trace search` / `trace get` | list recent traces; reassemble one trace into a span waterfall |
 | `auth login` / `status` / `logout` | store credentials, check identity, sign out |
-| `config init` / `show` / `contexts` / `use-context` | setup, inspect, manage servers |
+| `config init` / `show` / `get-contexts` / `use-context` / `delete-context` | setup, inspect, manage servers |
 | `doctor` | check configuration, credentials and connectivity |
 | `skill install` / `uninstall` | deploy or remove the embedded companion Skill |
 | `version` | print version and build information |
@@ -236,12 +236,15 @@ exists, re-running `config init` lists it and asks whether to **edit** a context
 to skip that prompt and target a context directly. Then:
 
 ```bash
-openobserve-cli config contexts                 # list contexts, current marked
+openobserve-cli config get-contexts             # list contexts, current marked
 openobserve-cli config use-context prod         # switch the current context
 openobserve-cli --use-context prod stream list  # override for one command
+openobserve-cli config delete-context staging   # remove a context and its unused secret
 ```
 
-`OPENOBSERVE_CONTEXT` overrides the current context via the environment.
+`OPENOBSERVE_CONTEXT` overrides the current context via the environment. New
+context names are saved trimmed and in lower case; existing names keep their
+spelling and match in any case.
 
 ## Errors and exit codes
 

@@ -1,10 +1,12 @@
 package app
 
 import (
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -18,9 +20,8 @@ import (
 // deleted such a secret: re-running the wizard across a spelling-only change of
 // the server URL removed the credential it had just saved, and removing one
 // context removed the secret another still used. `config init` here only ever
-// saves, and no command removes a context, so neither defect exists; these
-// tests pin that, so a cleanup step added later has to keep credentials that
-// are still in use.
+// saves. `config delete-context` removes a secret only when no remaining
+// context resolves it, and only after the config write. These tests pin that.
 
 func credentialServer(t *testing.T) *httptest.Server {
 	t.Helper()
@@ -147,5 +148,143 @@ func TestConfigInitKeepsACredentialAnotherContextUses(t *testing.T) {
 	}
 	if got, err := resolveStoredSecret(t, dir, "team"); err != nil || got != "shared-password" {
 		t.Fatalf("moving one context removed the credential another still uses: %q %v", got, err)
+	}
+}
+
+// storedSecret reads the secret stored for a server and scheme.
+func storedSecret(t *testing.T, cfgDir, server, scheme string) (string, error) {
+	t.Helper()
+	return auth.NewStore(cfgDir).Load(auth.AccountKey(server, scheme))
+}
+
+// saveSecret stores a secret the way login does, without validating it, so a
+// browser-session envelope can be stood in for by any string.
+func saveSecret(t *testing.T, cfgDir, server, scheme, secret string) {
+	t.Helper()
+	if _, err := auth.NewStore(cfgDir).Save(auth.AccountKey(server, scheme), secret); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// Deleting a context removes its secret only when no remaining context
+// resolves the same account: another spelling of the server, another
+// organization on it, or a preset with no scheme of its own (which resolves to
+// basic) keeps it.
+func TestDeleteContextKeepsACredentialAnotherContextUses(t *testing.T) {
+	cfgDir := isolateConfig(t)
+	other := basicContext("other-org", "https://o2.example.test/")
+	other.Org = "team-a"
+	writeContexts(t, cfgDir, "default",
+		basicContext("default", "https://o2.example.test/"),
+		config.NamedContext{Name: "team", BaseURL: "https://o2.example.test"},
+		other,
+		basicContext("elsewhere", "https://elsewhere.example.test/o2"))
+	saveSecret(t, cfgDir, "https://o2.example.test/", auth.SchemeBasic, "shared-password")
+	saveSecret(t, cfgDir, "https://elsewhere.example.test/o2", auth.SchemeBasic, "elsewhere-password")
+
+	for _, name := range []string{"team", "default"} {
+		if _, err := runConfig(t, cfgDir, "config", "delete-context", name); err != nil {
+			t.Fatal(err)
+		}
+		if got, err := storedSecret(t, cfgDir, "https://o2.example.test", auth.SchemeBasic); err != nil || got != "shared-password" {
+			t.Fatalf("deleting %s removed the credential another context uses: %q %v", name, got, err)
+		}
+	}
+	if _, err := runConfig(t, cfgDir, "config", "delete-context", "elsewhere"); err != nil {
+		t.Fatal(err)
+	}
+	if got, err := storedSecret(t, cfgDir, "https://elsewhere.example.test/o2", auth.SchemeBasic); !errors.Is(err, auth.ErrSecretNotFound) {
+		t.Fatalf("an unused credential was left behind: %q %v", got, err)
+	}
+	if file, _, _ := config.ReadFile(cfgDir); len(file.Contexts) != 1 || file.Contexts[0].Name != "other-org" {
+		t.Fatalf("unexpected contexts: %+v", file)
+	}
+}
+
+// A browser session is stored under the session scheme. Deleting a session
+// context keeps the session while another session context on the server
+// resolves it, removes it with the last one, and never touches a password
+// stored for the same server.
+func TestDeleteContextHandlesBrowserSessions(t *testing.T) {
+	cfgDir := isolateConfig(t)
+	session := func(name, org string) config.NamedContext {
+		return config.NamedContext{Name: name, BaseURL: "https://o2.example.test", Org: org,
+			Auth: config.AuthConfig{Scheme: auth.SchemeSession, Username: "alice@example.test"}}
+	}
+	writeContexts(t, cfgDir, "sso", session("sso", "default"), session("sso-team", "team-a"),
+		basicContext("password", "https://o2.example.test"))
+	saveSecret(t, cfgDir, "https://o2.example.test", auth.SchemeSession, "session-envelope")
+	saveSecret(t, cfgDir, "https://o2.example.test", auth.SchemeBasic, "the-password")
+
+	if _, err := runConfig(t, cfgDir, "config", "delete-context", "sso"); err != nil {
+		t.Fatal(err)
+	}
+	if got, err := storedSecret(t, cfgDir, "https://o2.example.test", auth.SchemeSession); err != nil || got != "session-envelope" {
+		t.Fatalf("deleting one session context removed the session another uses: %q %v", got, err)
+	}
+	if _, err := runConfig(t, cfgDir, "config", "delete-context", "sso-team"); err != nil {
+		t.Fatal(err)
+	}
+	if got, err := storedSecret(t, cfgDir, "https://o2.example.test", auth.SchemeSession); !errors.Is(err, auth.ErrSecretNotFound) {
+		t.Fatalf("the last session context left its session behind: %q %v", got, err)
+	}
+	if got, err := storedSecret(t, cfgDir, "https://o2.example.test", auth.SchemeBasic); err != nil || got != "the-password" {
+		t.Fatalf("deleting a session context removed a password: %q %v", got, err)
+	}
+
+	// The other way round: deleting the password context keeps a session.
+	writeContexts(t, cfgDir, "sso", session("sso", "default"), basicContext("password", "https://o2.example.test"))
+	saveSecret(t, cfgDir, "https://o2.example.test", auth.SchemeSession, "session-envelope")
+	if _, err := runConfig(t, cfgDir, "config", "delete-context", "password"); err != nil {
+		t.Fatal(err)
+	}
+	if got, err := storedSecret(t, cfgDir, "https://o2.example.test", auth.SchemeSession); err != nil || got != "session-envelope" {
+		t.Fatalf("deleting a password context removed a session: %q %v", got, err)
+	}
+	if got, err := storedSecret(t, cfgDir, "https://o2.example.test", auth.SchemeBasic); !errors.Is(err, auth.ErrSecretNotFound) {
+		t.Fatalf("the deleted context's password was left behind: %q %v", got, err)
+	}
+}
+
+// A context on the same server under the other scheme keeps its own secret
+// and does not keep the deleted context's secret alive.
+func TestDeleteContextScopesTheSharedCredentialByScheme(t *testing.T) {
+	cfgDir := isolateConfig(t)
+	token := config.NamedContext{Name: "token", BaseURL: "https://o2.example.test", Auth: config.AuthConfig{Scheme: auth.SchemeToken}}
+	writeContexts(t, cfgDir, "basic", basicContext("basic", "https://o2.example.test"), token)
+	saveSecret(t, cfgDir, token.BaseURL, auth.SchemeToken, "the-token")
+	saveSecret(t, cfgDir, token.BaseURL, auth.SchemeBasic, "the-password")
+
+	if _, err := runConfig(t, cfgDir, "config", "delete-context", "token"); err != nil {
+		t.Fatal(err)
+	}
+	if got, err := storedSecret(t, cfgDir, token.BaseURL, auth.SchemeToken); !errors.Is(err, auth.ErrSecretNotFound) {
+		t.Fatalf("the deleted context's secret was left behind: %q %v", got, err)
+	}
+	if got, err := storedSecret(t, cfgDir, token.BaseURL, auth.SchemeBasic); err != nil || got != "the-password" {
+		t.Fatalf("a secret under the other scheme was deleted: %q %v", got, err)
+	}
+}
+
+// A failed config write must not cost the credential: the context is still in
+// the file and still resolves it.
+func TestDeleteContextKeepsTheCredentialWhenTheConfigWriteFails(t *testing.T) {
+	if runtime.GOOS == "windows" || os.Geteuid() == 0 {
+		t.Skip("a read-only directory does not block file creation for this user")
+	}
+	cfgDir := isolateConfig(t)
+	writeContexts(t, cfgDir, "default", basicContext("default", "https://o2.example.test"), basicContext("target", "https://target.example.test"))
+	saveSecret(t, cfgDir, "https://target.example.test", auth.SchemeBasic, "target-password")
+	// The config is replaced through a temporary file in the same directory,
+	// so a read-only directory fails the write while the read still succeeds.
+	if err := os.Chmod(cfgDir, 0o500); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(cfgDir, 0o700) })
+	if _, err := runConfig(t, cfgDir, "config", "delete-context", "target"); err == nil {
+		t.Fatal("a failed config write was reported as success")
+	}
+	if got, err := storedSecret(t, cfgDir, "https://target.example.test", auth.SchemeBasic); err != nil || got != "target-password" {
+		t.Fatalf("a failed delete removed a credential the context still names: %q %v", got, err)
 	}
 }

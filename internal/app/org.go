@@ -66,7 +66,7 @@ func newOrgUseCmd(s *appState) *cobra.Command {
 			if !found {
 				return cerrors.Newf(cerrors.CategoryConfig, "NO_CONTEXT",
 					"context %q not found", target).
-					WithNextSteps("openobserve-cli config contexts")
+					WithNextSteps(config.ListContextsStep())
 			}
 			nc.Org = orgID
 			file.Upsert(nc)

@@ -99,7 +99,7 @@ fi
   server, so `auth.scheme: session` was not recorded in it. `OPENOBSERVE_URL` /
   `--base-url` override the server but not the context name. Re-run with a
   context whose `base_url` is the server you signed in to (`--use-context
-  <name>`, or `config use-context <name>`); `config contexts` lists them, and
+  <name>`, or `config use-context <name>`); `config get-contexts` lists them, and
   `config init` creates one.
 - **`PROFILE_REMOVE_FAILED` (config/3)** — `auth logout` removed the stored
   credential but could not delete

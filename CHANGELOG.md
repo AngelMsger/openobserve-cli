@@ -7,8 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `config delete-context <name>` removes a context. Its stored secret (a
+  password, token or browser session) is removed too, after the config file is
+  written, unless another context on the same server and authentication scheme
+  still uses it. Deleting the current context makes the first remaining one
+  current; the only context cannot be deleted (`LAST_CONTEXT`).
+
 ### Changed
 
+- `config get-contexts` lists contexts, matching the rest of the family; its
+  output is unchanged. `config contexts` keeps working as a hidden command.
+  Hints and next steps (`UNKNOWN_CONTEXT`, `CONTEXT_BASE_URL_MISMATCH`,
+  `org use`, `auth reuse`) and the `--from-context` help now name
+  `config get-contexts`.
+- A new context name from `config init --context` or the wizard's "add" prompt
+  is saved trimmed and in lower case (`--context Prod` writes `prod`), as
+  `config set-context` already did. A blank `--context` fails with
+  `CTX_NAME_EMPTY`. Existing names keep their spelling and still match in any
+  case.
+- Update the companion Skill to `0.3.10` for the context commands.
 - Layered configuration, context selection, the config file write and
   `config set-context` planning now come from agent-cli-kit's `config`
   package. Commands, output, error codes, hints and the `config.yaml` format

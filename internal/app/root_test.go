@@ -61,8 +61,8 @@ func TestBareGroupShowsHelp(t *testing.T) {
 
 // A valid subcommand is unaffected by the group's RunE guard.
 func TestValidSubcommandStillRuns(t *testing.T) {
-	// `config contexts` against an empty config dir succeeds with an empty list.
-	if err := runRoot(t, "config", "contexts"); err != nil {
+	// `config get-contexts` against an empty config dir succeeds with an empty list.
+	if err := runRoot(t, "config", "get-contexts"); err != nil {
 		t.Fatalf("valid subcommand should run, got: %v", err)
 	}
 }

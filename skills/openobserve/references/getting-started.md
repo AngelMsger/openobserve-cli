@@ -20,7 +20,13 @@ them against the server, then writes a context to
 When a config
 already exists, re-running it lists the contexts and asks whether to **edit** one
 (prefilled), **add** a new one, or **replace** everything; `config init --context
-prod` skips that prompt and targets the named context directly.
+prod` skips that prompt and targets the named context directly. A new context
+name is saved trimmed and in lower case (`--context Prod` writes `prod`).
+
+`config get-contexts` lists the contexts with the current one marked.
+`config delete-context <name>` removes a context; its stored secret (password,
+token or browser session) goes too unless another context on the same server
+and scheme still uses it. The only context cannot be deleted (`LAST_CONTEXT`).
 
 `--pretty` renders an interactive TUI and requires a terminal (otherwise it
 fails with `PRETTY_NEEDS_TTY`); the plain wizard reads stdin line by line, so it
@@ -161,6 +167,6 @@ For preset team services, use `config set-context` and `auth guide` before perso
 an existing context with the same complete service URL, scheme and provider scope.
 Apply without `--dry-run`, then verify with `auth status`. No login, token copy,
 current-context switch or replacement of a populated identity occurs. A different
-verified source can be selected with `--from-context` after `config contexts`.
+verified source can be selected with `--from-context` after `config get-contexts`.
 `AUTH_REUSE_AMBIGUOUS` requires choosing an identity; store/network/permission
 errors require their named recovery, not automatic reauthentication.

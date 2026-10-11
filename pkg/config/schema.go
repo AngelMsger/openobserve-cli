@@ -49,7 +49,7 @@ func init() {
 			ContextFlag:  "--use-context",
 			ContextEnv:   "OPENOBSERVE_CONTEXT",
 			NoHintEnv:    "OPENOBSERVE_CLI_NO_CONTEXT_HINT",
-			ListContexts: "config contexts",
+			ListContexts: "config get-contexts",
 			UseContext:   "config use-context",
 			SetContext:   "config set-context",
 			AuthGuide:    "auth guide",

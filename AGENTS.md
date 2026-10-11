@@ -144,9 +144,14 @@ credential resolution. Native self-configuration follows the existing read-only 
 
 A stored secret is keyed by the server URL's host and the auth scheme
 (`auth.AccountKey`), so contexts on one host resolve the same entry regardless of
-organization, path or trailing slash. `config init` only saves and no command
-removes a context; `auth logout` is the one deliberate removal. A change that
-deletes or re-homes a context must compare credential keys, not URL strings, and
-keep an entry another context still resolves — including the one it has just
-saved. Cover it with a fresh-load resolution test
-(`internal/app/config_credentials_test.go`).
+organization, path or trailing slash; a browser session is keyed under the
+`session` scheme, apart from a password or token on the same host. `config init`
+only saves. `config delete-context` and `auth logout` are the paths that remove
+one: `delete-context` forgets the deleted context's secret only when no
+remaining context resolves the same key (`forgetUnusedCredential`, as in the
+Atlassian CLIs), and only after the config write. A change that deletes or
+re-homes a context must compare credential keys, not URL strings, and keep an
+entry another context still resolves — including the one it has just saved.
+Cover it with a fresh-load resolution test
+(`internal/app/config_credentials_test.go`), which also pins that
+`delete-context` keeps a secret or session another context resolves.

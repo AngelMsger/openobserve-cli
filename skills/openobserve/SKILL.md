@@ -1,6 +1,6 @@
 ---
 name: openobserve
-version: 0.3.9
+version: 0.3.10
 description: "Query OpenObserve (O2) logs, metrics, and traces: discover streams and fields, search SQL logs, inspect histograms, evaluate PromQL, reconstruct traces, and follow live logs. Use for an OpenObserve URL or an investigation whose backend is known to be OpenObserve, including errors, latency, request volume, and stream discovery. Supports self-hosted and Cloud instances. Remote operations are read-only; dashboards, alerts, pipelines, and user management are not supported."
 metadata:
   requires:
@@ -114,7 +114,8 @@ openobserve-cli metrics query-range --query 'up' --since 1h --step 1m
 openobserve-cli trace search --stream <name> --since 1h    # recent traces (trace_id, duration, services)
 openobserve-cli trace get <trace_id> --stream <name> --since 1h    # span waterfall
 openobserve-cli config init|show               # configuration
-openobserve-cli config contexts|use-context <name>   # list / switch named server contexts
+openobserve-cli config get-contexts|use-context <name>   # list / switch named server contexts
+openobserve-cli config delete-context <name>   # remove a context and its unused secret
 openobserve-cli auth status                    # who am I / can I reach the server
 openobserve-cli doctor                         # diagnose config / creds / connectivity
 openobserve-cli skill status|install|path|show|uninstall   # manage the companion Skill
@@ -126,7 +127,7 @@ current context.
 
 ## Agent-facing conventions
 
-- **Skill handshake — set `OPENOBSERVE_CLI_SKILL=0.3.9`.** Once you have
+- **Skill handshake — set `OPENOBSERVE_CLI_SKILL=0.3.10`.** Once you have
   loaded this Skill, export that exact value in the environment used to run the
   CLI. The CLI compares it with the embedded Skill version and emits a
   structured stderr notice when the Skill is missing, old, or uses the legacy
