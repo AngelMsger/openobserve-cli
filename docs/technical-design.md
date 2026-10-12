@@ -24,11 +24,11 @@ cmd/openobserve-cli  →  internal/app  →  pkg/apiclient  →  pkg/transport
 
 Cross-cutting packages — `errors`, `output`, `config`, `auth`, `timeutil`,
 `cliflags`, `constants` — are used across the layers. `output`, `cliflags`,
-`update`, and the code behind `pkg/credstore`, `pkg/errors` and
-`pkg/transport` come from
+`update`, credential resolution, the configuration engine, and the code behind
+`pkg/credstore`, `pkg/errors` and `pkg/transport` come from
 [agent-cli-kit](https://github.com/AngelMsger/agent-cli-kit), shared by every
 CLI in the family; openobserve-cli supplies its own hints, User-Agent, keychain
-service name and release repository.
+service name, auth schemes, settings table and release repository.
 
 ## Command layer (`internal/app`)
 
@@ -144,6 +144,16 @@ tracked so `config show` can report where a value came from. Secrets
 (passwords, tokens) are never written to the YAML file. Contexts are
 kubectl-style; `--use-context` and `OPENOBSERVE_CONTEXT` override per invocation.
 
+The engine — layering, provenance, context selection, the atomic file write
+and set-context planning — is agent-cli-kit's `config` package. `pkg/config`
+registers openobserve-cli's settings (keys, `OPENOBSERVE_*` variables,
+defaults), the file location, the command wording and the browser-session check
+with it (`schema.go`), so a program that imports only `pkg/config` reads and
+writes the file the same way the CLI does. `pkg/config` keeps the YAML shape
+structs that define the file format; its `File` is an alias of the kit's
+`File[NamedContext, Defaults]`. `internal/config` keeps the resolved `Config`,
+the flag and secret structs and the names the rest of the CLI uses.
+
 ## Auth (`pkg/auth` + `internal/auth`)
 
 The pure, dependency-light credential model lives in the public **`pkg/auth`**:
@@ -152,9 +162,13 @@ The pure, dependency-light credential model lives in the public **`pkg/auth`**:
 password → `Authorization: Basic base64(email:pw)`), `token` (a pre-generated
 credential sent verbatim, or wrapped as `Basic`), and `session` (browser-captured
 cookies with an optional Authorization fallback, established by `auth login
---browser`). The config/keychain-coupled resolution stays in `internal/auth`:
-`Resolve` produces a validated `Credential` from config + secrets, loading the secret from
-the keychain when not supplied via flags/env. The `Store` lives in the public
+--browser`). `pkg/auth` registers them, with openobserve-cli's recovery
+wording, with agent-cli-kit's `auth` package when it is imported, so a library
+consumer gets the same schemes; the kit owns the credential model, the header
+encoding and the recovery errors. The config/keychain-coupled resolution stays
+in `internal/auth`: `Resolve` maps config + secrets onto the kit's resolver and
+produces a validated `Credential`, loading the secret from the keychain when
+not supplied via flags/env. The `Store` lives in the public
 **`pkg/credstore`**; it is agent-cli-kit's `credstore` under the
 `openobserve-cli` keychain service. It prefers the OS keychain (`go-keyring`) and falls back to a per-user
 DPAPI-encrypted file on Windows or a `0600` JSON file on macOS/Linux. On macOS
@@ -236,8 +250,11 @@ from `--help`; CI fails if the committed output is stale.
 
 ## Team service setup and login persistence
 
-`internal/config/setup.go` owns offline service-field validation, acquisition
-links and the pure `PlanServiceContext` merge used by execution and dry-run.
+`internal/config/setup.go` owns the acquisition links and wraps the shared
+offline service-field validation and the pure `PlanServiceContext` merge used by
+execution and dry-run. The merge refuses to repoint an existing browser-session
+context at another service or scheme (`BROWSER_MANAGED_SESSION`) before it
+reports any conflict.
 `LoadOptions.Setup` selects the requested destination even when it is new and
 filters personal environment fields before credential-based scheme inference.
 Ordinary runtime precedence and transient environment secrets remain supported.
@@ -270,3 +287,6 @@ again before writing. See the installation guide for the result and recovery con
 Equivalent service URL overrides preserve the persisted native credential lookup
 key without redirecting requests or copying secrets. Logout removes that same
 entry. A different complete deployment URL cannot use the retained lookup key.
+`config delete-context` removes the deleted context's entry (password, token or
+browser session) only when no remaining context resolves the same host and
+scheme, and only after the config file is written.

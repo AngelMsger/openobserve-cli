@@ -20,7 +20,8 @@ is published at <https://angelmsger.github.io/openobserve-cli/cli/>.
 | Command | Description |
 | --- | --- |
 | [`openobserve-cli config`](https://angelmsger.github.io/openobserve-cli/cli/#openobserve-cli-config) | Set up and inspect configuration and contexts |
-| [`openobserve-cli config contexts`](https://angelmsger.github.io/openobserve-cli/cli/#openobserve-cli-config-contexts) | List configured contexts and which one is current |
+| [`openobserve-cli config delete-context`](https://angelmsger.github.io/openobserve-cli/cli/#openobserve-cli-config-delete-context) | Delete a context and its stored credential |
+| [`openobserve-cli config get-contexts`](https://angelmsger.github.io/openobserve-cli/cli/#openobserve-cli-config-get-contexts) | List configured contexts and which one is current |
 | [`openobserve-cli config init`](https://angelmsger.github.io/openobserve-cli/cli/#openobserve-cli-config-init) | Interactively configure a context and store credentials |
 | [`openobserve-cli config set-context`](https://angelmsger.github.io/openobserve-cli/cli/#openobserve-cli-config-set-context) | Configure service presets without credentials or network access |
 | [`openobserve-cli config show`](https://angelmsger.github.io/openobserve-cli/cli/#openobserve-cli-config-show) | Show the resolved configuration with field provenance |

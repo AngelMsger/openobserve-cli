@@ -157,11 +157,26 @@ CFG="$(mktemp -d)"
 printf '%s\ndefault\nbasic\nu@example.com\npw\n' "$URL" | "$BIN" --config "$CFG" config init >/dev/null 2>&1
 printf 'add\nprod\n%s\nteam-a\nbasic\nu@example.com\npw\n' "$URL" | "$BIN" --config "$CFG" config init >/dev/null 2>"$CFG/err"
 if grep -q "edit/add/replace" "$CFG/err" \
-   && "$BIN" --config "$CFG" config contexts 2>/dev/null | grep -q '"name": "prod"'; then
+   && "$BIN" --config "$CFG" config get-contexts 2>/dev/null | grep -q '"name": "prod"'; then
   echo "ok   - config init asks edit/add/replace and adds a context"
   pass=$((pass + 1))
 else
   echo "FAIL - config init add-context flow"; cat "$CFG/err" | head -5; exit 1
+fi
+# The earlier name still lists; delete-context removes the added context, and
+# the only context left cannot be deleted.
+if "$BIN" --config "$CFG" config contexts 2>/dev/null | grep -q '"name": "prod"' \
+   && "$BIN" --config "$CFG" config delete-context PROD 2>/dev/null | grep -q '"status": "deleted"' \
+   && ! "$BIN" --config "$CFG" config get-contexts 2>/dev/null | grep -q '"name": "prod"'; then
+  set +e; "$BIN" --config "$CFG" config delete-context default >/dev/null 2>"$CFG/err"; code=$?; set -e
+  if [[ $code -eq 2 ]] && grep -q '"code": "LAST_CONTEXT"' "$CFG/err"; then
+    echo "ok   - config contexts still lists; delete-context removes a context, not the last"
+    pass=$((pass + 1))
+  else
+    echo "FAIL - delete-context of the only context (exit $code)"; head -5 "$CFG/err"; exit 1
+  fi
+else
+  echo "FAIL - config contexts / delete-context"; exit 1
 fi
 rm -rf "$CFG"
 

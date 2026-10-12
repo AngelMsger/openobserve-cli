@@ -35,11 +35,16 @@ mirrors the architecture of the sibling `confluence-cli` / `bitbucket-cli`.
 - `pkg/credstore` — re-exports the shared credential store under the
   `openobserve-cli` keychain service.
 - `pkg/auth`, `pkg/config` — the public credential model and on-disk YAML
-  config model, shared with external consumers (see the rule below).
+  config model, shared with external consumers (see the rule below). `pkg/auth`
+  declares openobserve-cli's auth schemes and recovery wording on top of the
+  shared credential model. `pkg/config` registers openobserve-cli's settings,
+  file location and wording with the shared config engine (`schema.go`) and
+  keeps the YAML shape of `config.yaml`.
 - `internal/config`, `internal/auth` — CLI-only layered loader + keychain
-  resolution, built over `pkg/config` / `pkg/auth` (which they re-export).
-- Output rendering, argv correction, the update check and the credential store
-  come from [agent-cli-kit](https://github.com/AngelMsger/agent-cli-kit), shared
+  resolution, built over `pkg/config` / `pkg/auth` (which they re-export);
+  `internal/auth` maps config onto the shared resolver.
+- Output rendering, argv correction, the update check, the credential store,
+  credential resolution and the configuration engine come from [agent-cli-kit](https://github.com/AngelMsger/agent-cli-kit), shared
   by every CLI in the family. Fix bugs in those there, not here.
 - `internal/timeutil` — human time ranges → microsecond epochs (the search API).
 - `skills/openobserve` — the companion Skill, embedded into the binary.
@@ -139,9 +144,14 @@ credential resolution. Native self-configuration follows the existing read-only 
 
 A stored secret is keyed by the server URL's host and the auth scheme
 (`auth.AccountKey`), so contexts on one host resolve the same entry regardless of
-organization, path or trailing slash. `config init` only saves and no command
-removes a context; `auth logout` is the one deliberate removal. A change that
-deletes or re-homes a context must compare credential keys, not URL strings, and
-keep an entry another context still resolves — including the one it has just
-saved. Cover it with a fresh-load resolution test
-(`internal/app/config_credentials_test.go`).
+organization, path or trailing slash; a browser session is keyed under the
+`session` scheme, apart from a password or token on the same host. `config init`
+only saves. `config delete-context` and `auth logout` are the paths that remove
+one: `delete-context` forgets the deleted context's secret only when no
+remaining context resolves the same key (`forgetUnusedCredential`, as in the
+Atlassian CLIs), and only after the config write. A change that deletes or
+re-homes a context must compare credential keys, not URL strings, and keep an
+entry another context still resolves — including the one it has just saved.
+Cover it with a fresh-load resolution test
+(`internal/app/config_credentials_test.go`), which also pins that
+`delete-context` keeps a secret or session another context resolves.

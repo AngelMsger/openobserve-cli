@@ -2,18 +2,18 @@
 // environment variables, a .env file, a YAML config file and built-in
 // defaults, in that precedence order (highest first).
 //
+// The engine — layering, provenance, context selection, the atomic file
+// write and team presets — comes from agent-cli-kit/config. The public
+// pkg/config registers openobserve-cli's fields, environment variables, file
+// location and command wording with it and keeps the YAML shape of the file;
+// this package keeps the names the rest of the repo uses.
+//
 // Secrets (passwords, tokens) are never stored in the YAML config file. They
 // are surfaced through Resolved.Secrets when supplied via flags/env/.env, or
 // loaded from the OS keychain by the auth package.
 package config
 
-import (
-	"strconv"
-	"strings"
-	"time"
-
-	"github.com/angelmsger/openobserve-cli/pkg/constants"
-)
+import kit "github.com/angelmsger/agent-cli-kit/config"
 
 // Auth scheme values.
 const (
@@ -26,18 +26,18 @@ const (
 )
 
 // DefaultContextName is the name given to an unnamed context.
-const DefaultContextName = "default"
+const DefaultContextName = kit.DefaultContextName
 
 // Context selection sources, reported on Resolved.ContextSource. The first two
 // are explicit (the caller named a context for this invocation); the rest are
 // implicit (the CLI fell back to a stored or sole context).
 const (
-	ContextSourceFlag    = "flag"            // --use-context
-	ContextSourceEnv     = "env"             // OPENOBSERVE_CONTEXT
-	ContextSourceCurrent = "current_context" // the file's current_context
-	ContextSourceSingle  = "single"          // the sole defined context
-	ContextSourceDefault = "default-name"    // a context literally named "default"
-	ContextSourceNone    = "none"            // nothing selected (no/empty config)
+	ContextSourceFlag    = kit.ContextSourceFlag    // --use-context
+	ContextSourceEnv     = kit.ContextSourceEnv     // OPENOBSERVE_CONTEXT
+	ContextSourceCurrent = kit.ContextSourceCurrent // the file's current_context
+	ContextSourceSingle  = kit.ContextSourceSingle  // the sole defined context
+	ContextSourceDefault = kit.ContextSourceDefault // a context literally named "default"
+	ContextSourceNone    = kit.ContextSourceNone    // nothing selected (no/empty config)
 )
 
 // NamedContext, AuthConfig, and Defaults are defined (and re-exported) via
@@ -48,8 +48,8 @@ type Config struct {
 	// CredentialBaseURL preserves an equivalent stored URL's native lookup key.
 	// It is runtime-only and never changes the request destination.
 	CredentialBaseURL string     `yaml:"-" json:"-"`
-	BaseURL           string     `yaml:"server"`
-	Org               string     `yaml:"org"`
+	BaseURL           string     `yaml:"server" config:"server"`
+	Org               string     `yaml:"org" config:"org"`
 	Auth              AuthConfig `yaml:"auth"`
 	Defaults          Defaults   `yaml:"defaults"`
 }
@@ -57,8 +57,8 @@ type Config struct {
 // Secrets holds credentials observed in non-file layers. Empty fields mean the
 // secret was not supplied via flags/env/.env and must come from the keychain.
 type Secrets struct {
-	Password string
-	Token    string
+	Password string `config:"secret.password"`
+	Token    string `config:"secret.token"`
 }
 
 // Resolved is the outcome of Load: the merged Config plus provenance and any
@@ -91,18 +91,15 @@ func (r *Resolved) ContextSelectedExplicitly() bool {
 
 // Field keys used for layer maps and provenance tracking.
 const (
-	fieldCredentialURL = "auth.credential_url"
-	fieldServer        = "server"
+	fieldCredentialURL = kit.KeyCredentialURL
+	fieldServer        = kit.KeyServer
 	fieldOrg           = "org"
-	fieldAuthScheme    = "auth.scheme"
+	fieldAuthScheme    = kit.KeyAuthScheme
 	fieldAuthUsername  = "auth.username"
 	fieldFormat        = "defaults.format"
 	fieldTimeout       = "defaults.timeout"
 	fieldMaxRetries    = "defaults.max_retries"
 	fieldReadOnly      = "defaults.read_only"
-	// Secret field keys (never persisted to the YAML file).
-	fieldPassword = "secret.password"
-	fieldToken    = "secret.token"
 )
 
 // Field key accessors for callers outside this package (e.g. config show).
@@ -117,67 +114,3 @@ const (
 	FieldMaxRetries    = fieldMaxRetries
 	FieldReadOnly      = fieldReadOnly
 )
-
-// defaultLayer returns the built-in defaults as a layer map.
-func defaultLayer() map[string]string {
-	return map[string]string{
-		fieldOrg:        constants.DefaultOrg,
-		fieldAuthScheme: SchemeBasic,
-		fieldFormat:     constants.DefaultFormat,
-		fieldTimeout:    constants.DefaultTimeout.String(),
-		fieldMaxRetries: strconv.Itoa(constants.DefaultMaxRetries),
-	}
-}
-
-// configFromMap builds a Config from a fully merged layer map.
-func configFromMap(m map[string]string) Config {
-	return Config{
-		BaseURL: m[fieldServer],
-		Org:     m[fieldOrg],
-		Auth: AuthConfig{
-			CredentialURL: m[fieldCredentialURL],
-			Scheme:        m[fieldAuthScheme],
-			Username:      m[fieldAuthUsername],
-		},
-		Defaults: Defaults{
-			Format:     m[fieldFormat],
-			Timeout:    durationOr(m[fieldTimeout], constants.DefaultTimeout),
-			MaxRetries: atoiOr(m[fieldMaxRetries], constants.DefaultMaxRetries),
-			ReadOnly:   boolOr(m[fieldReadOnly], false),
-		},
-	}
-}
-
-// boolOr parses a flag-style truthy string. "1", "true", "yes", "on" count as
-// true; everything else (including empty) yields the fallback.
-func boolOr(s string, fallback bool) bool {
-	switch strings.ToLower(strings.TrimSpace(s)) {
-	case "":
-		return fallback
-	case "1", "true", "yes", "on":
-		return true
-	case "0", "false", "no", "off":
-		return false
-	}
-	return fallback
-}
-
-func atoiOr(s string, fallback int) int {
-	if s == "" {
-		return fallback
-	}
-	if n, err := strconv.Atoi(s); err == nil {
-		return n
-	}
-	return fallback
-}
-
-func durationOr(s string, fallback time.Duration) time.Duration {
-	if s == "" {
-		return fallback
-	}
-	if d, err := time.ParseDuration(s); err == nil {
-		return d
-	}
-	return fallback
-}

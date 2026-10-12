@@ -21,8 +21,10 @@ func newConfigCmd(s *appState) *cobra.Command {
 	cmd.AddCommand(newConfigSetContextCmd(s),
 		newConfigInitCmd(s),
 		newConfigShowCmd(s),
+		newConfigGetContextsCmd(s),
 		newConfigContextsCmd(s),
 		newConfigUseContextCmd(s),
+		newConfigDeleteContextCmd(s),
 	)
 	return cmd
 }
@@ -165,7 +167,16 @@ func (s *appState) resolveInitTarget(cmd *cobra.Command, file config.File, ctxFl
 		if c, ok := file.Context(ctxFlag); ok {
 			return c.Name, &c, false, nil
 		}
-		return ctxFlag, nil, false, nil
+		// A new context is saved under its normalized name, and edits the
+		// context of that name when one exists.
+		name := config.NormalizeContextName(ctxFlag)
+		if name == "" {
+			return "", nil, false, cerrors.New(cerrors.CategoryUsage, "CTX_NAME_EMPTY", "provide a non-empty context name")
+		}
+		if c, ok := file.Context(name); ok {
+			return c.Name, &c, false, nil
+		}
+		return name, nil, false, nil
 	}
 	if len(file.Contexts) == 0 {
 		return config.DefaultContextName, nil, false, nil
@@ -267,7 +278,7 @@ func (s *appState) promptNewContextName(file config.File) (string, error) {
 		if err != nil {
 			return "", err
 		}
-		name = strings.TrimSpace(name)
+		name = config.NormalizeContextName(name)
 		if name == "" {
 			fmt.Fprintln(os.Stderr, "  a context name is required")
 			continue
@@ -311,31 +322,46 @@ func newConfigShowCmd(s *appState) *cobra.Command {
 	}
 }
 
+func newConfigGetContextsCmd(s *appState) *cobra.Command {
+	return &cobra.Command{
+		Use:     "get-contexts",
+		Short:   "List configured contexts and which one is current",
+		Example: "  openobserve-cli config get-contexts\n  openobserve-cli config get-contexts --format table",
+		Args:    cobra.NoArgs,
+		RunE:    s.listContexts,
+	}
+}
+
+// newConfigContextsCmd keeps the earlier name of get-contexts working without
+// listing it in help.
 func newConfigContextsCmd(s *appState) *cobra.Command {
 	return &cobra.Command{
-		Use:   "contexts",
-		Short: "List configured contexts and which one is current",
-		Args:  cobra.NoArgs,
-		RunE: func(cmd *cobra.Command, _ []string) error {
-			file, ok, err := config.ReadFile(s.cfgDir)
-			if err != nil {
-				return cerrors.Wrap(err, cerrors.CategoryConfig, "CONFIG_READ", "failed to read config")
-			}
-			if !ok {
-				return s.emitList([]any{}, pageInfo{})
-			}
-			items := make([]map[string]any, 0, len(file.Contexts))
-			for _, c := range file.Contexts {
-				items = append(items, map[string]any{
-					"name":     c.Name,
-					"base_url": c.BaseURL,
-					"org":      c.Org,
-					"current":  c.Name == file.CurrentContext,
-				})
-			}
-			return s.emitList(items, pageInfo{})
-		},
+		Use:    "contexts",
+		Short:  "List configured contexts and which one is current",
+		Hidden: true,
+		Args:   cobra.NoArgs,
+		RunE:   s.listContexts,
 	}
+}
+
+func (s *appState) listContexts(cmd *cobra.Command, _ []string) error {
+	file, ok, err := config.ReadFile(s.cfgDir)
+	if err != nil {
+		return cerrors.Wrap(err, cerrors.CategoryConfig, "CONFIG_READ", "failed to read config")
+	}
+	if !ok {
+		return s.emitList([]any{}, pageInfo{})
+	}
+	items := make([]map[string]any, 0, len(file.Contexts))
+	for _, c := range file.Contexts {
+		items = append(items, map[string]any{
+			"name":     c.Name,
+			"base_url": c.BaseURL,
+			"org":      c.Org,
+			"current":  c.Name == file.CurrentContext,
+		})
+	}
+	return s.emitList(items, pageInfo{})
 }
 
 func newConfigUseContextCmd(s *appState) *cobra.Command {
@@ -344,27 +370,89 @@ func newConfigUseContextCmd(s *appState) *cobra.Command {
 		Short: "Set the current context",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			name := args[0]
-			file, ok, err := config.ReadFile(s.cfgDir)
+			file, err := s.readConfigFile()
 			if err != nil {
-				return cerrors.Wrap(err, cerrors.CategoryConfig, "CONFIG_READ", "failed to read config")
+				return err
 			}
-			if !ok {
-				return cerrors.New(cerrors.CategoryConfig, "NO_CONFIG",
-					"no config file yet").WithNextSteps("openobserve-cli config init")
+			name, err := config.UseContext(&file, args[0])
+			if err != nil {
+				return err
 			}
-			nc, found := file.Context(name)
-			if !found {
-				return cerrors.Newf(cerrors.CategoryConfig, "UNKNOWN_CONTEXT",
-					"context %q is not defined", name).
-					WithHint(config.UnknownContextHint(name, file.ContextNames())).
-					WithNextSteps("openobserve-cli config contexts")
-			}
-			file.CurrentContext = nc.Name
 			if err := config.WriteFile(s.cfgDir, file); err != nil {
 				return cerrors.Wrap(err, cerrors.CategoryConfig, "CONFIG_WRITE", "failed to write config")
 			}
-			return s.emit(map[string]any{"current_context": nc.Name})
+			return s.emit(map[string]any{"current_context": name})
 		},
 	}
+}
+
+func newConfigDeleteContextCmd(s *appState) *cobra.Command {
+	return &cobra.Command{
+		Use:   "delete-context <name>",
+		Short: "Delete a context and its stored credential",
+		Long: "Delete a context from the config file, together with its stored credential\n" +
+			"(a password, token or browser session). The credential is kept when another\n" +
+			"context on the same server and authentication scheme still uses it. When the\n" +
+			"deleted context was current, the first remaining context becomes current.\n" +
+			"The only context cannot be deleted.",
+		Example: "  openobserve-cli config delete-context staging",
+		Args:    cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			file, err := s.readConfigFile()
+			if err != nil {
+				return err
+			}
+			target, err := config.DeleteContext(&file, args[0])
+			if err != nil {
+				return err
+			}
+			if err := config.WriteFile(s.cfgDir, file); err != nil {
+				return cerrors.Wrap(err, cerrors.CategoryConfig, "CONFIG_WRITE", "failed to write config")
+			}
+			// Only once the context is gone from the file, so a failed write
+			// never costs a credential a context still names.
+			forgetUnusedCredential(s.store, target, file.Contexts)
+			return s.emit(map[string]any{"context": target.Name, "status": "deleted"})
+		},
+	}
+}
+
+// readConfigFile reads the config file for a command that changes an existing
+// context.
+func (s *appState) readConfigFile() (config.File, error) {
+	file, ok, err := config.ReadFile(s.cfgDir)
+	if err != nil {
+		return config.File{}, cerrors.Wrap(err, cerrors.CategoryConfig, "CONFIG_READ", "failed to read config")
+	}
+	if !ok {
+		return config.File{}, cerrors.New(cerrors.CategoryConfig, "NO_CONFIG",
+			"no config file yet").WithNextSteps("openobserve-cli config init")
+	}
+	return file, nil
+}
+
+// credentialKey is the account a context's secret is stored under: the
+// server's host and the scheme a fresh process resolves from the file alone
+// (basic when the context names none). A browser-session context resolves to
+// the session scheme, so its captured session is keyed apart from a password
+// or token on the same server. Every context on one server and scheme shares
+// the key.
+func credentialKey(nc config.NamedContext) string {
+	return auth.AccountKey(nc.BaseURL, config.StoredContext(nc, config.Defaults{}).Auth.Scheme)
+}
+
+// forgetUnusedCredential removes the secret stored for old unless one of the
+// remaining contexts still resolves it: a team preset beside a personal
+// context, another organization on the same server, or another spelling of
+// the server shares the secret, and deleting it would sign that context out.
+// Errors are ignored on purpose; an orphan secret is harmless, while an error
+// here would suggest the delete did not take.
+func forgetUnusedCredential(store *auth.Store, old config.NamedContext, remaining []config.NamedContext) {
+	key := credentialKey(old)
+	for _, c := range remaining {
+		if credentialKey(c) == key {
+			return
+		}
+	}
+	_ = store.Delete(key)
 }

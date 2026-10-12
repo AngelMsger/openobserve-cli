@@ -244,7 +244,7 @@ func contextBaseURLMismatchError(name, ctxBaseURL, loggedInTo string) error {
 		WithHint("OPENOBSERVE_URL or --base-url overrode the server, but not the context name, "+
 			"so the context that would have been rewritten is not the one that was signed in to.").
 		WithNextSteps(
-			"openobserve-cli config contexts",
+			config.ListContextsStep(),
 			"Re-run `openobserve-cli auth login --browser` with a context whose base_url is "+
 				loggedInTo+" selected (--use-context <name>, or `config use-context <name>`).",
 			"openobserve-cli config init")
