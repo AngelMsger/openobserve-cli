@@ -151,17 +151,16 @@ done
 echo "ok   - ambiguous time windows exit 2 with BAD_TIME_RANGE"
 pass=$((pass + 1))
 
-# config init: a fresh setup, then a re-run that must announce the existing
-# config and ask edit/add/replace — here driving the "add" path to a 2nd context.
+# Exercise context persistence without touching the host credential store.
+# The interactive edit/add/replace wizard runs in Go tests with MockInit instead.
 CFG="$(mktemp -d)"
-printf '%s\ndefault\nbasic\nu@example.com\npw\n' "$URL" | "$BIN" --config "$CFG" config init >/dev/null 2>&1
-printf 'add\nprod\n%s\nteam-a\nbasic\nu@example.com\npw\n' "$URL" | "$BIN" --config "$CFG" config init >/dev/null 2>"$CFG/err"
-if grep -q "edit/add/replace" "$CFG/err" \
-   && "$BIN" --config "$CFG" config get-contexts 2>/dev/null | grep -q '"name": "prod"'; then
-  echo "ok   - config init asks edit/add/replace and adds a context"
+"$BIN" --config "$CFG" config set-context default --base-url "$URL" --auth-scheme basic --org default >/dev/null 2>&1
+"$BIN" --config "$CFG" config set-context prod --base-url "$URL" --auth-scheme basic --org default >/dev/null 2>"$CFG/err"
+if "$BIN" --config "$CFG" config get-contexts 2>/dev/null | grep -q '"name": "prod"'; then
+  echo "ok   - credential-free setup adds a second context"
   pass=$((pass + 1))
 else
-  echo "FAIL - config init add-context flow"; cat "$CFG/err" | head -5; exit 1
+  echo "FAIL - config set-context add-context flow"; cat "$CFG/err" | head -5; exit 1
 fi
 # The earlier name still lists; delete-context removes the added context, and
 # the only context left cannot be deleted.

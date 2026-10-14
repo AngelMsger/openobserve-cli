@@ -20,9 +20,9 @@ func (f failingKeyring) Delete(string, string) error        { return f.err }
 
 func TestResolveBrowserSessionFromSharedStore(t *testing.T) {
 	dir := t.TempDir()
-	// A refusing keychain routes Save to the file fallback — the same path a
-	// host with no usable keychain takes.
-	store := NewStoreWithBackend(dir, failingKeyring{errors.New("no keychain here")})
+	// A failed write can use the file fallback only when the keychain confirms
+	// that this account is absent; an unreadable keychain is not absence.
+	store := NewStoreWithBackend(dir, failingKeyring{keyring.ErrNotFound})
 	baseURL := "https://session-resolve-test.invalid"
 	blob, err := pkgauth.EncodeSession(pkgauth.Session{Cookies: "sid=abc"})
 	if err != nil {
@@ -46,7 +46,7 @@ func TestResolveBrowserSessionFromSharedStore(t *testing.T) {
 
 func TestResolveRejectsInvalidStoredBrowserSession(t *testing.T) {
 	dir := t.TempDir()
-	store := NewStoreWithBackend(dir, failingKeyring{errors.New("no keychain here")})
+	store := NewStoreWithBackend(dir, failingKeyring{keyring.ErrNotFound})
 	baseURL := "https://invalid-session-resolve-test.invalid"
 	if _, err := store.Save(AccountKey(baseURL, SchemeSession), "{}"); err != nil {
 		t.Fatal(err)
