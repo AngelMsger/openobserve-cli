@@ -1,8 +1,10 @@
 package app
 
 import (
+	"errors"
 	"reflect"
 
+	kitauth "github.com/angelmsger/agent-cli-kit/auth"
 	"github.com/angelmsger/openobserve-cli/internal/auth"
 	"github.com/angelmsger/openobserve-cli/internal/config"
 	"github.com/angelmsger/openobserve-cli/pkg/apiclient"
@@ -102,7 +104,7 @@ func completeLogin(s *appState, cfg config.Config, cred auth.Credential, service
 	}
 	backend, err := services.Save(cfg.BaseURL, cred)
 	if err != nil {
-		return "", cerrors.Wrap(err, cerrors.CategoryConfig, "CREDENTIAL_SAVE_FAILED", "credentials verified but could not be stored").WithNextSteps(constants.AppName+" doctor", constants.AppName+" auth login")
+		return "", credentialSaveFailure(err, backend)
 	}
 	if !reflect.DeepEqual(original, file) {
 		if err := services.Write(s.cfgDir, file); err != nil {
@@ -124,4 +126,32 @@ func verifyCredential(s *appState, cfg config.Config, cred auth.Credential) erro
 	}
 	_, err = client.Ping(ctx)
 	return err
+}
+
+// credentialSaveFailure preserves a successful backend write when cleanup of
+// another store failed. Login must not persist a new identity after this error.
+func credentialSaveFailure(cause error, backend string) error {
+	message := "credentials verified but storage could not be completed"
+	hint := "The verified credential was not stored. Restore host access to the OS keychain and config directory, then retry auth login with the same credential."
+	if backend != "" {
+		message = "credential stored, but credential-store cleanup failed"
+		hint = "The verified credential was stored, but another credential copy could not be removed. Restore host access to the OS keychain and config directory, then retry auth login with the same credential."
+	}
+	return cerrors.Wrap(cause, cerrors.CategoryConfig, "CREDENTIAL_SAVE_FAILED", message).
+		WithDetails(map[string]any{"credential_stored": backend != "", "stored_in": backend}).
+		WithHint(hint).
+		WithRecovery(kitauth.HostRecovery()).
+		WithNextSteps("Restore credential-store access on the host and retry the same login; do not acquire a replacement credential.")
+}
+
+func credentialLogoutFailure(cause error) error {
+	// Service-scope guards run before store access and retain their own recovery.
+	var existing *cerrors.CLIError
+	if errors.As(cause, &existing) {
+		return cause
+	}
+	return cerrors.Wrap(cause, cerrors.CategoryConfig, "LOGOUT_FAILED", "stored credential removal could not be completed").
+		WithHint("Restore host access to the OS keychain and config directory, then retry auth logout. Do not acquire a replacement credential.").
+		WithRecovery(kitauth.HostRecovery()).
+		WithNextSteps("Retry auth logout on the host after restoring credential-store access.")
 }

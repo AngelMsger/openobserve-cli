@@ -8,6 +8,7 @@ import (
 	"runtime"
 	"time"
 
+	kitauth "github.com/angelmsger/agent-cli-kit/auth"
 	"github.com/angelmsger/openobserve-cli/internal/auth"
 	"github.com/angelmsger/openobserve-cli/internal/config"
 	"github.com/angelmsger/openobserve-cli/pkg/apiclient"
@@ -93,8 +94,7 @@ func runBrowserLoginWith(s *appState, driver webauth.Driver) error {
 	// (e.g. a trailing slash, or a bare host:port from OPENOBSERVE_URL).
 	backend, err := auth.Save(cfg.BaseURL, cred, s.store)
 	if err != nil {
-		return cerrors.Wrap(err, cerrors.CategoryConfig, "SAVE_FAILED",
-			"captured the session but could not store it")
+		return browserSessionSaveFailure(err, backend)
 	}
 
 	// Storing the secret is only half the job: without `auth.scheme: session`
@@ -357,4 +357,20 @@ func profileRemoveFailed(err error, dir string) error {
 	return cerrors.Wrap(err, cerrors.CategoryConfig, "PROFILE_REMOVE_FAILED",
 		"removed the stored credential but could not remove the browser profile").
 		WithHint("Delete " + dir + " by hand to clear the remembered browser session.")
+}
+
+// Capturing a new session is not a credential-store recovery operation. Report
+// partial storage without directing the caller back through browser sign-in.
+func browserSessionSaveFailure(cause error, backend string) error {
+	message := "captured the session but storage could not be completed"
+	if backend != "" {
+		message = "stored the captured session, but credential-store cleanup failed"
+	}
+	recovery := kitauth.HostRecovery()
+	recovery.Action = "inspect_existing_session"
+	return cerrors.Wrap(cause, cerrors.CategoryConfig, "SAVE_FAILED", message).
+		WithDetails(map[string]any{"session_captured": true, "credential_stored": backend != "", "stored_in": backend, "scheme": auth.SchemeSession}).
+		WithHint("Restore host access to the credential store and inspect the existing session before attempting another capture. Do not sign in again or issue a replacement session solely because storage failed.").
+		WithRecovery(recovery).
+		WithNextSteps("Restore access to the host home directory and OS keychain.", "openobserve-cli --auth-scheme session auth status")
 }

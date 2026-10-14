@@ -165,8 +165,7 @@ func newAuthLogoutCmd(s *appState) *cobra.Command {
 				scheme = auth.SchemeBasic
 			}
 			if err := auth.ForgetForConfig(cfg, scheme, s.store); err != nil {
-				return cerrors.Wrap(err, cerrors.CategoryConfig, "LOGOUT_FAILED",
-					"failed to remove stored credential")
+				return credentialLogoutFailure(err)
 			}
 			profileRemoved, err := removeBrowserProfile(s.cfgDir)
 			if err != nil {

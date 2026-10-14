@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Preserve partial credential-save outcomes and return host credential-store recovery for failed login persistence or logout.
+
 ## [0.16.0] - 2026-10-12
 
 ### Added

@@ -1,6 +1,7 @@
 package app
 
 import (
+	"encoding/json"
 	"errors"
 	"os"
 	"path/filepath"
@@ -15,6 +16,7 @@ import (
 	cerrors "github.com/angelmsger/openobserve-cli/pkg/errors"
 	"github.com/angelmsger/openobserve-cli/pkg/webauth"
 	"github.com/angelmsger/openobserve-cli/pkg/webauth/cdp"
+	"github.com/zalando/go-keyring"
 )
 
 func TestBrowserCaptureErrorMapsSentinels(t *testing.T) {
@@ -116,20 +118,20 @@ func TestBrowserLoginNormalizesBaseURL(t *testing.T) {
 	}
 }
 
-// failingKeyring refuses every operation, routing Store.Save/Load/Delete to
-// the file fallback so tests never touch the real OS keychain. Mirrors the
+// failingKeyring refuses writes but confirms that the account is absent,
+// permitting a safe file fallback without a real OS keychain. Mirrors the
 // unexported type of the same name in internal/auth's own tests, redefined
 // here because that one is package-private.
 type failingKeyring struct{}
 
 func (failingKeyring) Get(string, string) (string, error) {
-	return "", errors.New("no keychain in tests")
+	return "", keyring.ErrNotFound
 }
 func (failingKeyring) Set(string, string, string) error {
 	return errors.New("no keychain in tests")
 }
 func (failingKeyring) Delete(string, string) error {
-	return errors.New("no keychain in tests")
+	return keyring.ErrNotFound
 }
 
 // newTestAppState builds an appState with the given (possibly un-normalized)
@@ -503,9 +505,8 @@ func TestAuthLogoutRemovesTheSessionCredential(t *testing.T) {
 	if err := cmd.RunE(cmd, nil); err != nil {
 		t.Fatalf("auth logout: %v", err)
 	}
-	// The test store's keychain backend always fails, so a missing secret
-	// surfaces as a store-access error rather than ErrSecretNotFound; what
-	// matters is that the secret is no longer loadable when it was a moment ago.
+	// The fake keychain confirms absence; the file-backed session must no
+	// longer be loadable after logout.
 	if secret, err := s.store.Load(key); err == nil {
 		t.Fatalf("the captured session survived logout (still loads %d bytes); "+
 			"logout reported success while leaving the credential in the store", len(secret))
@@ -630,5 +631,39 @@ func TestBrowserLoginEquivalentURLKeepsCredentialKey(t *testing.T) {
 	fresh.Auth = nc.Auth
 	if _, err := auth.Resolve(fresh, config.Secrets{}, s.store); err != nil {
 		t.Fatalf("equivalent URL orphaned browser session: %v", err)
+	}
+}
+
+func TestBrowserSessionSaveFailurePreservesOutcome(t *testing.T) {
+	for _, backend := range []string{"", "keychain"} {
+		cause := errors.New("private session diagnostic")
+		err := browserSessionSaveFailure(cause, backend)
+		ce := cerrors.AsCLIError(err)
+		details, _ := ce.Details.(map[string]any)
+		if !errors.Is(err, cause) || ce.Code != "SAVE_FAILED" || ce.Retryable || ce.Recovery == nil || ce.Recovery.Scope != "host" || ce.Recovery.Action != "inspect_existing_session" || details["credential_stored"] != (backend != "") || details["stored_in"] != backend {
+			t.Fatalf("lost partial session outcome: %+v", ce)
+		}
+		raw, _ := json.Marshal(ce.Payload())
+		if strings.Contains(string(raw), cause.Error()) || strings.Contains(strings.Join(ce.NextSteps, " "), "login --browser") {
+			t.Fatalf("unsafe session recovery: %s", raw)
+		}
+	}
+}
+
+func TestBrowserSaveFailureDoesNotPersistIdentity(t *testing.T) {
+	s := newTestAppState(t, "https://o2.example.com", "")
+	blocked := filepath.Join(t.TempDir(), "not-a-directory")
+	if err := os.WriteFile(blocked, []byte("fixture"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	s.store = auth.NewStoreWithBackend(blocked, failingKeyring{})
+	driver := &fakeDriver{sess: pkgauth.Session{Cookies: "session=private", Email: "ops@example.com"}}
+	err := runBrowserLoginWith(s, driver)
+	ce := cerrors.AsCLIError(err)
+	if err == nil || ce.Code != "SAVE_FAILED" || ce.Recovery == nil || ce.Recovery.Scope != "host" {
+		t.Fatalf("lost store recovery: %v", err)
+	}
+	if _, err := os.Stat(config.ConfigFilePath(s.cfgDir)); !os.IsNotExist(err) {
+		t.Fatalf("failed session storage persisted identity: %v", err)
 	}
 }
