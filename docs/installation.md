@@ -269,8 +269,11 @@ and `source_context` (when the source is a context). States are `available`
 (verified preview), `reused`, `unchanged`, or `unavailable`. The last two do not
 establish successful authentication: run the check `next_steps` names
 (`auth status`). No reusable login is a normal no-change result. Network,
-permission and credential-store failures retain their structured errors instead
-of suggesting a fresh login.
+permission and credential-store failures on the context itself, on contexts
+under its own scheme, or on an explicitly selected source retain their
+structured errors instead of suggesting a fresh login; while checking stored
+secrets or other schemes they leave the earlier answer in place, with its
+`reason`.
 
 Several different verified logins return `AUTH_REUSE_AMBIGUOUS` with
 `details.candidates`; repeat with `--from-context <name>`, `--from-scheme

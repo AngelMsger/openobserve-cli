@@ -1,6 +1,7 @@
 package app
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"os"
@@ -673,12 +674,23 @@ func TestBrowserSaveFailureDoesNotPersistIdentity(t *testing.T) {
 	}
 }
 
+// memKeyring is an in-memory keychain, so a test never reaches the host's.
+type memKeyring map[string]string
+
+func (m memKeyring) Get(_, account string) (string, error) {
+	if v, ok := m[account]; ok {
+		return v, nil
+	}
+	return "", keyring.ErrNotFound
+}
+func (m memKeyring) Set(_, account, secret string) error { m[account] = secret; return nil }
+func (m memKeyring) Delete(_, account string) error      { delete(m, account); return nil }
+
 // A browser sign-in does not silently replace a long-lived login that still
 // works: it asks for --replace first, before opening a browser.
 func TestRunBrowserLoginAsksBeforeReplacingAWorkingLogin(t *testing.T) {
-	keyring.MockInit()
 	s := newTestAppState(t, "https://o2.example.com", auth.SchemeBasic)
-	s.store = auth.NewStore(s.cfgDir)
+	s.store = auth.NewStoreWithBackend(s.cfgDir, memKeyring{})
 	writeContext(t, s.cfgDir, config.NamedContext{Name: config.DefaultContextName, BaseURL: "https://o2.example.com", Org: "default",
 		Auth: config.AuthConfig{Scheme: auth.SchemeBasic, Username: "old@example.com"}})
 	if _, err := auth.Save("https://o2.example.com", auth.Credential{Scheme: auth.SchemeBasic, Username: "old@example.com", Secret: "pw"}, s.store); err != nil {
@@ -717,10 +729,24 @@ func TestRunBrowserLoginAsksBeforeReplacingAWorkingLogin(t *testing.T) {
 	if nc, _ = file.Context(config.DefaultContextName); nc.Auth.Username != "old@example.com" {
 		t.Fatalf("second sign-in replaced the username: %+v", nc)
 	}
+
+	// Once the session expires, reuse returns to the password left behind (S15).
+	s.resolved = loadFromDisk(t, s.cfgDir)
+	s.resolved.ActiveContext = config.DefaultContextName
+	services := s.reuseServices()
+	services.Verify = func(_ context.Context, cfg config.Config, cred auth.Credential) error {
+		if cred.Scheme == auth.SchemeBasic && cred.Username == "old@example.com" && cred.Secret == "pw" {
+			return nil
+		}
+		return cerrors.New(cerrors.CategoryAuth, "HTTP_UNAUTHORIZED", "expired").WithHTTPStatus(401)
+	}
+	r, err := reuseAuthentication(s, reuseOptions{}, services)
+	if err != nil || r.State != "reused" || r.Scheme != auth.SchemeBasic || r.Username != "old@example.com" {
+		t.Fatalf("reuse after expiry: %+v %v", r, err)
+	}
 }
 
 func TestRunBrowserLoginReplaceSkipsTheCheck(t *testing.T) {
-	keyring.MockInit()
 	s := newTestAppState(t, "https://o2.example.com", auth.SchemeBasic)
 	writeContext(t, s.cfgDir, config.NamedContext{Name: config.DefaultContextName, BaseURL: "https://o2.example.com", Org: "default",
 		Auth: config.AuthConfig{Scheme: auth.SchemeBasic, Username: "old@example.com"}})
