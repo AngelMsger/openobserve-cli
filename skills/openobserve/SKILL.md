@@ -181,6 +181,12 @@ semantics, credential URL overrides, and failure recovery.
 
 ## Reuse existing authentication
 
-Before repeating login, preview `openobserve-cli --use-context <target> auth reuse
---dry-run`, then apply. Keep the separate `auth status` check. See
-[reuse and ambiguity recovery](references/getting-started.md#reuse-existing-authentication).
+A context without a working login can adopt one already verified for the same
+service, preferring a long-lived password or token over a browser session.
+Workspace tools apply this during setup. Elsewhere the CLI lists `auth reuse`
+ahead of any sign-in step, including after an HTTP 401, and its result names the
+next step and the login it used (`scheme`, `username`). A working login is never
+replaced automatically; `--from-context` and `--from-scheme` select one
+explicitly. `auth login --browser` asks for `--replace` before replacing a
+password or token login that still works: do not add `--replace` for the user.
+See [reuse and ambiguity recovery](references/getting-started.md#reuse-existing-authentication).

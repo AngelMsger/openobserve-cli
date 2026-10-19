@@ -19,6 +19,7 @@ func newAuthCmd(s *appState) *cobra.Command {
 func newAuthLoginCmd(s *appState) *cobra.Command {
 	var useBrowser bool
 	var freshProfile bool
+	var replace bool
 	cmd := &cobra.Command{
 		Use:   "login",
 		Short: "Store credentials for the active context (interactive)",
@@ -31,7 +32,14 @@ func newAuthLoginCmd(s *appState) *cobra.Command {
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			if useBrowser {
-				return runBrowserLogin(s, freshProfile)
+				return runBrowserLogin(s, freshProfile, replace)
+			}
+			if replace {
+				return cerrors.New(cerrors.CategoryUsage, "REPLACE_NEEDS_BROWSER",
+					"--replace only applies to browser sign-in").
+					WithHint("It lets a browser session replace a long-lived login that still works.").
+					WithNextSteps("openobserve-cli auth login --browser --replace",
+						"openobserve-cli auth login")
 			}
 			// --fresh-profile only means anything to the browser driver.
 			// Silently ignoring it would hide a typo'd invocation behind an
@@ -107,6 +115,8 @@ func newAuthLoginCmd(s *appState) *cobra.Command {
 		"Sign in through a browser window and store the captured session")
 	cmd.Flags().BoolVar(&freshProfile, "fresh-profile", false,
 		"Use a throwaway browser profile instead of the remembered one")
+	cmd.Flags().BoolVar(&replace, "replace", false,
+		"With --browser, replace a password or token login that still works")
 	return cmd
 }
 

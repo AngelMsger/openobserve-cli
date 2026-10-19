@@ -13,6 +13,8 @@ run() {
 require() { [[ "$1" == *"$2"* ]] || { echo "FAIL: expected $2" >&2; exit 1; }; }
 out="$(run config set-context team --base-url https://offline.invalid/deploy --auth-scheme basic  --dry-run)"
 require "$out" '"dry_run": true'
+# A context without an identity is offered reuse before any sign-in step.
+require "$out" "--use-context 'team' auth reuse"
 [[ ! -e "$WORK/config/config.yaml" ]]
 out="$(env -i PATH="$PATH" HOME="$WORK" NO_COLOR=1 OPENOBSERVE_CLI_NO_UPDATE_NOTIFIER=1 OPENOBSERVE_CONTEXT=unconfigured \
   OPENOBSERVE_PASSWORD=do-not-save OPENOBSERVE_EMAIL=do-not-save \

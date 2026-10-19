@@ -79,6 +79,11 @@ func newDoctorCmd(s *appState) *cobra.Command {
 				"version": versionString(),
 				"checks":  checks,
 			}
+			if step := cfg.ReuseStep; step != "" && serverOK && !connOK && !storeInaccessible(checks) {
+				// A stored login may replace a missing or rejected one; reuse reads
+				// the same store, so an unreadable store is recovered on the host.
+				report["next_steps"] = []string{step}
+			}
 			// Release-update check: informational only, it never affects health
 			// and never fails the command — being out of date is not a fault.
 			if !skipUpdate {
@@ -185,6 +190,15 @@ func updateContext(s *appState) (context.Context, context.CancelFunc) {
 func containsOrg(orgs []apiclient.Org, want string) bool {
 	for _, o := range orgs {
 		if o.Identifier == want {
+			return true
+		}
+	}
+	return false
+}
+
+func storeInaccessible(checks []doctorCheck) bool {
+	for _, c := range checks {
+		if c.Status == "inaccessible" {
 			return true
 		}
 	}

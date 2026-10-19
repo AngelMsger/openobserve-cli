@@ -47,11 +47,15 @@ const (
 type Config struct {
 	// CredentialBaseURL preserves an equivalent stored URL's native lookup key.
 	// It is runtime-only and never changes the request destination.
-	CredentialBaseURL string     `yaml:"-" json:"-"`
-	BaseURL           string     `yaml:"server" config:"server"`
-	Org               string     `yaml:"org" config:"org"`
-	Auth              AuthConfig `yaml:"auth"`
-	Defaults          Defaults   `yaml:"defaults"`
+	CredentialBaseURL string `yaml:"-" json:"-"`
+	// ReuseStep is the `auth reuse` command that goes before any sign-in step
+	// for this context, or "" when the file offers nothing to reuse. It is
+	// runtime-only, computed offline from the configuration file.
+	ReuseStep string     `yaml:"-" json:"-"`
+	BaseURL   string     `yaml:"server" config:"server"`
+	Org       string     `yaml:"org" config:"org"`
+	Auth      AuthConfig `yaml:"auth"`
+	Defaults  Defaults   `yaml:"defaults"`
 }
 
 // Secrets holds credentials observed in non-file layers. Empty fields mean the

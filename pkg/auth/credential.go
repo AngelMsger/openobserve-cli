@@ -33,6 +33,9 @@ const (
 	SchemeSession = "session"
 )
 
+// MissingStep is the last recovery step when no stored secret is visible.
+const MissingStep = "Only if the host retry also reports missing credentials, run `" + constants.AppName + " config init` in the user's terminal or set OPENOBSERVE_* environment variables."
+
 func init() {
 	kit.Register(&kit.Product{
 		Schemes: []kit.Scheme{
@@ -40,13 +43,13 @@ func init() {
 				Missing: "basic auth requires both an email and a password"},
 			{Name: SchemeToken, Kind: kit.Custom, MissingCode: "AUTH_NO_TOKEN",
 				Missing: "no token configured", Header: tokenHeader},
-			{Name: SchemeSession, Kind: kit.Custom,
+			{Name: SchemeSession, Kind: kit.Custom, Session: true,
 				Validate: validateSession, Decorate: decorateSession},
 		},
 		DefaultScheme:    SchemeBasic,
 		Name:             "OpenObserve",
 		Doctor:           constants.AppName + " doctor",
-		MissingStep:      "Only if the host retry also reports missing credentials, run `" + constants.AppName + " config init` in the user's terminal or set OPENOBSERVE_* environment variables.",
+		MissingStep:      MissingStep,
 		InaccessibleStep: "Do not run `config init` unless the same check also fails in the host environment.",
 		ListSchemes:      true,
 	})
