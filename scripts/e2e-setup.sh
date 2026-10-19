@@ -25,6 +25,8 @@ require "$out" '"current_context": "team"'
 [[ ! -e "$WORK/config/credentials" ]]
 out="$(run config set-context team)"; require "$out" '"changed": false'
 out="$(run auth guide)"; require "$out" 'https://help.invalid/team-tokens'; require "$out" '"source": "file"'; require "$out" "--use-context 'team' auth login"
+require "$out" "--use-context 'team' auth reuse"
+[[ "$out" != *"--use-context 'team' --use-context"* ]] || { echo 'FAIL: auth guide repeats --use-context' >&2; exit 1; }
 if run config set-context team --base-url https://other.invalid >out.json 2>error.json; then
   echo 'FAIL: conflicting setup succeeded' >&2; exit 1
 fi
