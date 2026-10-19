@@ -255,11 +255,17 @@ secrets or environment credentials are copied. Both source and unrelated context
 remain unchanged. Configuration or credential changes during verification stop
 the write.
 
-Checks the command did not make before (of a labelled destination, of stored
-secrets, of other schemes) run within ten seconds of the start, or the
-`--timeout` when shorter, and only adopt on reliable evidence that the destination
-has no working login: the keychain itself answered during this run. Otherwise the
-earlier answer stands, with its `reason`. A scheme supplied by `--auth-scheme`,
+Reuse first gives the answer earlier versions gave: contexts under the
+destination's own scheme are checked as before, and their failures keep their
+structured errors. Every check those versions did not make (of a destination
+whose username is only a label, past a missing secret, of stored secrets, of
+other schemes) runs after it, within ten seconds of the start or the
+`--timeout` when shorter, and may only replace that answer with a better one. It
+adopts only on reliable evidence that the destination has no working login: the
+scheme authenticates with a username and the destination records none, or the
+keychain itself answered during this run. When such a check fails, times out or
+finds no reliable evidence, the earlier answer stands, errors included, with its
+`reason` when it is a no-change result. A scheme supplied by `--auth-scheme`,
 `OPENOBSERVE_AUTH_SCHEME`, `.env` or a credential variable keeps reuse within that
 scheme.
 
@@ -269,11 +275,9 @@ and `source_context` (when the source is a context). States are `available`
 (verified preview), `reused`, `unchanged`, or `unavailable`. The last two do not
 establish successful authentication: run the check `next_steps` names
 (`auth status`). No reusable login is a normal no-change result. Network,
-permission and credential-store failures on the context itself, on contexts
-under its own scheme, or on an explicitly selected source retain their
-structured errors instead of suggesting a fresh login; while checking stored
-secrets or other schemes they leave the earlier answer in place, with its
-`reason`.
+permission and credential-store failures in the checks earlier versions made,
+and on an explicitly selected source, keep their structured errors instead of
+suggesting a fresh login.
 
 Several different verified logins return `AUTH_REUSE_AMBIGUOUS` with
 `details.candidates`; repeat with `--from-context <name>`, `--from-scheme
