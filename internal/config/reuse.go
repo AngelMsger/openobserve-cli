@@ -60,7 +60,7 @@ func reuseStep(cfg Config, sources map[string]string, file File, name string) st
 		runtimeUser = cfg.Auth.Username
 	}
 	supplied := SchemeSupplied(sources)
-	if !reuse.MayReuse(target, ReuseContexts(file), runtimeUser, supplied) {
+	if !reuse.MayReuse(target, ReuseContexts(file), runtimeUser, supplied, validUnder(storedCfg)) {
 		return ""
 	}
 	step := constants.AppName + " --use-context " + kit.QuoteArg(stored.Name) + " auth reuse"
@@ -68,4 +68,14 @@ func reuseStep(cfg Config, sources map[string]string, file File, name string) st
 		step += " --auth-scheme " + cfg.Auth.Scheme
 	}
 	return step
+}
+
+// validUnder reports whether the context stays a valid configuration under a
+// scheme, so reuse is not offered for a scheme its deployment rejects.
+func validUnder(cfg Config) func(string) bool {
+	return func(scheme string) bool {
+		c := cfg
+		c.Auth.Scheme = scheme
+		return ValidateService(c) == nil
+	}
 }
