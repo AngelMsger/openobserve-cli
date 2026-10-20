@@ -746,6 +746,29 @@ func TestRunBrowserLoginAsksBeforeReplacingAWorkingLogin(t *testing.T) {
 	}
 }
 
+// A store this host cannot read keeps its own recovery: the session could not
+// be stored there either, so no browser opens.
+func TestRunBrowserLoginStopsWhenTheStoreCannotBeRead(t *testing.T) {
+	s := newTestAppState(t, "https://o2.example.com", auth.SchemeBasic)
+	s.store = auth.NewStoreWithBackend(s.cfgDir, &loginContractBackend{getErr: errors.New("keychain locked")})
+	writeContext(t, s.cfgDir, config.NamedContext{Name: config.DefaultContextName, BaseURL: "https://o2.example.com", Org: "default",
+		Auth: config.AuthConfig{Scheme: auth.SchemeBasic, Username: "old@example.com"}})
+	browserReplaceVerify = func(*appState, config.Config, auth.Credential) error {
+		t.Fatal("verified without a readable credential")
+		return nil
+	}
+	t.Cleanup(func() { browserReplaceVerify = verifyCredential })
+
+	d := &fakeDriver{sess: pkgauth.Session{Cookies: "auth_tokens=x"}}
+	err := runBrowserLoginWith(s, d, false)
+	if ce := cerrors.AsCLIError(err); ce == nil || ce.Code != "CREDENTIAL_STORE_INACCESSIBLE" || ce.Recovery == nil || ce.Recovery.Scope != "host" {
+		t.Fatalf("unreadable store: %v", err)
+	}
+	if d.loginURL != "" {
+		t.Fatal("a browser was opened although the session could not be stored")
+	}
+}
+
 func TestRunBrowserLoginReplaceSkipsTheCheck(t *testing.T) {
 	s := newTestAppState(t, "https://o2.example.com", auth.SchemeBasic)
 	writeContext(t, s.cfgDir, config.NamedContext{Name: config.DefaultContextName, BaseURL: "https://o2.example.com", Org: "default",
