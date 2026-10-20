@@ -227,10 +227,10 @@ func persistSessionScheme(s *appState, baseURL, org, email string) (string, erro
 // still verifies it refuses with BROWSER_LOGIN_REPLACES_LOGIN unless replace
 // is set: a browser session expires, and the working login would only be left
 // behind. A login the service rejects, or one that is absent or incomplete, is
-// replaced without asking. A store this host cannot read returns its error
-// before a browser opens: the captured session could not be stored either,
-// because credstore keeps a failed keychain write off the file unless the
-// keychain confirms the account is missing.
+// replaced without asking. A store this host cannot read returns its error and
+// host recovery before a browser opens: a session captured there would usually
+// fail to store too, since credstore writes the file only when the keychain
+// confirms the account is missing.
 func longLivedLoginToReplace(s *appState, replace bool) (string, error) {
 	file, _, err := config.ReadFile(s.cfgDir)
 	if err != nil {

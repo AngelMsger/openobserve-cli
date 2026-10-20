@@ -185,7 +185,8 @@ keychain could not be read here, retry on the host before signing in.
 
 `auth login --browser` on a context whose password or token login still works
 stops with `BROWSER_LOGIN_REPLACES_LOGIN`; that login is usable as it is. Only the
-user decides to pass `--replace`. When the keychain cannot be read here, it stops
-with `CREDENTIAL_STORE_INACCESSIBLE` before opening a browser; retry on the host. A browser sign-in never overwrites the username
+user decides to pass `--replace`. When that check cannot read the stored password
+or token, it stops with `CREDENTIAL_STORE_INACCESSIBLE` before opening a browser;
+retry on the host. A browser sign-in never overwrites the username
 the context records, so `auth reuse` can return to the password once the session
 expires.

@@ -42,9 +42,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   even while it works.
 - `auth login --browser` stops with `BROWSER_LOGIN_REPLACES_LOGIN` (exit 11)
   before opening a browser when the context's password or token login still
-  works; `--replace` signs in anyway and reports `replaced_scheme`. When the
-  credential store cannot be read, it stops with `CREDENTIAL_STORE_INACCESSIBLE`
-  before opening a browser, since the session could not be stored either.
+  works; `--replace` signs in anyway and reports `replaced_scheme`. When that
+  check cannot read the stored password or token, it stops with
+  `CREDENTIAL_STORE_INACCESSIBLE` and its host recovery before opening a browser.
 
 ## [0.16.1] - 2026-10-19
 

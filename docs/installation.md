@@ -290,9 +290,9 @@ credentials.
 file shows that a stored login could apply. `auth login --browser` on a context
 whose password or token login still works stops with
 `BROWSER_LOGIN_REPLACES_LOGIN` unless `--replace` is given, and never overwrites
-the username the context records. When the credential store cannot be read
-here, it stops with `CREDENTIAL_STORE_INACCESSIBLE` before opening a browser:
-the session could not be stored either.
+the username the context records. When that check cannot read the context's
+stored password or token, it stops with `CREDENTIAL_STORE_INACCESSIBLE` before
+opening a browser; retry on the host, or pass `--replace` to skip the check.
 
 Equivalent service URL overrides preserve the persisted native credential lookup
 key without redirecting requests or copying secrets. Logout removes that same
