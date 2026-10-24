@@ -49,9 +49,13 @@ func newDoctorCmd(s *appState) *cobra.Command {
 			add("server_configured", serverOK, statusForOK(serverOK, "missing"), cfg.BaseURL, "")
 
 			credOK := false
+			// A stored login may replace a missing or rejected one; reuse reads the
+			// same store, so an unreadable store or an outage is recovered otherwise.
+			reuseHelps := false
 			client, err := s.newClient()
 			if err != nil {
 				add("credentials", false, diagnosticStatus(err), err.Error(), diagnosticRecoveryScope(err))
+				reuseHelps = diagnosticStatus(err) != "inaccessible"
 			} else {
 				credOK = true
 				add("credentials", true, "ok", "scheme "+cfg.Auth.Scheme, "")
@@ -64,6 +68,8 @@ func newDoctorCmd(s *appState) *cobra.Command {
 				orgs, perr := client.Ping(ctx)
 				if perr != nil {
 					add("connectivity", false, diagnosticStatus(perr), perr.Error(), diagnosticRecoveryScope(perr))
+					ce := cerrors.AsCLIError(perr)
+					reuseHelps = ce.Category == cerrors.CategoryAuth && ce.HTTPStatus == 401
 				} else {
 					connOK = true
 					add("connectivity", true, "ok", "reached and authenticated", "")
@@ -78,6 +84,9 @@ func newDoctorCmd(s *appState) *cobra.Command {
 				"healthy": healthy,
 				"version": versionString(),
 				"checks":  checks,
+			}
+			if step := cfg.ReuseStep; step != "" && serverOK && reuseHelps {
+				report["next_steps"] = []string{step}
 			}
 			// Release-update check: informational only, it never affects health
 			// and never fails the command — being out of date is not a fault.

@@ -240,25 +240,59 @@ openobserve-cli --use-context team auth reuse
 openobserve-cli --use-context team auth status
 ```
 
-Reuse matches the complete normalized service URL, authentication scheme and
-provider scope (deployment flavor, organization or tenant where applicable).
-It verifies the source credential before filling missing destination identity.
-A populated destination identity is preserved. Credentials stay in their native
-store; no secrets or environment credentials are copied. Both source and unrelated
-contexts remain unchanged. Configuration changes during verification stop the write.
+Reuse matches the complete normalized service URL and organization before any
+credential access, then prefers a long-lived credential to a browser session,
+which expires. It looks at contexts under the destination's scheme first, then at
+any password or token for the service, including one stored for it that no
+context points at (paired with the usernames recorded on the service, and only
+when every context on that credential key is this same service), and at a browser
+session last. A username recorded under `session` or `token` is only a label; a
+destination with a label adopts a password only for that username. A destination
+with a basic username, and any login that still works, is kept: a working browser
+session is replaced only on request (`--from-scheme basic`, or `--from-context`
+naming a password or token context). Credentials stay in their native store; no
+secrets or environment credentials are copied. Both source and unrelated contexts
+remain unchanged. Configuration or credential changes during verification stop
+the write.
 
-The JSON result reports `context`, `state`, `changed`, `verified`, `dry_run` and,
-when selected, `source_context`. States are `available` (verified preview),
-`reused`, `unchanged`, or `unavailable`. The last two do not establish successful
-authentication: always retain the separate `auth status` check. No reusable
-identity is a normal no-change result. Network, permission and credential-store
-failures retain their structured errors instead of suggesting a fresh login.
+Reuse first gives the answer earlier versions gave: contexts under the
+destination's own scheme are checked as before, and their failures keep their
+structured errors. Every check those versions did not make (of a destination
+whose username is only a label, past a missing secret, of stored secrets, of
+other schemes) runs after it, within ten seconds of the start or the
+`--timeout` when shorter, and may only replace that answer with a better one. It
+adopts only on reliable evidence that the destination has no working login: the
+scheme authenticates with a username and the destination records none, or the
+keychain itself answered during this run. When such a check fails, times out or
+finds no reliable evidence, the earlier answer stands, errors included, with its
+`reason` when it is a no-change result. A scheme supplied by `--auth-scheme`,
+`OPENOBSERVE_AUTH_SCHEME`, `.env` or a credential variable keeps reuse within that
+scheme.
 
-Multiple different verified identities return `AUTH_REUSE_AMBIGUOUS`; discover
-context names with `config get-contexts`, then repeat with `--from-context <name>`.
-The command does not replace identities or switch authentication schemes. As
-with native `auth login`, updating this CLI's own settings remains available
-in remote read-only mode; `--dry-run` never changes settings or credentials.
+The JSON result reports `context`, `state`, `changed`, `verified`, `dry_run`,
+`next_steps` and, when a source was selected, `scheme`, `username` (for basic)
+and `source_context` (when the source is a context). States are `available`
+(verified preview), `reused`, `unchanged`, or `unavailable`. The last two do not
+establish successful authentication: run the check `next_steps` names
+(`auth status`). No reusable login is a normal no-change result. Network,
+permission and credential-store failures in the checks earlier versions made,
+and on an explicitly selected source, keep their structured errors instead of
+suggesting a fresh login.
+
+Several different verified logins return `AUTH_REUSE_AMBIGUOUS` with
+`details.candidates`; repeat with `--from-context <name>`, `--from-scheme
+<scheme>`, or both. As with native `auth login`, updating this CLI's own settings
+remains available in remote read-only mode; `--dry-run` never changes settings or
+credentials.
+
+`config set-context`, `auth guide`, missing-credential errors, `doctor` and HTTP
+401 errors list `auth reuse` before any sign-in step when the configuration
+file shows that a stored login could apply. `auth login --browser` on a context
+whose password or token login still works stops with
+`BROWSER_LOGIN_REPLACES_LOGIN` unless `--replace` is given, and never overwrites
+the username the context records. When that check cannot read the context's
+stored password or token, it stops with `CREDENTIAL_STORE_INACCESSIBLE` before
+opening a browser; retry on the host, or pass `--replace` to skip the check.
 
 Equivalent service URL overrides preserve the persisted native credential lookup
 key without redirecting requests or copying secrets. Logout removes that same

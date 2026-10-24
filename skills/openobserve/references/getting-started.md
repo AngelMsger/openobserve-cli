@@ -163,10 +163,30 @@ For preset team services, use `config set-context` and `auth guide` before perso
 
 ## Reuse existing authentication
 
-`openobserve-cli --use-context team auth reuse --dry-run` previews association from
-an existing context with the same complete service URL, scheme and provider scope.
-Apply without `--dry-run`, then verify with `auth status`. No login, token copy,
-current-context switch or replacement of a populated identity occurs. A different
-verified source can be selected with `--from-context` after `config get-contexts`.
-`AUTH_REUSE_AMBIGUOUS` requires choosing an identity; store/network/permission
-errors require their named recovery, not automatic reauthentication.
+`openobserve-cli --use-context team auth reuse` points a context without a
+working login at one this machine already verified for the same complete service
+URL and organization; `--dry-run` previews the same decision. It looks, in order,
+at contexts under the context's own scheme, then at any long-lived credential
+(a password or token, including one stored for this service that no context
+points at any more, paired with the usernames recorded on the service), and at a
+browser session last. A username under the `session` or `token` scheme is only a
+label: it does not stop reuse, and a context with a label only adopts a password
+for that same username. A working login, including a working browser session, is
+never replaced automatically; `--from-scheme basic` (or `--from-context <name>`)
+replaces a session explicitly. The result reports `scheme`, `username` and, when
+the source is a context, `source_context`; its `next_steps` name the check to run
+next (`auth status`). No secret is copied and the current context does not change.
+
+`AUTH_REUSE_AMBIGUOUS` lists `details.candidates`; choose one with
+`--from-context <name>`, `--from-scheme <scheme>`, or both (the stored secret of
+that scheme paired with that context's username). Store, network and permission
+errors require their named recovery, not a new login. When the result says the
+keychain could not be read here, retry on the host before signing in.
+
+`auth login --browser` on a context whose password or token login still works
+stops with `BROWSER_LOGIN_REPLACES_LOGIN`; that login is usable as it is. Only the
+user decides to pass `--replace`. When that check cannot read the stored password
+or token, it stops with `CREDENTIAL_STORE_INACCESSIBLE` before opening a browser;
+retry on the host. A browser sign-in never overwrites the username
+the context records, so `auth reuse` can return to the password once the session
+expires.

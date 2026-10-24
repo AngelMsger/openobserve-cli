@@ -7,6 +7,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- `auth reuse` prefers a long-lived credential to a browser session. A context
+  without a working login (its session expired, was rejected or is absent)
+  adopts a password or token already verified for the same service and
+  organization, under any scheme: another context's, or one stored for this
+  service that no context points at any more, paired with the usernames the
+  service's contexts record. Contexts under the destination's own scheme still
+  come first and a browser session comes last. A working login, including a
+  working session, is never replaced automatically. A username under `session`
+  or `token` is now only a label: such a context is checked instead of being
+  reported `unchanged`, and a context on the same stored session no longer makes
+  the command fail when that session is gone. Checks the command did not make
+  before run within ten seconds (or `--timeout`), adopt only when the keychain
+  itself showed the destination has no working login, and otherwise leave the
+  earlier answer. A scheme supplied by flag, environment, `.env` or a credential
+  variable keeps reuse within it. The decision now comes from agent-cli-kit's
+  shared `reuse` package.
+- The `auth reuse` result adds `scheme`, `username` and `next_steps`;
+  `AUTH_REUSE_AMBIGUOUS` adds `details.candidates`.
+- `auth login --browser` never overwrites the username a context records; the
+  captured email is still reported.
+- `config set-context`, `auth guide`, missing-credential errors, `doctor` and
+  HTTP 401 errors list `auth reuse` before any sign-in step when the configuration
+  file shows that a stored login could apply. A 401 on a session context offers
+  `auth login --browser` instead of `config init`.
+
+### Added
+
+- `auth reuse --from-scheme <scheme>` selects the credential stored for the
+  service under that scheme; with `--from-context`, paired with that context's
+  username. An explicitly selected password or token replaces a browser session
+  even while it works.
+- `auth login --browser` stops with `BROWSER_LOGIN_REPLACES_LOGIN` (exit 11)
+  before opening a browser when the context's password or token login still
+  works; `--replace` signs in anyway and reports `replaced_scheme`. When that
+  check cannot read the stored password or token, it stops with
+  `CREDENTIAL_STORE_INACCESSIBLE` and its host recovery before opening a browser.
+
 ## [0.16.1] - 2026-10-19
 
 ### Changed

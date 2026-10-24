@@ -1,6 +1,7 @@
 package app
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"os"
@@ -215,7 +216,7 @@ func TestRunBrowserLoginNormalizesBeforeCapture(t *testing.T) {
 	for _, tc := range cases {
 		s := newTestAppState(t, tc.raw, "")
 		d := &fakeDriver{sess: pkgauth.Session{Cookies: "auth_tokens=x", Email: "ops@example.com"}}
-		if err := runBrowserLoginWith(s, d); err != nil {
+		if err := runBrowserLoginWith(s, d, false); err != nil {
 			t.Fatalf("%q: %v", tc.raw, err)
 		}
 		if d.loginURL != tc.wantLogin {
@@ -242,7 +243,7 @@ func TestRunBrowserLoginSavesUnderRawBaseURL(t *testing.T) {
 	raw := "o2.example.com:8080/"
 	s := newTestAppState(t, raw, "")
 	d := &fakeDriver{sess: pkgauth.Session{Cookies: "auth_tokens=x", Email: "ops@example.com"}}
-	if err := runBrowserLoginWith(s, d); err != nil {
+	if err := runBrowserLoginWith(s, d, false); err != nil {
 		t.Fatal(err)
 	}
 
@@ -291,7 +292,7 @@ func TestRunBrowserLoginPersistsSessionScheme(t *testing.T) {
 			d := &fakeDriver{sess: pkgauth.Session{
 				Cookies: "auth_tokens=captured", Email: "ops@example.com",
 			}}
-			if err := runBrowserLoginWith(s, d); err != nil {
+			if err := runBrowserLoginWith(s, d, false); err != nil {
 				t.Fatalf("runBrowserLoginWith: %v", err)
 			}
 
@@ -308,8 +309,12 @@ func TestRunBrowserLoginPersistsSessionScheme(t *testing.T) {
 				t.Fatalf("config file records scheme %q, want %q — nothing else writes it, "+
 					"so the captured session is unreachable", nc.Auth.Scheme, auth.SchemeSession)
 			}
-			if nc.Auth.Username != "ops@example.com" {
-				t.Errorf("username = %q, want the captured email", nc.Auth.Username)
+			wantUser := "ops@example.com"
+			if tc.scheme != "" {
+				wantUser = "old@example.com" // a recorded username is kept
+			}
+			if nc.Auth.Username != wantUser {
+				t.Errorf("username = %q, want %q", nc.Auth.Username, wantUser)
 			}
 
 			// 2. A fresh invocation resolves the captured session from it.
@@ -351,7 +356,7 @@ func TestRunBrowserLoginPreservesTheRestOfTheConfigFile(t *testing.T) {
 	}
 
 	d := &fakeDriver{sess: pkgauth.Session{Cookies: "auth_tokens=x", Email: "ops@example.com"}}
-	if err := runBrowserLoginWith(s, d); err != nil {
+	if err := runBrowserLoginWith(s, d, false); err != nil {
 		t.Fatal(err)
 	}
 
@@ -370,9 +375,10 @@ func TestRunBrowserLoginPreservesTheRestOfTheConfigFile(t *testing.T) {
 		t.Errorf("the unrelated context changed: %+v, want %+v", stg, before.Contexts[0])
 	}
 	prod, _ := after.Context("prod")
+	// The recorded username stays: it pairs with the basic secret left behind.
 	want := config.NamedContext{
 		Name: "prod", BaseURL: "https://prod.example.com", Org: "default",
-		Auth: config.AuthConfig{Scheme: auth.SchemeSession, Username: "ops@example.com"},
+		Auth: config.AuthConfig{Scheme: auth.SchemeSession, Username: "old@example.com"},
 	}
 	if prod != want {
 		t.Errorf("prod context = %+v, want %+v", prod, want)
@@ -408,7 +414,7 @@ func TestRunBrowserLoginRefusesToRewriteADifferentServersContext(t *testing.T) {
 	}
 
 	d := &fakeDriver{sess: pkgauth.Session{Cookies: "auth_tokens=x", Email: "ops@example.com"}}
-	err = runBrowserLoginWith(s, d)
+	err = runBrowserLoginWith(s, d, false)
 	if err == nil {
 		t.Fatal("browser login silently rewrote a context that points at a different server")
 	}
@@ -465,7 +471,7 @@ func TestRunBrowserLoginFreshContextWithTrailingSlashResolvesLater(t *testing.T)
 	d := &fakeDriver{sess: pkgauth.Session{
 		Cookies: "auth_tokens=captured", Email: "ops@example.com",
 	}}
-	if err := runBrowserLoginWith(s, d); err != nil {
+	if err := runBrowserLoginWith(s, d, false); err != nil {
 		t.Fatalf("a fresh context for the server just signed in to must be created: %v", err)
 	}
 
@@ -493,7 +499,7 @@ func TestRunBrowserLoginFreshContextWithTrailingSlashResolvesLater(t *testing.T)
 func TestAuthLogoutRemovesTheSessionCredential(t *testing.T) {
 	s := newTestAppState(t, "https://o2.example.com", "")
 	d := &fakeDriver{sess: pkgauth.Session{Cookies: "auth_tokens=x", Email: "ops@example.com"}}
-	if err := runBrowserLoginWith(s, d); err != nil {
+	if err := runBrowserLoginWith(s, d, false); err != nil {
 		t.Fatal(err)
 	}
 	key := auth.AccountKey(s.cfg().BaseURL, auth.SchemeSession)
@@ -593,7 +599,7 @@ func TestRunBrowserLoginWithNeverConsultsTheDisplayCheck(t *testing.T) {
 
 	s := newTestAppState(t, "https://o2.example.com", "")
 	d := &fakeDriver{sess: pkgauth.Session{Cookies: "auth_tokens=x", Email: "ops@example.com"}}
-	if err := runBrowserLoginWith(s, d); err != nil {
+	if err := runBrowserLoginWith(s, d, false); err != nil {
 		t.Fatalf("runBrowserLoginWith failed (display check should never have run): %v", err)
 	}
 	if calls != 0 {
@@ -618,7 +624,7 @@ func TestBrowserLoginEquivalentURLKeepsCredentialKey(t *testing.T) {
 	s.resolved.ActiveContext = config.DefaultContextName
 	writeContext(t, s.cfgDir, config.NamedContext{Name: config.DefaultContextName, BaseURL: "https://service.example.test/deploy", Auth: config.AuthConfig{Scheme: auth.SchemeBasic}})
 	driver := &fakeDriver{sess: pkgauth.Session{Cookies: "auth_tokens=x", Email: "ops@example.com"}}
-	if err := runBrowserLoginWith(s, driver); err != nil {
+	if err := runBrowserLoginWith(s, driver, false); err != nil {
 		t.Fatal(err)
 	}
 	file, _, err := config.ReadFile(s.cfgDir)
@@ -658,12 +664,121 @@ func TestBrowserSaveFailureDoesNotPersistIdentity(t *testing.T) {
 	}
 	s.store = auth.NewStoreWithBackend(blocked, failingKeyring{})
 	driver := &fakeDriver{sess: pkgauth.Session{Cookies: "session=private", Email: "ops@example.com"}}
-	err := runBrowserLoginWith(s, driver)
+	err := runBrowserLoginWith(s, driver, false)
 	ce := cerrors.AsCLIError(err)
 	if err == nil || ce.Code != "SAVE_FAILED" || ce.Recovery == nil || ce.Recovery.Scope != "host" {
 		t.Fatalf("lost store recovery: %v", err)
 	}
 	if _, err := os.Stat(config.ConfigFilePath(s.cfgDir)); !os.IsNotExist(err) {
 		t.Fatalf("failed session storage persisted identity: %v", err)
+	}
+}
+
+// memKeyring is an in-memory keychain, so a test never reaches the host's.
+type memKeyring map[string]string
+
+func (m memKeyring) Get(_, account string) (string, error) {
+	if v, ok := m[account]; ok {
+		return v, nil
+	}
+	return "", keyring.ErrNotFound
+}
+func (m memKeyring) Set(_, account, secret string) error { m[account] = secret; return nil }
+func (m memKeyring) Delete(_, account string) error      { delete(m, account); return nil }
+
+// A browser sign-in does not silently replace a long-lived login that still
+// works: it asks for --replace first, before opening a browser.
+func TestRunBrowserLoginAsksBeforeReplacingAWorkingLogin(t *testing.T) {
+	s := newTestAppState(t, "https://o2.example.com", auth.SchemeBasic)
+	s.store = auth.NewStoreWithBackend(s.cfgDir, memKeyring{})
+	writeContext(t, s.cfgDir, config.NamedContext{Name: config.DefaultContextName, BaseURL: "https://o2.example.com", Org: "default",
+		Auth: config.AuthConfig{Scheme: auth.SchemeBasic, Username: "old@example.com"}})
+	if _, err := auth.Save("https://o2.example.com", auth.Credential{Scheme: auth.SchemeBasic, Username: "old@example.com", Secret: "pw"}, s.store); err != nil {
+		t.Fatal(err)
+	}
+	verified := error(nil)
+	browserReplaceVerify = func(*appState, config.Config, auth.Credential) error { return verified }
+	t.Cleanup(func() { browserReplaceVerify = verifyCredential })
+
+	d := &fakeDriver{sess: pkgauth.Session{Cookies: "auth_tokens=x", Email: "sso@example.com"}}
+	err := runBrowserLoginWith(s, d, false)
+	if ce := cerrors.AsCLIError(err); ce == nil || ce.Code != "BROWSER_LOGIN_REPLACES_LOGIN" || cerrors.ExitCode(ce) != 11 {
+		t.Fatalf("working login: %v", err)
+	}
+	if d.loginURL != "" {
+		t.Fatal("a browser was opened before the confirmation")
+	}
+
+	verified = cerrors.New(cerrors.CategoryAuth, "HTTP_UNAUTHORIZED", "rejected").WithHTTPStatus(401)
+	if err := runBrowserLoginWith(s, d, false); err != nil {
+		t.Fatalf("rejected login: %v", err)
+	}
+	file, _, _ := config.ReadFile(s.cfgDir)
+	nc, _ := file.Context(config.DefaultContextName)
+	if nc.Auth.Scheme != auth.SchemeSession || nc.Auth.Username != "old@example.com" {
+		t.Fatalf("context after sign-in: %+v", nc)
+	}
+	if _, err := s.store.Load(auth.AccountKey("https://o2.example.com", auth.SchemeBasic)); err != nil {
+		t.Fatal("the long-lived secret was removed")
+	}
+	// A second browser sign-in keeps the recorded username too.
+	if err := runBrowserLoginWith(s, d, false); err != nil {
+		t.Fatal(err)
+	}
+	file, _, _ = config.ReadFile(s.cfgDir)
+	if nc, _ = file.Context(config.DefaultContextName); nc.Auth.Username != "old@example.com" {
+		t.Fatalf("second sign-in replaced the username: %+v", nc)
+	}
+
+	// Once the session expires, reuse returns to the password left behind (S15).
+	s.resolved = loadFromDisk(t, s.cfgDir)
+	s.resolved.ActiveContext = config.DefaultContextName
+	services := s.reuseServices()
+	services.Verify = func(_ context.Context, cfg config.Config, cred auth.Credential) error {
+		if cred.Scheme == auth.SchemeBasic && cred.Username == "old@example.com" && cred.Secret == "pw" {
+			return nil
+		}
+		return cerrors.New(cerrors.CategoryAuth, "HTTP_UNAUTHORIZED", "expired").WithHTTPStatus(401)
+	}
+	r, err := reuseAuthentication(s, reuseOptions{}, services)
+	if err != nil || r.State != "reused" || r.Scheme != auth.SchemeBasic || r.Username != "old@example.com" {
+		t.Fatalf("reuse after expiry: %+v %v", r, err)
+	}
+}
+
+// A store this host cannot read keeps its own recovery: the session could not
+// be stored there either, so no browser opens.
+func TestRunBrowserLoginStopsWhenTheStoreCannotBeRead(t *testing.T) {
+	s := newTestAppState(t, "https://o2.example.com", auth.SchemeBasic)
+	s.store = auth.NewStoreWithBackend(s.cfgDir, &loginContractBackend{getErr: errors.New("keychain locked")})
+	writeContext(t, s.cfgDir, config.NamedContext{Name: config.DefaultContextName, BaseURL: "https://o2.example.com", Org: "default",
+		Auth: config.AuthConfig{Scheme: auth.SchemeBasic, Username: "old@example.com"}})
+	browserReplaceVerify = func(*appState, config.Config, auth.Credential) error {
+		t.Fatal("verified without a readable credential")
+		return nil
+	}
+	t.Cleanup(func() { browserReplaceVerify = verifyCredential })
+
+	d := &fakeDriver{sess: pkgauth.Session{Cookies: "auth_tokens=x"}}
+	err := runBrowserLoginWith(s, d, false)
+	if ce := cerrors.AsCLIError(err); ce == nil || ce.Code != "CREDENTIAL_STORE_INACCESSIBLE" || ce.Recovery == nil || ce.Recovery.Scope != "host" {
+		t.Fatalf("unreadable store: %v", err)
+	}
+	if d.loginURL != "" {
+		t.Fatal("a browser was opened although the session could not be stored")
+	}
+}
+
+func TestRunBrowserLoginReplaceSkipsTheCheck(t *testing.T) {
+	s := newTestAppState(t, "https://o2.example.com", auth.SchemeBasic)
+	writeContext(t, s.cfgDir, config.NamedContext{Name: config.DefaultContextName, BaseURL: "https://o2.example.com", Org: "default",
+		Auth: config.AuthConfig{Scheme: auth.SchemeBasic, Username: "old@example.com"}})
+	browserReplaceVerify = func(*appState, config.Config, auth.Credential) error {
+		t.Fatal("checked despite --replace")
+		return nil
+	}
+	t.Cleanup(func() { browserReplaceVerify = verifyCredential })
+	if err := runBrowserLoginWith(s, &fakeDriver{sess: pkgauth.Session{Cookies: "auth_tokens=x"}}, true); err != nil {
+		t.Fatal(err)
 	}
 }

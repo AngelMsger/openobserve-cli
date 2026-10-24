@@ -9,10 +9,12 @@ import (
 	"time"
 
 	kitauth "github.com/angelmsger/agent-cli-kit/auth"
+	kitconfig "github.com/angelmsger/agent-cli-kit/config"
 	"github.com/angelmsger/openobserve-cli/internal/auth"
 	"github.com/angelmsger/openobserve-cli/internal/config"
 	"github.com/angelmsger/openobserve-cli/pkg/apiclient"
 	pkgauth "github.com/angelmsger/openobserve-cli/pkg/auth"
+	"github.com/angelmsger/openobserve-cli/pkg/constants"
 	cerrors "github.com/angelmsger/openobserve-cli/pkg/errors"
 	"github.com/angelmsger/openobserve-cli/pkg/webauth"
 	"github.com/angelmsger/openobserve-cli/pkg/webauth/cdp"
@@ -20,7 +22,7 @@ import (
 
 // runBrowserLogin signs in through a real browser and stores the captured
 // session in the keychain under the active context.
-func runBrowserLogin(s *appState, freshProfile bool) error {
+func runBrowserLogin(s *appState, freshProfile, replace bool) error {
 	// Only the real driver launches a browser that needs somewhere to draw, so
 	// the display check belongs here rather than in runBrowserLoginWith: that
 	// function is driver-agnostic by design and must stay runnable with an
@@ -32,7 +34,7 @@ func runBrowserLogin(s *appState, freshProfile bool) error {
 	if !freshProfile {
 		profileDir = cdp.DefaultProfileDir(s.cfgDir)
 	}
-	return runBrowserLoginWith(s, cdp.New(cdp.Options{ProfileDir: profileDir}))
+	return runBrowserLoginWith(s, cdp.New(cdp.Options{ProfileDir: profileDir}), replace)
 }
 
 // runBrowserLoginWith is the testable core of runBrowserLogin: everything
@@ -41,7 +43,7 @@ func runBrowserLogin(s *appState, freshProfile bool) error {
 // that the base URL was normalized before use, since NormalizeBaseURL and
 // hostOfBaseURL individually stay correct even if a caller forgets to chain
 // them.
-func runBrowserLoginWith(s *appState, driver webauth.Driver) error {
+func runBrowserLoginWith(s *appState, driver webauth.Driver, replace bool) error {
 	cfg := s.cfg()
 	if cfg.BaseURL == "" {
 		return cerrors.New(cerrors.CategoryConfig, "NO_BASE_URL",
@@ -57,6 +59,10 @@ func runBrowserLoginWith(s *appState, driver webauth.Driver) error {
 	}
 
 	if _, _, err := loginFile(s, cfg, auth.Credential{Scheme: auth.SchemeSession, Username: cfg.Auth.Username}); err != nil {
+		return err
+	}
+	replaced, err := longLivedLoginToReplace(s, replace)
+	if err != nil {
 		return err
 	}
 	host, err := hostOfBaseURL(baseURL)
@@ -111,6 +117,9 @@ func runBrowserLoginWith(s *appState, driver webauth.Driver) error {
 		"scheme":    auth.SchemeSession,
 		"stored_in": backend,
 		"context":   ctxName,
+	}
+	if replaced != "" {
+		out["replaced_scheme"] = replaced
 	}
 	if sess.Email != "" {
 		out["email"] = sess.Email
@@ -188,8 +197,12 @@ func persistSessionScheme(s *appState, baseURL, org, email string) (string, erro
 		}
 	}
 
+	// A username the context already records is kept: it is what pairs with
+	// the long-lived secret this sign-in leaves behind, so `auth reuse` can
+	// return to it when the session expires. The captured email is reported
+	// in the output instead.
 	want := config.AuthConfig{Scheme: auth.SchemeSession, Username: nc.Auth.Username, CredentialURL: nc.Auth.CredentialURL}
-	if email != "" {
+	if want.Username == "" {
 		want.Username = email
 	}
 	s.resolved.Config.Auth = want
@@ -208,6 +221,59 @@ func persistSessionScheme(s *appState, baseURL, org, email string) (string, erro
 	}
 	return nc.Name, nil
 }
+
+// longLivedLoginToReplace returns the long-lived scheme a browser sign-in would
+// replace in the selected context, or "" when there is none. When that login
+// still verifies it refuses with BROWSER_LOGIN_REPLACES_LOGIN unless replace
+// is set: a browser session expires, and the working login would only be left
+// behind. A login the service rejects, or one that is absent or incomplete, is
+// replaced without asking. A store this host cannot read returns its error and
+// host recovery before a browser opens: a session captured there would usually
+// fail to store too, since credstore writes the file only when the keychain
+// confirms the account is missing.
+func longLivedLoginToReplace(s *appState, replace bool) (string, error) {
+	file, _, err := config.ReadFile(s.cfgDir)
+	if err != nil {
+		return "", cerrors.Wrap(err, cerrors.CategoryConfig, "CONFIG_READ", "failed to read config")
+	}
+	name := s.resolved.ActiveContext
+	if name == "" {
+		name = config.DefaultContextName
+	}
+	nc, found := file.Context(name)
+	if !found || nc.BaseURL == "" {
+		return "", nil
+	}
+	stored := config.StoredContext(nc, file.Defaults)
+	if stored.Auth.Scheme == auth.SchemeSession {
+		return "", nil
+	}
+	if replace {
+		return stored.Auth.Scheme, nil
+	}
+	cred, err := auth.Resolve(stored, config.Secrets{}, s.store)
+	if err != nil {
+		switch cerrors.AsCLIError(err).Code {
+		case "AUTH_NO_BASIC", "AUTH_NO_TOKEN", "AUTH_BAD_SESSION", "CREDENTIAL_NOT_VISIBLE_OR_MISSING":
+			return stored.Auth.Scheme, nil
+		}
+		return "", err
+	}
+	if err := browserReplaceVerify(s, stored, cred); err != nil {
+		if ce := cerrors.AsCLIError(err); ce.Category == cerrors.CategoryAuth && ce.HTTPStatus == 401 {
+			return stored.Auth.Scheme, nil
+		}
+		return "", err
+	}
+	selected := constants.AppName + " --use-context " + kitconfig.QuoteArg(nc.Name)
+	return "", cerrors.Newf(cerrors.CategoryConflict, "BROWSER_LOGIN_REPLACES_LOGIN",
+		"context %q already has a working %s login; a browser sign-in would replace it with a session that expires", nc.Name, stored.Auth.Scheme).
+		WithHint("Keep the working login. Pass --replace only if this context should use a browser session instead; the existing secret stays stored and `auth reuse` can return to it.").
+		WithNextSteps(selected+" auth status", selected+" auth login --browser --replace")
+}
+
+// browserReplaceVerify is a variable so tests can stand in for the server.
+var browserReplaceVerify = verifyCredential
 
 // contextBaseURL picks the base URL to record for a context that does not have
 // one yet. The normalized form is what a user wants to read in their config

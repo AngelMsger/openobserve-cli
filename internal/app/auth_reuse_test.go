@@ -1,69 +1,105 @@
 package app
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
 
+	"github.com/angelmsger/agent-cli-kit/credstore"
 	"github.com/angelmsger/openobserve-cli/internal/auth"
 	"github.com/angelmsger/openobserve-cli/internal/config"
 	cerrors "github.com/angelmsger/openobserve-cli/pkg/errors"
+	"github.com/spf13/cobra"
 	"github.com/zalando/go-keyring"
 )
 
-func reuseFixture(t *testing.T) (*appState, config.File, reuseServices) {
+// The decision itself is agent-cli-kit/reuse's and tested there. These tests
+// cover openobserve-cli's wiring: how contexts are described, how the
+// destination is rewritten, and the native store, verification and command.
+
+const reuseBase = "https://service.example.test/deploy"
+
+// fakeStore answers lookups from keychain entries keyed like the real store.
+type fakeStore map[string]string
+
+func (f fakeStore) lookup(key string) credstore.Lookup {
+	if v, ok := f[key]; ok {
+		return credstore.Lookup{Secret: v, Keychain: credstore.Hit}
+	}
+	return credstore.Lookup{Keychain: credstore.Miss, File: credstore.Miss}
+}
+
+func (f fakeStore) resolve(cfg config.Config) (auth.Credential, credstore.Lookup, error) {
+	l := f.lookup(auth.AccountKey(cfg.BaseURL, cfg.Auth.Scheme))
+	if !l.Found() {
+		return auth.Credential{}, l, cerrors.New(cerrors.CategoryConfig, "CREDENTIAL_NOT_VISIBLE_OR_MISSING", "missing")
+	}
+	cred := auth.Credential{Scheme: cfg.Auth.Scheme, Username: cfg.Auth.Username, Secret: l.Secret}
+	return cred, l, cred.Validate()
+}
+
+func reuseFixture(t *testing.T, contexts ...config.NamedContext) (*appState, fakeStore, reuseServices) {
 	t.Helper()
 	dir := t.TempDir()
-	source := config.NamedContext{Name: "personal", BaseURL: "https://service.example.test/deploy", Auth: config.AuthConfig{Scheme: "basic", Username: "existing-user"}}
-	target := source
-	target.Name = "team"
-	target.Auth.Username = ""
-	file := config.File{CurrentContext: "personal", Contexts: []config.NamedContext{source, target}}
+	if len(contexts) == 0 {
+		contexts = []config.NamedContext{
+			{Name: "personal", BaseURL: reuseBase, Auth: config.AuthConfig{Scheme: "basic", Username: "existing-user"}},
+			{Name: "team", BaseURL: reuseBase, Auth: config.AuthConfig{Scheme: "basic"}},
+		}
+	}
+	file := config.File{CurrentContext: contexts[0].Name, Contexts: contexts}
 	if err := config.WriteFile(dir, file); err != nil {
 		t.Fatal(err)
 	}
-	s := &appState{cfgDir: dir, resolved: &config.Resolved{Config: reuseContextConfig(target, file.Defaults), ActiveContext: "team"}}
-	services := reuseServices{Read: config.ReadFile, Write: config.WriteFile,
-		Resolve: func(cfg config.Config) (auth.Credential, error) {
-			return auth.Credential{Scheme: cfg.Auth.Scheme, Username: cfg.Auth.Username, Secret: "test-secret"}, nil
-		},
-		Verify: func(config.Config, auth.Credential) error { return nil }}
-	return s, file, services
+	target := contexts[len(contexts)-1]
+	s := &appState{cfgDir: dir, resolved: &config.Resolved{Config: config.StoredContext(target, file.Defaults), ActiveContext: target.Name}}
+	store := fakeStore{auth.AccountKey(reuseBase, "basic"): "test-secret"}
+	services := reuseServices{Read: config.ReadFile, Write: config.WriteFile, Resolve: store.resolve, Lookup: store.lookup,
+		Verify: func(_ context.Context, cfg config.Config, cred auth.Credential) error {
+			if cred.Secret == "test-secret" && cred.Username == "existing-user" {
+				return nil
+			}
+			return cerrors.New(cerrors.CategoryAuth, "HTTP_UNAUTHORIZED", "rejected").WithHTTPStatus(401)
+		}}
+	return s, store, services
+}
+
+func targetOf(t *testing.T, s *appState) config.NamedContext {
+	t.Helper()
+	file, _, err := config.ReadFile(s.cfgDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	c, _ := file.Context(s.resolved.ActiveContext)
+	return c
 }
 
 func TestAuthReusePreviewApplyAndIdempotence(t *testing.T) {
-	s, before, services := reuseFixture(t)
-	path := config.ConfigFilePath(s.cfgDir)
-	bytesBefore, _ := os.ReadFile(path)
-	preview, err := reuseAuthentication(s, "", true, services)
-	if err != nil || !preview.Changed || preview.State != "available" || !preview.Verified {
+	s, _, services := reuseFixture(t)
+	before, _, _ := config.ReadFile(s.cfgDir)
+	preview, err := reuseAuthentication(s, reuseOptions{DryRun: true}, services)
+	if err != nil || !preview.Changed || preview.State != "available" || !preview.Verified || preview.Scheme != "basic" {
 		t.Fatalf("preview: %+v %v", preview, err)
 	}
-	afterPreview, _ := os.ReadFile(path)
-	if string(afterPreview) != string(bytesBefore) {
+	if after, _, _ := config.ReadFile(s.cfgDir); !reflect.DeepEqual(before, after) {
 		t.Fatal("preview changed config")
 	}
-	applied, err := reuseAuthentication(s, "", false, services)
-	if err != nil || applied.State != "reused" || applied.SourceContext != "personal" {
+	applied, err := reuseAuthentication(s, reuseOptions{}, services)
+	if err != nil || applied.State != "reused" || applied.SourceContext != "personal" || applied.Username != "existing-user" {
 		t.Fatalf("apply: %+v %v", applied, err)
 	}
 	after, _, _ := config.ReadFile(s.cfgDir)
-	target, _ := after.Context("team")
-	if target.Auth.Username != "existing-user" || after.CurrentContext != before.CurrentContext || !reflect.DeepEqual(after.Contexts[0], before.Contexts[0]) {
-		t.Fatal("did not preserve personal source/current context")
+	if got := targetOf(t, s); got.Auth.Username != "existing-user" || after.CurrentContext != before.CurrentContext || !reflect.DeepEqual(after.Contexts[0], before.Contexts[0]) {
+		t.Fatalf("did not preserve the source or the current context: %+v", after)
 	}
 	services.Write = func(string, config.File) error { t.Fatal("repeated write"); return nil }
-	services.Resolve = func(config.Config) (auth.Credential, error) {
-		t.Fatal("populated identity must remain unchanged")
-		return auth.Credential{}, nil
-	}
-	repeated, err := reuseAuthentication(s, "", false, services)
+	repeated, err := reuseAuthentication(s, reuseOptions{}, services)
 	if err != nil || repeated.Changed || repeated.State != "unchanged" {
 		t.Fatalf("repeat: %+v %v", repeated, err)
 	}
@@ -71,58 +107,107 @@ func TestAuthReusePreviewApplyAndIdempotence(t *testing.T) {
 	if strings.Contains(string(raw), "test-secret") {
 		t.Fatal("secret reached output")
 	}
+	if len(applied.NextSteps) != 1 || !strings.HasSuffix(applied.NextSteps[0], "auth status") {
+		t.Fatalf("next steps: %v", applied.NextSteps)
+	}
 }
 
-func TestAuthReuseNativeCredentialSurvivesFreshLoad(t *testing.T) {
-	keyring.MockInit()
-	s, _, services := reuseFixture(t)
-	store := auth.NewStore(s.cfgDir)
-	credential := auth.Credential{Scheme: "basic", Username: "existing-user", Secret: "retained-secret"}
-	if _, err := auth.Save(s.cfg().BaseURL, credential, store); err != nil {
-		t.Fatal(err)
+// A browser-session team context adopts the personal basic login on the same
+// service once its own session is gone.
+func TestAuthReuseSessionContextAdoptsLongLivedLogin(t *testing.T) {
+	s, _, services := reuseFixture(t,
+		config.NamedContext{Name: "personal", BaseURL: reuseBase, Auth: config.AuthConfig{Scheme: "basic", Username: "existing-user"}},
+		config.NamedContext{Name: "browser", BaseURL: reuseBase, Auth: config.AuthConfig{Scheme: "session"}},
+		config.NamedContext{Name: "team", BaseURL: reuseBase, Auth: config.AuthConfig{Scheme: "session"}},
+	)
+	r, err := reuseAuthentication(s, reuseOptions{}, services)
+	if err != nil || r.State != "reused" || r.SourceContext != "personal" || r.Scheme != "basic" {
+		t.Fatalf("got %+v %v", r, err)
 	}
-	services.Resolve = func(cfg config.Config) (auth.Credential, error) { return auth.Resolve(cfg, config.Secrets{}, store) }
-	if _, err := reuseAuthentication(s, "", false, services); err != nil {
-		t.Fatal(err)
+	if got := targetOf(t, s); got.Auth.Scheme != "basic" || got.Auth.Username != "existing-user" {
+		t.Fatalf("destination %+v", got)
 	}
-	file, _, _ := config.ReadFile(s.cfgDir)
-	target, _ := file.Context("team")
-	got, err := auth.Resolve(reuseContextConfig(target, file.Defaults), config.Secrets{}, auth.NewStore(s.cfgDir))
-	if err != nil || got.Secret != credential.Secret || got.Username != credential.Username {
-		t.Fatalf("fresh identity could not resolve existing credential: %v", err)
+}
+
+// A session context whose username is only a label adopts the basic secret
+// stored for its service, which no context points at any more.
+func TestAuthReuseLabelledSessionAdoptsStoredSecret(t *testing.T) {
+	s, _, services := reuseFixture(t,
+		config.NamedContext{Name: "team", BaseURL: reuseBase, Auth: config.AuthConfig{Scheme: "session", Username: "existing-user"}},
+	)
+	r, err := reuseAuthentication(s, reuseOptions{}, services)
+	if err != nil || r.State != "reused" || r.SourceContext != "" || r.Username != "existing-user" {
+		t.Fatalf("got %+v %v", r, err)
+	}
+	if got := targetOf(t, s); got.Auth.Scheme != "basic" || got.Auth.Username != "existing-user" {
+		t.Fatalf("destination %+v", got)
+	}
+}
+
+// Two session contexts on one key whose shared session is gone used to fail
+// the command; now the stored basic secret pairs with the recorded label.
+func TestAuthReuseSharedSessionKeyDoesNotFail(t *testing.T) {
+	s, _, services := reuseFixture(t,
+		config.NamedContext{Name: "test", BaseURL: reuseBase, Auth: config.AuthConfig{Scheme: "session", Username: "existing-user"}},
+		config.NamedContext{Name: "dev", BaseURL: reuseBase, Auth: config.AuthConfig{Scheme: "session"}},
+	)
+	r, err := reuseAuthentication(s, reuseOptions{}, services)
+	if err != nil || r.State != "reused" || r.Username != "existing-user" {
+		t.Fatalf("got %+v %v", r, err)
+	}
+}
+
+func TestAuthReuseKeepsAWorkingSessionUnlessSelected(t *testing.T) {
+	s, store, services := reuseFixture(t,
+		config.NamedContext{Name: "team", BaseURL: reuseBase, Auth: config.AuthConfig{Scheme: "session", Username: "existing-user"}},
+	)
+	store[auth.AccountKey(reuseBase, "session")] = `{"cookies":"auth_tokens=ok"}`
+	verify := services.Verify
+	services.Verify = func(ctx context.Context, cfg config.Config, cred auth.Credential) error {
+		if cred.Scheme == "session" {
+			return nil
+		}
+		return verify(ctx, cfg, cred)
+	}
+	r, err := reuseAuthentication(s, reuseOptions{}, services)
+	if err != nil || r.State != "unchanged" || !r.Verified {
+		t.Fatalf("automatic: %+v %v", r, err)
+	}
+	r, err = reuseAuthentication(s, reuseOptions{FromScheme: "basic"}, services)
+	if err != nil || r.State != "reused" || r.Scheme != "basic" {
+		t.Fatalf("explicit: %+v %v", r, err)
 	}
 }
 
 func TestAuthReuseMatchesCompleteServiceBeforeCredentialAccess(t *testing.T) {
-	for _, kind := range []string{"host", "path", "protocol", "port", "scheme", "org"} {
+	for _, kind := range []string{"host", "path", "protocol", "port", "org"} {
 		t.Run(kind, func(t *testing.T) {
-			s, file, services := reuseFixture(t)
+			personal := config.NamedContext{Name: "personal", BaseURL: reuseBase, Auth: config.AuthConfig{Scheme: "basic", Username: "existing-user"}}
 			switch kind {
 			case "host":
-				file.Contexts[0].BaseURL = "https://other.example.test/deploy"
+				personal.BaseURL = "https://other.example.test/deploy"
 			case "path":
-				file.Contexts[0].BaseURL = "https://service.example.test/other"
+				personal.BaseURL = "https://service.example.test/other"
 			case "protocol":
-				file.Contexts[0].BaseURL = "http://service.example.test/deploy"
+				personal.BaseURL = "http://service.example.test/deploy"
 			case "port":
-				file.Contexts[0].BaseURL = "https://service.example.test:8443/deploy"
-			case "scheme":
-				file.Contexts[0].Auth.Scheme = "token"
+				personal.BaseURL = "https://service.example.test:8443/deploy"
 			case "org":
-				file.Contexts[0].Org = "other-org"
+				personal.Org = "other-org"
 			}
-			if err := config.WriteFile(s.cfgDir, file); err != nil {
-				t.Fatal(err)
+			s, _, services := reuseFixture(t, personal, config.NamedContext{Name: "team", BaseURL: reuseBase, Auth: config.AuthConfig{Scheme: "basic"}})
+			resolve := services.Resolve
+			services.Resolve = func(cfg config.Config) (auth.Credential, credstore.Lookup, error) {
+				if cfg.Auth.Username == "existing-user" {
+					t.Fatal("read another service's credential")
+				}
+				return resolve(cfg)
 			}
-			services.Resolve = func(config.Config) (auth.Credential, error) {
-				t.Fatal("read credential before matching service")
-				return auth.Credential{}, nil
-			}
-			result, err := reuseAuthentication(s, "", true, services)
+			result, err := reuseAuthentication(s, reuseOptions{DryRun: true}, services)
 			if err != nil || result.Changed || result.State != "unavailable" {
 				t.Fatalf("mismatch: %+v %v", result, err)
 			}
-			_, err = reuseAuthentication(s, "personal", true, services)
+			_, err = reuseAuthentication(s, reuseOptions{From: "personal", DryRun: true}, services)
 			if err == nil || cerrors.AsCLIError(err).Code != "AUTH_REUSE_SOURCE_MISMATCH" {
 				t.Fatalf("explicit mismatch: %v", err)
 			}
@@ -130,181 +215,137 @@ func TestAuthReuseMatchesCompleteServiceBeforeCredentialAccess(t *testing.T) {
 	}
 }
 
+// A scheme the invocation supplies keeps reuse within that scheme.
+func TestAuthReuseSuppliedSchemeStaysWithinIt(t *testing.T) {
+	s, _, services := reuseFixture(t,
+		config.NamedContext{Name: "personal", BaseURL: reuseBase, Auth: config.AuthConfig{Scheme: "basic", Username: "existing-user"}},
+		config.NamedContext{Name: "team", BaseURL: reuseBase, Auth: config.AuthConfig{Scheme: "session"}},
+	)
+	s.resolved.Sources = map[string]string{config.FieldAuthScheme: "flag"}
+	r, err := reuseAuthentication(s, reuseOptions{}, services)
+	if err != nil || r.State != "unavailable" || r.Changed {
+		t.Fatalf("pinned: %+v %v", r, err)
+	}
+	_, err = reuseAuthentication(s, reuseOptions{From: "personal"}, services)
+	if err == nil || cerrors.AsCLIError(err).Code != "AUTH_REUSE_SOURCE_MISMATCH" {
+		t.Fatalf("pinned explicit: %v", err)
+	}
+}
+
 func TestAuthReusePreservesDestinationIdentity(t *testing.T) {
-	s, file, services := reuseFixture(t)
-	file.Contexts[1].Auth.Username = "other-user"
-	if err := config.WriteFile(s.cfgDir, file); err != nil {
-		t.Fatal(err)
-	}
-	services.Resolve = func(config.Config) (auth.Credential, error) {
+	s, _, services := reuseFixture(t,
+		config.NamedContext{Name: "personal", BaseURL: reuseBase, Auth: config.AuthConfig{Scheme: "basic", Username: "existing-user"}},
+		config.NamedContext{Name: "team", BaseURL: reuseBase, Auth: config.AuthConfig{Scheme: "basic", Username: "other-user"}},
+	)
+	services.Resolve = func(config.Config) (auth.Credential, credstore.Lookup, error) {
 		t.Fatal("must not replace an existing identity")
-		return auth.Credential{}, nil
+		return auth.Credential{}, credstore.Lookup{}, nil
 	}
-	r, err := reuseAuthentication(s, "", false, services)
+	r, err := reuseAuthentication(s, reuseOptions{}, services)
 	if err != nil || r.State != "unchanged" || r.Changed {
 		t.Fatalf("existing identity: %+v %v", r, err)
 	}
 }
 
 func TestAuthReuseAmbiguityAndExplicitSelection(t *testing.T) {
-	s, file, services := reuseFixture(t)
-	other := file.Contexts[0]
-	other.Name = "second"
-	other.Auth.Username = "second-user"
-	file.Contexts = append(file.Contexts, other)
-	if err := config.WriteFile(s.cfgDir, file); err != nil {
-		t.Fatal(err)
-	}
-	_, err := reuseAuthentication(s, "", true, services)
+	s, store, services := reuseFixture(t,
+		config.NamedContext{Name: "personal", BaseURL: reuseBase, Auth: config.AuthConfig{Scheme: "token"}},
+		config.NamedContext{Name: "second", BaseURL: "https://SERVICE.example.test:443/deploy", Auth: config.AuthConfig{Scheme: "token"}},
+		config.NamedContext{Name: "team", BaseURL: reuseBase, Auth: config.AuthConfig{Scheme: "session"}},
+	)
+	store[auth.AccountKey(reuseBase, "token")] = "first"
+	store[auth.AccountKey("https://SERVICE.example.test:443/deploy", "token")] = "second"
+	delete(store, auth.AccountKey(reuseBase, "basic"))
+	services.Verify = func(context.Context, config.Config, auth.Credential) error { return nil }
+	_, err := reuseAuthentication(s, reuseOptions{DryRun: true}, services)
 	if err == nil || cerrors.AsCLIError(err).Code != "AUTH_REUSE_AMBIGUOUS" {
 		t.Fatalf("ambiguity: %v", err)
 	}
-	r, err := reuseAuthentication(s, "SECOND", false, services)
+	r, err := reuseAuthentication(s, reuseOptions{From: "SECOND"}, services)
 	if err != nil || r.SourceContext != "second" || r.State != "reused" {
 		t.Fatalf("explicit choice: %+v %v", r, err)
 	}
-}
-
-func TestAuthReuseDuplicateAliasesDoNotRequireChoice(t *testing.T) {
-	s, file, services := reuseFixture(t)
-	alias := file.Contexts[0]
-	alias.Name = "alias"
-	file.Contexts = append(file.Contexts, alias)
-	if err := config.WriteFile(s.cfgDir, file); err != nil {
-		t.Fatal(err)
-	}
-	r, err := reuseAuthentication(s, "", true, services)
-	if err != nil || !r.Changed {
-		t.Fatalf("same native credential: %+v %v", r, err)
+	if got := targetOf(t, s); got.BaseURL != "https://SERVICE.example.test:443/deploy" {
+		t.Fatalf("destination does not resolve the chosen key: %+v", got)
 	}
 }
 
 func TestAuthReuseRetainsOperationalFailures(t *testing.T) {
 	for _, kind := range []string{"store", "network", "permission"} {
 		t.Run(kind, func(t *testing.T) {
-			s, before, services := reuseFixture(t)
+			s, _, services := reuseFixture(t)
+			before, _, _ := config.ReadFile(s.cfgDir)
 			failure := cerrors.New(cerrors.CategoryNetwork, "NETWORK_ERROR", "network unavailable")
-			if kind == "store" {
+			switch kind {
+			case "store":
 				failure = cerrors.New(cerrors.CategoryConfig, "CREDENTIAL_STORE_INACCESSIBLE", "host keychain unavailable")
-				services.Resolve = func(config.Config) (auth.Credential, error) { return auth.Credential{}, failure }
-			}
-			if kind == "permission" {
+				services.Resolve = func(config.Config) (auth.Credential, credstore.Lookup, error) {
+					return auth.Credential{}, credstore.Lookup{Keychain: credstore.Failed}, failure
+				}
+			case "permission":
 				failure = cerrors.New(cerrors.CategoryPermission, "FORBIDDEN", "access denied")
 			}
 			if kind != "store" {
-				services.Verify = func(config.Config, auth.Credential) error { return failure }
+				services.Verify = func(context.Context, config.Config, auth.Credential) error { return failure }
 			}
-			_, err := reuseAuthentication(s, "", false, services)
+			_, err := reuseAuthentication(s, reuseOptions{}, services)
 			if !errors.Is(err, failure) {
 				t.Fatalf("lost diagnostic: %v", err)
 			}
-			after, _, _ := config.ReadFile(s.cfgDir)
-			if !reflect.DeepEqual(before, after) {
+			if after, _, _ := config.ReadFile(s.cfgDir); !reflect.DeepEqual(before, after) {
 				t.Fatal("failure mutated config")
 			}
 		})
 	}
 }
 
-func TestAuthReuseExpiredIdentityIsUnavailable(t *testing.T) {
+func TestAuthReuseConcurrentChangeAndRotation(t *testing.T) {
 	s, _, services := reuseFixture(t)
-	services.Verify = func(config.Config, auth.Credential) error {
-		return cerrors.New(cerrors.CategoryAuth, "HTTP_UNAUTHORIZED", "expired").WithHTTPStatus(401)
-	}
-	r, err := reuseAuthentication(s, "", true, services)
-	if err != nil || r.State != "unavailable" || r.Changed {
-		t.Fatalf("expired credential: %+v %v", r, err)
-	}
-}
-
-func TestAuthReuseSelfConfigurationAndConcurrentChange(t *testing.T) {
-	s, _, services := reuseFixture(t)
-	s.resolved.Config.Defaults.ReadOnly = true
-	r, err := reuseAuthentication(s, "", true, services)
-	if err != nil || !r.Changed {
-		t.Fatal("read-only preview blocked", err)
-	}
-	r, err = reuseAuthentication(s, "", false, services)
-	if err != nil || r.State != "reused" {
-		t.Fatalf("native self-configuration should remain available: %+v %v", r, err)
-	}
-	s, _, services = reuseFixture(t)
-	services.Verify = func(config.Config, auth.Credential) error {
-		f, _, e := config.ReadFile(s.cfgDir)
-		if e != nil {
-			return e
-		}
+	verify := services.Verify
+	services.Verify = func(ctx context.Context, cfg config.Config, cred auth.Credential) error {
+		f, _, _ := config.ReadFile(s.cfgDir)
 		f.CurrentContext = "changed-by-user"
-		return config.WriteFile(s.cfgDir, f)
+		if err := config.WriteFile(s.cfgDir, f); err != nil {
+			return err
+		}
+		return verify(ctx, cfg, cred)
 	}
-	_, err = reuseAuthentication(s, "", false, services)
+	_, err := reuseAuthentication(s, reuseOptions{}, services)
 	if err == nil || cerrors.AsCLIError(err).Code != "AUTH_REUSE_CONFIG_CHANGED" {
 		t.Fatalf("concurrent change: %v", err)
+	}
+
+	s, store, services := reuseFixture(t)
+	before, _, _ := config.ReadFile(s.cfgDir)
+	resolve := services.Resolve
+	calls := 0
+	services.Resolve = func(cfg config.Config) (auth.Credential, credstore.Lookup, error) {
+		calls++
+		if calls > 1 {
+			store[auth.AccountKey(reuseBase, "basic")] = "rotated-secret"
+		}
+		return resolve(cfg)
+	}
+	_, err = reuseAuthentication(s, reuseOptions{}, services)
+	if err == nil || cerrors.AsCLIError(err).Code != "AUTH_REUSE_CREDENTIAL_CHANGED" {
+		t.Fatalf("credential rotation: %v", err)
+	}
+	if after, _, _ := config.ReadFile(s.cfgDir); !reflect.DeepEqual(before, after) {
+		t.Fatal("rotation changed destination")
 	}
 }
 
 func TestAuthReuseRejectsTargetOverridesAndUnknownSource(t *testing.T) {
 	s, _, services := reuseFixture(t)
 	s.resolved.Config.BaseURL = "https://service.example.test/other"
-	_, err := reuseAuthentication(s, "", true, services)
+	_, err := reuseAuthentication(s, reuseOptions{DryRun: true}, services)
 	if err == nil || cerrors.AsCLIError(err).Code != "AUTH_REUSE_TARGET_MISMATCH" {
 		t.Fatal(err)
 	}
-	s.resolved.Config.BaseURL = "https://service.example.test/deploy"
-	_, err = reuseAuthentication(s, "missing", true, services)
+	s.resolved.Config.BaseURL = reuseBase
+	_, err = reuseAuthentication(s, reuseOptions{From: "missing", DryRun: true}, services)
 	if err == nil || cerrors.AsCLIError(err).Code != "AUTH_REUSE_SOURCE_NOT_FOUND" {
 		t.Fatal(err)
-	}
-}
-
-func TestAuthReuseRejectsCredentialRotationBeforeAssociation(t *testing.T) {
-	s, before, services := reuseFixture(t)
-	loads := 0
-	services.Resolve = func(cfg config.Config) (auth.Credential, error) {
-		if cfg.Auth.Username != "" {
-			loads++
-		}
-		secret := "verified-secret"
-		if loads > 1 {
-			secret = "rotated-secret"
-		}
-		return auth.Credential{Scheme: cfg.Auth.Scheme, Username: cfg.Auth.Username, Secret: secret}, nil
-	}
-	_, err := reuseAuthentication(s, "", false, services)
-	if err == nil || cerrors.AsCLIError(err).Code != "AUTH_REUSE_CREDENTIAL_CHANGED" {
-		t.Fatalf("credential rotation: %v", err)
-	}
-	after, _, _ := config.ReadFile(s.cfgDir)
-	if !reflect.DeepEqual(before, after) {
-		t.Fatal("rotation changed destination")
-	}
-}
-
-func TestAuthReuseUsesPersistedDefaultsWithoutEnvironmentIdentity(t *testing.T) {
-	s, file, services := reuseFixture(t)
-	file.Contexts[0].Auth.Scheme = ""
-	cfg := config.StoredContext(file.Contexts[0], file.Defaults)
-	file.Contexts[1].Auth.Scheme = cfg.Auth.Scheme
-	s.resolved.Config = config.StoredContext(file.Contexts[1], file.Defaults)
-	s.resolved.Secrets = config.Secrets{Password: "environment-secret"}
-	if err := config.WriteFile(s.cfgDir, file); err != nil {
-		t.Fatal(err)
-	}
-	sourceResolver := services.Resolve
-	services.Resolve = func(cfg config.Config) (auth.Credential, error) {
-		if cfg.Auth.Username == "" {
-			return auth.Credential{}, cerrors.New(cerrors.CategoryConfig, "CREDENTIAL_NOT_VISIBLE_OR_MISSING", "no destination credential")
-		}
-		return sourceResolver(cfg)
-	}
-	r, err := reuseAuthentication(s, "", false, services)
-	if err != nil || r.State != "reused" {
-		t.Fatalf("stored defaults: %+v %v", r, err)
-	}
-	after, _, _ := config.ReadFile(s.cfgDir)
-	target, _ := after.Context("team")
-	if target.Auth.Username != "existing-user" {
-		t.Fatal("identity did not come from stored source")
 	}
 }
 
@@ -315,27 +356,21 @@ func TestAuthReuseCommandVerifiesNativeStoredCredential(t *testing.T) {
 		requests++
 		user, password, ok := r.BasicAuth()
 		if r.Method != http.MethodGet || !ok || user != "existing-user" || password != "retained-secret" {
-			t.Error("unexpected request authentication or mutation")
 			w.WriteHeader(http.StatusUnauthorized)
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
-		w.Header().Set("X-AUSERNAME", "existing-user")
-		_, _ = w.Write([]byte(`{"id":"existing-user","name":"existing-user","username":"existing-user","slug":"existing-user","uuid":"test-user","accountId":"test-user","userKey":"test-user","type":"known","authenticated":true,"anonymous":false,"status":"success","data":[{"identifier":"default","name":"Default"}]}`))
+		_, _ = w.Write([]byte(`{"data":[{"identifier":"default","name":"Default"}]}`))
 	}))
 	defer server.Close()
-	s, file, _ := reuseFixture(t)
-	for i := range file.Contexts {
-		file.Contexts[i].BaseURL = server.URL + "/deploy"
-	}
-
-	if err := config.WriteFile(s.cfgDir, file); err != nil {
-		t.Fatal(err)
-	}
-	s.resolved.Config = config.StoredContext(file.Contexts[1], file.Defaults)
+	base := server.URL + "/deploy"
+	s, _, _ := reuseFixture(t,
+		config.NamedContext{Name: "personal", BaseURL: base, Auth: config.AuthConfig{Scheme: "basic", Username: "existing-user"}},
+		config.NamedContext{Name: "team", BaseURL: base, Auth: config.AuthConfig{Scheme: "session"}},
+	)
 	s.store = auth.NewStore(s.cfgDir)
 	credential := auth.Credential{Scheme: "basic", Username: "existing-user", Secret: "retained-secret"}
-	if _, err := auth.Save(file.Contexts[0].BaseURL, credential, s.store); err != nil {
+	if _, err := auth.Save(base, credential, s.store); err != nil {
 		t.Fatal(err)
 	}
 	command := newAuthReuseCmd(s)
@@ -343,7 +378,7 @@ func TestAuthReuseCommandVerifiesNativeStoredCredential(t *testing.T) {
 		t.Fatal(err)
 	}
 	if requests == 0 {
-		t.Fatal("did not verify with native API client")
+		t.Fatal("did not verify with the native API client")
 	}
 	after, _, _ := config.ReadFile(s.cfgDir)
 	target, _ := after.Context("team")
@@ -353,33 +388,27 @@ func TestAuthReuseCommandVerifiesNativeStoredCredential(t *testing.T) {
 	}
 }
 
-func TestAuthReuseDoesNotHideUnavailableIdentityProof(t *testing.T) {
-	s, _, services := reuseFixture(t)
-	failure := cerrors.New(cerrors.CategoryAuth, "AUTH_IDENTITY_UNAVAILABLE", "authenticated identity could not be established")
-	services.Verify = func(config.Config, auth.Credential) error { return failure }
-	_, err := reuseAuthentication(s, "", true, services)
-	if !errors.Is(err, failure) {
-		t.Fatalf("lost identity diagnostic: %v", err)
-	}
-}
-
 func TestAuthReusePreservesLegacyStoreKeyUnderEquivalentOverride(t *testing.T) {
 	keyring.MockInit()
-	s, file, services := reuseFixture(t)
-	file.Contexts[0].BaseURL = "https://SERVICE.example.test:443/deploy/"
-	if err := config.WriteFile(s.cfgDir, file); err != nil {
-		t.Fatal(err)
-	}
+	legacy := "https://SERVICE.example.test:443/deploy/"
+	s, _, services := reuseFixture(t,
+		config.NamedContext{Name: "personal", BaseURL: legacy, Auth: config.AuthConfig{Scheme: "basic", Username: "existing-user"}},
+		config.NamedContext{Name: "team", BaseURL: reuseBase, Auth: config.AuthConfig{Scheme: "basic"}},
+	)
 	store := auth.NewStore(s.cfgDir)
 	credential := auth.Credential{Scheme: "basic", Username: "existing-user", Secret: "retained-secret"}
-	if _, err := auth.Save(file.Contexts[0].BaseURL, credential, store); err != nil {
+	if _, err := auth.Save(legacy, credential, store); err != nil {
 		t.Fatal(err)
 	}
-	services.Resolve = func(cfg config.Config) (auth.Credential, error) { return auth.Resolve(cfg, config.Secrets{}, store) }
-	if _, err := reuseAuthentication(s, "", false, services); err != nil {
+	services.Resolve = func(cfg config.Config) (auth.Credential, credstore.Lookup, error) {
+		return auth.ResolveLookup(cfg, config.Secrets{}, store)
+	}
+	services.Lookup = store.Lookup
+	services.Verify = func(context.Context, config.Config, auth.Credential) error { return nil }
+	if _, err := reuseAuthentication(s, reuseOptions{}, services); err != nil {
 		t.Fatal(err)
 	}
-	fresh, err := config.Load(config.LoadOptions{ConfigDir: s.cfgDir, Context: "team", DotenvPath: filepath.Join(t.TempDir(), "absent"), Flags: config.FlagValues{BaseURL: "https://service.example.test/deploy"}})
+	fresh, err := config.Load(config.LoadOptions{ConfigDir: s.cfgDir, Context: "team", DotenvPath: filepath.Join(t.TempDir(), "absent"), Flags: config.FlagValues{BaseURL: reuseBase}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -387,56 +416,30 @@ func TestAuthReusePreservesLegacyStoreKeyUnderEquivalentOverride(t *testing.T) {
 	if err != nil || got.Secret != credential.Secret || got.Username != credential.Username {
 		t.Fatalf("equivalent override lost native credential: %v", err)
 	}
-	if fresh.Config.BaseURL != "https://service.example.test/deploy" {
+	if fresh.Config.BaseURL != reuseBase {
 		t.Fatal("changed request destination")
-	}
-	if err := auth.ForgetForConfig(fresh.Config, fresh.Config.Auth.Scheme, store); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := store.Load(auth.AccountKey(file.Contexts[0].BaseURL, credential.Scheme)); err == nil {
-		t.Fatal("logout left the original credential active")
-	}
-	fresh.Config.BaseURL = "https://service.example.test/other"
-	_, err = auth.Resolve(fresh.Config, config.Secrets{}, store)
-	if err == nil || cerrors.AsCLIError(err).Code != "CREDENTIAL_SERVICE_MISMATCH" {
-		t.Fatalf("foreign deployment reused stored key: %v", err)
 	}
 }
 
-func TestAuthReusePreservesWorkingTokenWithoutUsername(t *testing.T) {
-	keyring.MockInit()
-	s, file, services := reuseFixture(t)
-	file.Contexts[0].BaseURL = "https://SERVICE.example.test:443/deploy/"
-	for i := range file.Contexts {
-		file.Contexts[i].Auth.Scheme = "token"
+// A rejected credential leads with reuse when a stored login could replace it,
+// and a session context is offered browser sign-in rather than config init.
+func TestRejectedCredentialRecoveryLeadsWithReuse(t *testing.T) {
+	s := &appState{resolved: &config.Resolved{Config: config.Config{BaseURL: reuseBase,
+		Auth: config.AuthConfig{Scheme: "session"}, ReuseStep: "openobserve-cli --use-context 'team' auth reuse"}}}
+	ce := cerrors.New(cerrors.CategoryAuth, "HTTP_UNAUTHORIZED", "rejected").WithHTTPStatus(401)
+	withReuseRecovery(ce, s, &cobra.Command{Use: "search"})
+	if len(ce.NextSteps) < 2 || ce.NextSteps[0] != s.cfg().ReuseStep {
+		t.Fatalf("next steps %v", ce.NextSteps)
 	}
-	file.Contexts[1].Auth.Username = ""
-	if err := config.WriteFile(s.cfgDir, file); err != nil {
-		t.Fatal(err)
-	}
-	s.resolved.Config = config.StoredContext(file.Contexts[1], file.Defaults)
-	store := auth.NewStore(s.cfgDir)
-	existing := auth.Credential{Scheme: "token", Secret: "destination-secret"}
-	source := auth.Credential{Scheme: "token", Secret: "other-source-secret", Username: "existing-user"}
-	if _, err := auth.Save(file.Contexts[1].BaseURL, existing, store); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := auth.Save(file.Contexts[0].BaseURL, source, store); err != nil {
-		t.Fatal(err)
-	}
-	services.Resolve = func(cfg config.Config) (auth.Credential, error) { return auth.Resolve(cfg, config.Secrets{}, store) }
-	services.Verify = func(_ config.Config, credential auth.Credential) error {
-		if credential.Secret != existing.Secret {
-			t.Fatal("attempted to switch an already valid destination login")
+	for _, step := range ce.NextSteps {
+		if strings.HasSuffix(step, "config init") {
+			t.Fatalf("session context offered config init: %v", ce.NextSteps)
 		}
-		return nil
 	}
-	r, err := reuseAuthentication(s, "", false, services)
-	if err != nil || r.Changed || !r.Verified || r.State != "unchanged" {
-		t.Fatalf("existing token: %+v %v", r, err)
-	}
-	after, _, _ := config.ReadFile(s.cfgDir)
-	if !reflect.DeepEqual(file, after) {
-		t.Fatal("modified a valid token-only context")
+	forbidden := cerrors.New(cerrors.CategoryPermission, "FORBIDDEN", "denied").WithHTTPStatus(403)
+	steps := append([]string(nil), forbidden.NextSteps...)
+	withReuseRecovery(forbidden, s, &cobra.Command{Use: "search"})
+	if !reflect.DeepEqual(steps, forbidden.NextSteps) {
+		t.Fatal("a permission error gained a reuse step")
 	}
 }

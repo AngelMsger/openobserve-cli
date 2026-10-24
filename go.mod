@@ -3,7 +3,7 @@ module github.com/angelmsger/openobserve-cli
 go 1.24.0
 
 require (
-	github.com/angelmsger/agent-cli-kit v0.4.0
+	github.com/angelmsger/agent-cli-kit v0.5.0
 	github.com/charmbracelet/huh v1.0.0
 	github.com/coder/websocket v1.8.15
 	github.com/spf13/cobra v1.10.2
