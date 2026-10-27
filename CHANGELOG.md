@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.17.0] - 2026-10-27
+
 ### Changed
 
 - `auth reuse` prefers a long-lived credential to a browser session. A context
@@ -33,6 +35,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   HTTP 401 errors list `auth reuse` before any sign-in step when the configuration
   file shows that a stored login could apply. A 401 on a session context offers
   `auth login --browser` instead of `config init`.
+- Update the companion Skill to `0.3.11` for `auth reuse`.
 
 ### Added
 
@@ -600,7 +603,8 @@ Initial release — a read-only, agent-facing CLI for OpenObserve (O2).
   release binaries and `make install`. A generated CLI reference
   (`docs/cli/`) and a GitHub Pages landing page.
 
-[Unreleased]: https://github.com/AngelMsger/openobserve-cli/compare/v0.16.1...HEAD
+[Unreleased]: https://github.com/AngelMsger/openobserve-cli/compare/v0.17.0...HEAD
+[0.17.0]: https://github.com/AngelMsger/openobserve-cli/compare/v0.16.1...v0.17.0
 [0.16.1]: https://github.com/AngelMsger/openobserve-cli/compare/v0.16.0...v0.16.1
 [0.16.0]: https://github.com/AngelMsger/openobserve-cli/compare/v0.15.0...v0.16.0
 [0.15.0]: https://github.com/AngelMsger/openobserve-cli/compare/v0.14.0...v0.15.0
