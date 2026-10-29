@@ -195,6 +195,42 @@ else
   echo "FAIL - search tail produced no rows"; cat "$TMP/tail.out" | head -5; exit 1
 fi
 
+# Alerts: CRUD against the mock meta store plus the write-safety contract.
+cat >"$TMP/alert.json" <<'JSON'
+{"name": "cpu-high", "description": "e2e", "stream_type": "metrics", "stream_name": "node", "enabled": true, "query_condition": {"type": "promql", "conditions": []}, "trigger_condition": {"period": 10, "threshold": 1}}
+JSON
+check "alert list"     '"alert_id": "alert1"' -- run alert list
+check "alert get"      '"name": "cpu-high"'   -- run alert get alert1
+check "alert dry-run"  '"dry_run": true'      -- run alert create --dry-run --file "$TMP/alert.json"
+check "alert create"   '"created": true'      -- run alert create --file "$TMP/alert.json"
+check "alert update"   '"updated": true'      -- run alert update alert1 --file "$TMP/alert.json"
+check "alert disable"  '"disabled": true'     -- run alert disable alert1
+check "alert enable"   '"enabled": true'      -- run alert enable alert1
+check "alert delete"   '"deleted": true'      -- run alert delete alert1 --yes
+
+# Deletion refuses without --yes (exit 2, CONFIRM_REQUIRED, nothing sent).
+set +e
+run alert delete alert1 >"$TMP/del.out" 2>"$TMP/del.err"; code=$?
+set -e
+if [[ "$code" -eq 2 ]] && grep -q '"CONFIRM_REQUIRED"' "$TMP/del.err"; then
+  echo "ok   - alert delete requires --yes"
+  pass=$((pass + 1))
+else
+  echo "FAIL - alert delete without --yes (exit $code)"; head -5 "$TMP/del.err"; exit 1
+fi
+
+# Read-only mode blocks writes before any request (exit 5), even with --yes.
+set +e
+env OPENOBSERVE_CLI_READ_ONLY=1 "$BIN" --config "$TMP" alert delete alert1 --yes \
+  >"$TMP/ro.out" 2>"$TMP/ro.err"; code=$?
+set -e
+if [[ "$code" -eq 5 ]] && grep -q '"READONLY_BLOCKED"' "$TMP/ro.err"; then
+  echo "ok   - read-only mode blocks alert writes"
+  pass=$((pass + 1))
+else
+  echo "FAIL - read-only block (exit $code)"; head -5 "$TMP/ro.err"; exit 1
+fi
+
 echo ""
 echo "e2e: $pass checks passed"
 
