@@ -48,7 +48,8 @@ command's `PersistentPreRunE` and captured by every subcommand:
   convenience accessors.
 
 Each noun lives in its own file (`org.go`, `stream.go`, `search.go`, `metrics.go`,
-`trace.go`, `auth.go`, `config.go`, `doctor.go`, `skill.go`), organised
+`trace.go`, `auth.go`, `config.go`, `doctor.go`, `skill.go`, `dashboard.go`),
+organised
 `<noun> <verb>`. `search.go` owns the SQL-building helpers and is the heart of the
 logs path: it converts human time ranges to microseconds (via `timeutil`) and
 builds `SELECT` / `histogram` queries so the API client only ever receives a ready
@@ -56,7 +57,11 @@ query; it also hosts `search tail` (poll-and-stream) and `--all` paging.
 `metrics.go` queries the Prometheus-compatible PromQL endpoints (times in
 **seconds**, not microseconds — `metrics.go` owns that conversion); `trace.go`
 lists traces and reassembles a trace's spans into a parent/child waterfall.
-`notify.go` emits the post-run update notice (agent-cli-kit `update`).
+`dashboard.go` is the first write surface: read commands (`list`, `get`) render
+from the meta store the query commands cannot see, while `create`, `update` and
+`delete` carry `--dry-run` request plans, require `--yes` for deletion, and are
+gated by the read-only wrapper (`update` re-reads the current hash before writing
+to feed the server's concurrent-edit check). `notify.go` emits the post-run update notice (agent-cli-kit `update`).
 
 ## API client (`pkg/apiclient`)
 

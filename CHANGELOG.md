@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Dashboard management: `dashboard list|get` discover dashboards and their
+  definitions (the meta store is invisible to the query commands), and
+  `dashboard create|update|delete` manage them from JSON files. Writes
+  support `--dry-run` request plans, deletion requires `--yes`, and all
+  three respect read-only mode with a structured `READONLY_BLOCKED` error;
+  `update` re-reads the current hash before writing to feed OpenObserve's
+  concurrent-edit check, and a stale file fails with a `conflict` error
+  (exit 7). `pkg/apiclient` grows `ListDashboards`, `GetDashboard`,
+  `CreateDashboard`, `UpdateDashboard` and `DeleteDashboard`.
+
 ## [0.17.0] - 2026-10-27
 
 ### Changed

@@ -44,6 +44,15 @@
       <a href="#openobserve-cli-config-use-context">openobserve-cli config use-context</a>
       </div>
     <div class="side-group">
+      <div class="side-title">dashboard</div>
+      <a href="#openobserve-cli-dashboard">openobserve-cli dashboard</a>
+      <a href="#openobserve-cli-dashboard-create">openobserve-cli dashboard create</a>
+      <a href="#openobserve-cli-dashboard-delete">openobserve-cli dashboard delete</a>
+      <a href="#openobserve-cli-dashboard-get">openobserve-cli dashboard get</a>
+      <a href="#openobserve-cli-dashboard-list">openobserve-cli dashboard list</a>
+      <a href="#openobserve-cli-dashboard-update">openobserve-cli dashboard update</a>
+      </div>
+    <div class="side-group">
       <div class="side-title">doctor</div>
       <a href="#openobserve-cli-doctor">openobserve-cli doctor</a>
       </div>
@@ -308,6 +317,121 @@ OPENOBSERVE_PASSWORD (or OPENOBSERVE_TOKEN) instead.</p>
       <pre>openobserve-cli config use-context &lt;name&gt;</pre>
 
 
+
+    </section>
+
+    <section class="cmd" id="openobserve-cli-dashboard">
+      <h2>openobserve-cli dashboard</h2>
+      <p class="short">List, inspect and manage OpenObserve dashboards</p>
+      <pre>openobserve-cli dashboard</pre>
+      <p class="long">Dashboards live in OpenObserve&#39;s meta store, so the query commands
+cannot see them. `dashboard list` discovers IDs, folders and hashes;
+`get` fetches a definition; `create`, `update` and `delete` manage it.
+Writes support --dry-run, `delete` requires --yes, and all three are
+blocked by read-only mode (defaults.read_only / OPENOBSERVE_CLI_READ_ONLY)
+unless you pass the root --allow-writes flag.</p>
+
+
+    </section>
+
+    <section class="cmd" id="openobserve-cli-dashboard-create">
+      <h2>openobserve-cli dashboard create</h2>
+      <p class="short">Create a dashboard from a JSON definition file</p>
+      <pre>openobserve-cli dashboard create [flags]</pre>
+      <p class="long">The file holds the dashboard definition OpenObserve expects (a JSON
+object carrying its schema `version`). A full `dashboard get` response
+works too — the version-keyed body is unwrapped and the hash envelope
+dropped. Use --file - to read from stdin. Blocked by read-only mode
+unless you pass --allow-writes.</p>
+      <h3>Options</h3>
+      <table>
+        <thead><tr><th>Flag</th><th>Default</th><th>Description</th></tr></thead>
+        <tbody>
+        <tr><td><code>--dry-run</code></td><td><code>false</code></td><td>print the request plan without sending anything</td></tr>
+        <tr><td><code>--file</code></td><td></td><td>dashboard definition file (- for stdin); required</td></tr>
+        <tr><td><code>--folder</code></td><td></td><td>folder ID to create in (default: &#34;default&#34;)</td></tr>
+        </tbody>
+      </table>
+      <h3>Examples</h3><pre>  openobserve-cli dashboard create --file dashboard.json
+  openobserve-cli dashboard get ops-1 &gt; ops-1.json &amp;&amp; openobserve-cli dashboard create --file ops-1.json</pre>
+    </section>
+
+    <section class="cmd" id="openobserve-cli-dashboard-delete">
+      <h2>openobserve-cli dashboard delete</h2>
+      <p class="short">Delete a dashboard permanently (requires --yes)</p>
+      <pre>openobserve-cli dashboard delete &lt;id&gt; [flags]</pre>
+      <p class="long">Deletion cannot be undone, so --yes is mandatory. --dry-run prints
+the request plan without deleting (and does not need --yes). Blocked
+by read-only mode unless you pass --allow-writes.</p>
+      <h3>Options</h3>
+      <table>
+        <thead><tr><th>Flag</th><th>Default</th><th>Description</th></tr></thead>
+        <tbody>
+        <tr><td><code>--dry-run</code></td><td><code>false</code></td><td>print the request plan without sending anything</td></tr>
+        <tr><td><code>--folder</code></td><td></td><td>folder ID the dashboard lives in (default: &#34;default&#34;)</td></tr>
+        <tr><td><code>--yes</code></td><td><code>false</code></td><td>confirm the deletion (mandatory)</td></tr>
+        </tbody>
+      </table>
+
+    </section>
+
+    <section class="cmd" id="openobserve-cli-dashboard-get">
+      <h2>openobserve-cli dashboard get</h2>
+      <p class="short">Get a dashboard definition and its current hash</p>
+      <pre>openobserve-cli dashboard get &lt;id&gt; [flags]</pre>
+      <p class="long">Returns the full dashboard JSON (the version-keyed body plus the
+concurrent-edit hash) exactly as stored. The output feeds straight
+into `dashboard create` / `update` — both unwrap the envelope for you.
+Discover IDs with `dashboard list`.</p>
+      <h3>Options</h3>
+      <table>
+        <thead><tr><th>Flag</th><th>Default</th><th>Description</th></tr></thead>
+        <tbody>
+        <tr><td><code>--folder</code></td><td></td><td>folder ID the dashboard lives in (default: &#34;default&#34;)</td></tr>
+        </tbody>
+      </table>
+
+    </section>
+
+    <section class="cmd" id="openobserve-cli-dashboard-list">
+      <h2>openobserve-cli dashboard list</h2>
+      <p class="short">List dashboards in the organization</p>
+      <pre>openobserve-cli dashboard list [flags]</pre>
+      <p class="long">Lists dashboard summaries: dashboard_id, title, folder, owner, schema
+version and the current hash. Without filters the server lists the
+&#34;default&#34; folder; --folder picks another, and --title matches a
+case-insensitive substring across folders. Fetch a full definition
+with `dashboard get &lt;id&gt;`.</p>
+      <h3>Options</h3>
+      <table>
+        <thead><tr><th>Flag</th><th>Default</th><th>Description</th></tr></thead>
+        <tbody>
+        <tr><td><code>--folder</code></td><td></td><td>folder ID to list (the server defaults to its &#34;default&#34; folder)</td></tr>
+        <tr><td><code>--title</code></td><td></td><td>case-insensitive title substring; searches across folders when --folder is unset</td></tr>
+        </tbody>
+      </table>
+
+    </section>
+
+    <section class="cmd" id="openobserve-cli-dashboard-update">
+      <h2>openobserve-cli dashboard update</h2>
+      <p class="short">Replace a dashboard&#39;s definition from a JSON file</p>
+      <pre>openobserve-cli dashboard update &lt;id&gt; [flags]</pre>
+      <p class="long">Read-modify-write built in: unless --hash pins a revision, update
+first GETs the dashboard to learn its current hash, then PUTs the new
+body so the server&#39;s concurrent-edit check can run. A --dry-run plan
+shows both requests and sends nothing; it never contacts the server.
+Blocked by read-only mode unless you pass --allow-writes.</p>
+      <h3>Options</h3>
+      <table>
+        <thead><tr><th>Flag</th><th>Default</th><th>Description</th></tr></thead>
+        <tbody>
+        <tr><td><code>--dry-run</code></td><td><code>false</code></td><td>print the request plan without sending anything</td></tr>
+        <tr><td><code>--file</code></td><td></td><td>dashboard definition file (- for stdin); required</td></tr>
+        <tr><td><code>--folder</code></td><td></td><td>folder ID the dashboard lives in (default: &#34;default&#34;)</td></tr>
+        <tr><td><code>--hash</code></td><td></td><td>expected current hash (skips the read-modify-write GET)</td></tr>
+        </tbody>
+      </table>
 
     </section>
 

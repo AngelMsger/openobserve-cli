@@ -142,6 +142,7 @@ func newRootCmdWithState() (*cobra.Command, *appState) {
 		newSearchCmd(state),
 		newMetricsCmd(state),
 		newTraceCmd(state),
+		newDashboardCmd(state),
 		newAuthCmd(state),
 		newConfigCmd(state),
 		newDoctorCmd(state),

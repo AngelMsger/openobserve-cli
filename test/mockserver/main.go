@@ -113,6 +113,94 @@ func main() {
 		writeJSON(w, map[string]any{"took": 5, "total": len(page), "scan_size": 1.5, "hits": page})
 	})
 
+	// Dashboards: a tiny in-memory meta store mirroring the real API contract
+	// (list envelope, folder/hash query params, hash-protected updates).
+	dashes := map[string]map[string]any{}
+	hashSeq := 0
+	versionOf := func(m map[string]any) int {
+		if v, ok := m["version"].(float64); ok {
+			return int(v)
+		}
+		return 5
+	}
+	saveDash := func(id string, body map[string]any) map[string]any {
+		hashSeq++
+		v := versionOf(body)
+		body["dashboardId"] = id
+		d := map[string]any{fmt.Sprintf("v%d", v): body, "version": v, "hash": fmt.Sprintf("h%d", hashSeq)}
+		dashes[id] = d
+		return d
+	}
+	dashListItem := func(id string, d map[string]any) map[string]any {
+		v := versionOf(d)
+		inner, _ := d[fmt.Sprintf("v%d", v)].(map[string]any)
+		return map[string]any{
+			"folder_id": "default", "folder_name": "default",
+			"dashboard_id": id, "title": inner["title"], "description": inner["description"],
+			"owner": inner["owner"], "version": v, "hash": d["hash"],
+		}
+	}
+	saveDash("dash1", map[string]any{
+		"title": "Ops Overview", "description": "mock", "owner": "root@example.com",
+		"version": 5, "tabs": []any{},
+	})
+	mux.HandleFunc("/api/default/dashboards", func(w http.ResponseWriter, r *http.Request) {
+		if !requireAuth(w, r) {
+			return
+		}
+		switch r.Method {
+		case http.MethodGet:
+			items := make([]map[string]any, 0, len(dashes))
+			for id, d := range dashes {
+				items = append(items, dashListItem(id, d))
+			}
+			writeJSON(w, map[string]any{"dashboards": items})
+		case http.MethodPost:
+			raw, _ := io.ReadAll(r.Body)
+			var body map[string]any
+			if err := json.Unmarshal(raw, &body); err != nil || body == nil {
+				http.Error(w, `{"message":"invalid dashboard body"}`, http.StatusBadRequest)
+				return
+			}
+			id := fmt.Sprintf("dash%d", hashSeq+1)
+			w.WriteHeader(http.StatusCreated)
+			writeJSON(w, saveDash(id, body))
+		default:
+			w.WriteHeader(http.StatusMethodNotAllowed)
+		}
+	})
+	mux.HandleFunc("/api/default/dashboards/", func(w http.ResponseWriter, r *http.Request) {
+		if !requireAuth(w, r) {
+			return
+		}
+		id := strings.TrimPrefix(r.URL.Path, "/api/default/dashboards/")
+		d, ok := dashes[id]
+		if !ok {
+			http.Error(w, `{"message":"Dashboard not found"}`, http.StatusNotFound)
+			return
+		}
+		switch r.Method {
+		case http.MethodGet:
+			writeJSON(w, d)
+		case http.MethodPut:
+			raw, _ := io.ReadAll(r.Body)
+			var body map[string]any
+			if err := json.Unmarshal(raw, &body); err != nil || body == nil {
+				http.Error(w, `{"message":"invalid dashboard body"}`, http.StatusBadRequest)
+				return
+			}
+			if sent := r.URL.Query().Get("hash"); sent != "" && sent != d["hash"] {
+				http.Error(w, `{"message":"dashboard version mismatch"}`, http.StatusConflict)
+				return
+			}
+			writeJSON(w, saveDash(id, body))
+		case http.MethodDelete:
+			delete(dashes, id)
+			writeJSON(w, map[string]any{"message": "Dashboard deleted"})
+		default:
+			w.WriteHeader(http.StatusMethodNotAllowed)
+		}
+	})
 	// PromQL instant + range (Prometheus-compatible envelope).
 	mux.HandleFunc("/api/default/prometheus/api/v1/query", func(w http.ResponseWriter, r *http.Request) {
 		if !requireAuth(w, r) {

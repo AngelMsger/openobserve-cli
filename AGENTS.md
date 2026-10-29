@@ -104,7 +104,8 @@ that lists values of that kind.
 
 ## When extending (P1)
 
-Write commands (dashboards, alerts, functions/pipelines, users, ingest) must:
+Write commands (dashboards; later alerts, functions/pipelines, users, ingest)
+must:
 add `--dry-run` (emit the would-be request plan), require `--yes` for destructive
 ops, route through `apiclient.NewReadOnly` (override the new method to return
 `READONLY_BLOCKED`), and keep the `{items,next,has_more}` + structured-error
