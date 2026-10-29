@@ -53,6 +53,20 @@ type Client interface {
 
 	// LatestTraces returns recent traces in a trace stream, newest first.
 	LatestTraces(ctx context.Context, org, stream string, startMicros, endMicros int64, from, size int, filter string) (*TraceSearchResponse, error)
+
+	// ListAlerts returns alert summaries visible under the given options.
+	ListAlerts(ctx context.Context, org string, opts AlertListOptions) ([]AlertSummary, error)
+	// GetAlert returns the full alert definition.
+	GetAlert(ctx context.Context, org, id, folder string) (*Alert, error)
+	// CreateAlert stores body as a new alert in folder ("" = "default").
+	CreateAlert(ctx context.Context, org, folder string, body json.RawMessage) (*Alert, error)
+	// UpdateAlert replaces an alert's definition.
+	UpdateAlert(ctx context.Context, org, id, folder string, body json.RawMessage) (*Alert, error)
+	// DeleteAlert removes an alert permanently.
+	DeleteAlert(ctx context.Context, org, id, folder string) error
+	// SetAlertEnabled enables or disables an alert without replacing its
+	// definition.
+	SetAlertEnabled(ctx context.Context, org, id, folder string, value bool) error
 }
 
 // apiClient is the single Client implementation.

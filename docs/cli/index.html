@@ -25,6 +25,17 @@
 <div class="layout">
   <aside class="side">
     <div class="side-group">
+      <div class="side-title">alert</div>
+      <a href="#openobserve-cli-alert">openobserve-cli alert</a>
+      <a href="#openobserve-cli-alert-create">openobserve-cli alert create</a>
+      <a href="#openobserve-cli-alert-delete">openobserve-cli alert delete</a>
+      <a href="#openobserve-cli-alert-disable">openobserve-cli alert disable</a>
+      <a href="#openobserve-cli-alert-enable">openobserve-cli alert enable</a>
+      <a href="#openobserve-cli-alert-get">openobserve-cli alert get</a>
+      <a href="#openobserve-cli-alert-list">openobserve-cli alert list</a>
+      <a href="#openobserve-cli-alert-update">openobserve-cli alert update</a>
+      </div>
+    <div class="side-group">
       <div class="side-title">auth</div>
       <a href="#openobserve-cli-auth">openobserve-cli auth</a>
       <a href="#openobserve-cli-auth-guide">openobserve-cli auth guide</a>
@@ -134,6 +145,159 @@ After a CLI upgrade, refresh the Skill and reload the agent context.</p>
       </table>
     </section>
 
+
+    <section class="cmd" id="openobserve-cli-alert">
+      <h2>openobserve-cli alert</h2>
+      <p class="short">List, inspect and manage OpenObserve alerts</p>
+      <pre>openobserve-cli alert</pre>
+      <p class="long">Alerts live in OpenObserve&#39;s meta store, so the query commands
+cannot see them. `alert list` discovers IDs, names, streams and folders;
+`get` fetches a definition; `create`, `update`, `delete`, `enable` and
+`disable` manage it. Writes support --dry-run, `delete` requires --yes,
+and all are blocked by read-only mode (defaults.read_only /
+OPENOBSERVE_CLI_READ_ONLY) unless you pass the root --allow-writes flag.</p>
+
+
+    </section>
+
+    <section class="cmd" id="openobserve-cli-alert-create">
+      <h2>openobserve-cli alert create</h2>
+      <p class="short">Create an alert from a JSON definition file</p>
+      <pre>openobserve-cli alert create [flags]</pre>
+      <p class="long">The file holds the alert definition OpenObserve expects (name,
+stream_type, stream_name, query_condition, trigger_condition). A full
+`alert get` response works too — server-managed fields (id, owner,
+timestamps) are stripped. Stream names come from `stream list`. Use
+--file - to read from stdin. Blocked by read-only mode unless you
+pass --allow-writes.</p>
+      <h3>Options</h3>
+      <table>
+        <thead><tr><th>Flag</th><th>Default</th><th>Description</th></tr></thead>
+        <tbody>
+        <tr><td><code>--dry-run</code></td><td><code>false</code></td><td>print the request plan without sending anything</td></tr>
+        <tr><td><code>--file</code></td><td></td><td>alert definition file (- for stdin); required</td></tr>
+        <tr><td><code>--folder</code></td><td></td><td>folder ID to create in (default: &#34;default&#34;)</td></tr>
+        </tbody>
+      </table>
+      <h3>Examples</h3><pre>  openobserve-cli alert create --file alert.json
+  openobserve-cli alert get 02tzjqPXzvOx8NBvgBWB2rinBDa &gt; alert.json &amp;&amp; openobserve-cli alert create --file alert.json</pre>
+    </section>
+
+    <section class="cmd" id="openobserve-cli-alert-delete">
+      <h2>openobserve-cli alert delete</h2>
+      <p class="short">Delete an alert permanently (requires --yes)</p>
+      <pre>openobserve-cli alert delete &lt;id&gt; [flags]</pre>
+      <p class="long">Deletion cannot be undone, so --yes is mandatory. --dry-run prints
+the request plan without deleting (and does not need --yes). Blocked
+by read-only mode unless you pass --allow-writes.</p>
+      <h3>Options</h3>
+      <table>
+        <thead><tr><th>Flag</th><th>Default</th><th>Description</th></tr></thead>
+        <tbody>
+        <tr><td><code>--dry-run</code></td><td><code>false</code></td><td>print the request plan without sending anything</td></tr>
+        <tr><td><code>--folder</code></td><td></td><td>folder ID the alert lives in (default: &#34;default&#34;)</td></tr>
+        <tr><td><code>--yes</code></td><td><code>false</code></td><td>confirm the deletion (mandatory)</td></tr>
+        </tbody>
+      </table>
+
+    </section>
+
+    <section class="cmd" id="openobserve-cli-alert-disable">
+      <h2>openobserve-cli alert disable</h2>
+      <p class="short">Disable an alert without editing its definition</p>
+      <pre>openobserve-cli alert disable &lt;id&gt; [flags]</pre>
+      <p class="long">Whether an alert fires is a single server-side flag, so it gets its own
+command: no definition file, no read-modify-write. Removing the alert
+entirely needs `alert delete`; editing its destinations permanently
+needs `alert update`. Blocked by read-only mode unless you pass
+--allow-writes.</p>
+      <h3>Options</h3>
+      <table>
+        <thead><tr><th>Flag</th><th>Default</th><th>Description</th></tr></thead>
+        <tbody>
+        <tr><td><code>--dry-run</code></td><td><code>false</code></td><td>print the request plan without sending anything</td></tr>
+        <tr><td><code>--folder</code></td><td></td><td>folder ID the alert lives in (default: &#34;default&#34;)</td></tr>
+        </tbody>
+      </table>
+
+    </section>
+
+    <section class="cmd" id="openobserve-cli-alert-enable">
+      <h2>openobserve-cli alert enable</h2>
+      <p class="short">Enable an alert without editing its definition</p>
+      <pre>openobserve-cli alert enable &lt;id&gt; [flags]</pre>
+      <p class="long">Whether an alert fires is a single server-side flag, so it gets its own
+command: no definition file, no read-modify-write. Removing the alert
+entirely needs `alert delete`; editing its destinations permanently
+needs `alert update`. Blocked by read-only mode unless you pass
+--allow-writes.</p>
+      <h3>Options</h3>
+      <table>
+        <thead><tr><th>Flag</th><th>Default</th><th>Description</th></tr></thead>
+        <tbody>
+        <tr><td><code>--dry-run</code></td><td><code>false</code></td><td>print the request plan without sending anything</td></tr>
+        <tr><td><code>--folder</code></td><td></td><td>folder ID the alert lives in (default: &#34;default&#34;)</td></tr>
+        </tbody>
+      </table>
+
+    </section>
+
+    <section class="cmd" id="openobserve-cli-alert-get">
+      <h2>openobserve-cli alert get</h2>
+      <p class="short">Get an alert definition</p>
+      <pre>openobserve-cli alert get &lt;id&gt; [flags]</pre>
+      <p class="long">Returns the full alert JSON (name, stream, query condition, trigger
+condition, destinations, ...) exactly as stored. The output feeds
+straight into `alert create` / `update` — both strip the server-managed
+fields for you. Discover IDs with `alert list`.</p>
+      <h3>Options</h3>
+      <table>
+        <thead><tr><th>Flag</th><th>Default</th><th>Description</th></tr></thead>
+        <tbody>
+        <tr><td><code>--folder</code></td><td></td><td>folder ID the alert lives in (default: &#34;default&#34;)</td></tr>
+        </tbody>
+      </table>
+
+    </section>
+
+    <section class="cmd" id="openobserve-cli-alert-list">
+      <h2>openobserve-cli alert list</h2>
+      <p class="short">List alerts in the organization</p>
+      <pre>openobserve-cli alert list [flags]</pre>
+      <p class="long">Lists alert summaries: alert_id, name, stream, folder, owner and
+whether the alert is enabled. Without filters the server lists the
+&#34;default&#34; folder; --folder picks another. Fetch the full definition
+with `alert get &lt;id&gt;`.</p>
+      <h3>Options</h3>
+      <table>
+        <thead><tr><th>Flag</th><th>Default</th><th>Description</th></tr></thead>
+        <tbody>
+        <tr><td><code>--folder</code></td><td></td><td>folder ID to list (the server defaults to its &#34;default&#34; folder)</td></tr>
+        </tbody>
+      </table>
+
+    </section>
+
+    <section class="cmd" id="openobserve-cli-alert-update">
+      <h2>openobserve-cli alert update</h2>
+      <p class="short">Replace an alert&#39;s definition from a JSON file</p>
+      <pre>openobserve-cli alert update &lt;id&gt; [flags]</pre>
+      <p class="long">Reads as little as possible: the file is the new definition, sent
+verbatim. Server-managed fields from an `alert get` backup are
+stripped first, so a copy-edit-restore round trip needs no `jq`
+surgery. A --dry-run plan shows the request and sends nothing.
+Blocked by read-only mode unless you pass --allow-writes.</p>
+      <h3>Options</h3>
+      <table>
+        <thead><tr><th>Flag</th><th>Default</th><th>Description</th></tr></thead>
+        <tbody>
+        <tr><td><code>--dry-run</code></td><td><code>false</code></td><td>print the request plan without sending anything</td></tr>
+        <tr><td><code>--file</code></td><td></td><td>alert definition file (- for stdin); required</td></tr>
+        <tr><td><code>--folder</code></td><td></td><td>folder ID the alert lives in (default: &#34;default&#34;)</td></tr>
+        </tbody>
+      </table>
+
+    </section>
 
     <section class="cmd" id="openobserve-cli-auth">
       <h2>openobserve-cli auth</h2>

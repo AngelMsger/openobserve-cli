@@ -113,6 +113,97 @@ func main() {
 		writeJSON(w, map[string]any{"took": 5, "total": len(page), "scan_size": 1.5, "hits": page})
 	})
 
+	// Alerts: a tiny in-memory meta store mirroring the real API contract
+	// (list envelope, folder param, enabled toggle).
+	alerts := map[string]map[string]any{}
+	alertSeq := 0
+	alertListItem := func(id string, a map[string]any) map[string]any {
+		return map[string]any{
+			"folder_id": "default", "folder_name": "default",
+			"id": id, "name": a["name"], "description": a["description"],
+			"stream_type": a["stream_type"], "stream_name": a["stream_name"],
+			"enabled": a["enabled"], "owner": a["owner"],
+		}
+	}
+	saveAlert := func(id string, body map[string]any) map[string]any {
+		alertSeq++
+		body["id"] = id
+		alerts[id] = body
+		return body
+	}
+	saveAlert("alert1", map[string]any{
+		"name": "cpu-high", "description": "mock", "owner": "root@example.com",
+		"stream_type": "metrics", "stream_name": "node", "enabled": true,
+		"query_condition":   map[string]any{"type": "promql", "conditions": []any{}},
+		"trigger_condition": map[string]any{"period": 10, "threshold": 1},
+	})
+	mux.HandleFunc("/api/default/alerts", func(w http.ResponseWriter, r *http.Request) {
+		if !requireAuth(w, r) {
+			return
+		}
+		switch r.Method {
+		case http.MethodGet:
+			items := make([]map[string]any, 0, len(alerts))
+			for id, a := range alerts {
+				items = append(items, alertListItem(id, a))
+			}
+			writeJSON(w, map[string]any{"list": items})
+		case http.MethodPost:
+			raw, _ := io.ReadAll(r.Body)
+			var body map[string]any
+			if err := json.Unmarshal(raw, &body); err != nil || body == nil {
+				http.Error(w, `{"message":"invalid alert body"}`, http.StatusBadRequest)
+				return
+			}
+			w.WriteHeader(http.StatusCreated)
+			writeJSON(w, saveAlert(fmt.Sprintf("alert%d", alertSeq+1), body))
+		default:
+			w.WriteHeader(http.StatusMethodNotAllowed)
+		}
+	})
+	mux.HandleFunc("/api/default/alerts/", func(w http.ResponseWriter, r *http.Request) {
+		if !requireAuth(w, r) {
+			return
+		}
+		id := strings.TrimPrefix(r.URL.Path, "/api/default/alerts/")
+		if strings.HasSuffix(id, "/enabled") {
+			if r.Method != http.MethodPatch {
+				w.WriteHeader(http.StatusMethodNotAllowed)
+				return
+			}
+			a, ok := alerts[strings.TrimSuffix(id, "/enabled")]
+			if !ok {
+				http.Error(w, `{"message":"Alert not found"}`, http.StatusNotFound)
+				return
+			}
+			a["enabled"] = r.URL.Query().Get("value") == "true"
+			writeJSON(w, a)
+			return
+		}
+		a, ok := alerts[id]
+		if !ok {
+			http.Error(w, `{"message":"Alert not found"}`, http.StatusNotFound)
+			return
+		}
+		switch r.Method {
+		case http.MethodGet:
+			writeJSON(w, a)
+		case http.MethodPut:
+			raw, _ := io.ReadAll(r.Body)
+			var body map[string]any
+			if err := json.Unmarshal(raw, &body); err != nil || body == nil {
+				http.Error(w, `{"message":"invalid alert body"}`, http.StatusBadRequest)
+				return
+			}
+			writeJSON(w, saveAlert(id, body))
+		case http.MethodDelete:
+			delete(alerts, id)
+			writeJSON(w, map[string]any{"message": "Alert deleted"})
+		default:
+			w.WriteHeader(http.StatusMethodNotAllowed)
+		}
+	})
+
 	// PromQL instant + range (Prometheus-compatible envelope).
 	mux.HandleFunc("/api/default/prometheus/api/v1/query", func(w http.ResponseWriter, r *http.Request) {
 		if !requireAuth(w, r) {
