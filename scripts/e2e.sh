@@ -195,6 +195,40 @@ else
   echo "FAIL - search tail produced no rows"; cat "$TMP/tail.out" | head -5; exit 1
 fi
 
+# Dashboards: CRUD against the mock meta store plus the write-safety contract.
+cat >"$TMP/dash.json" <<'JSON'
+{"version": 5, "title": "Ops Board", "description": "e2e", "tabs": [], "variables": {"list": []}}
+JSON
+check "dashboard list"    '"dashboard_id": "dash1"' -- run dashboard list
+check "dashboard get"     '"hash": "h1"'            -- run dashboard get dash1
+check "dashboard dry-run" '"dry_run": true'         -- run dashboard create --dry-run --file "$TMP/dash.json"
+check "dashboard create"  '"created": true'         -- run dashboard create --file "$TMP/dash.json"
+check "dashboard update"  '"updated": true'         -- run dashboard update dash1 --file "$TMP/dash.json"
+check "dashboard delete"  '"deleted": true'         -- run dashboard delete dash1 --yes
+
+# Deletion refuses without --yes (exit 2, CONFIRM_REQUIRED, nothing sent).
+set +e
+run dashboard delete dash1 >"$TMP/del.out" 2>"$TMP/del.err"; code=$?
+set -e
+if [[ "$code" -eq 2 ]] && grep -q '"CONFIRM_REQUIRED"' "$TMP/del.err"; then
+  echo "ok   - dashboard delete requires --yes"
+  pass=$((pass + 1))
+else
+  echo "FAIL - dashboard delete without --yes (exit $code)"; head -5 "$TMP/del.err"; exit 1
+fi
+
+# Read-only mode blocks writes before any request (exit 5), even with --yes.
+set +e
+env OPENOBSERVE_CLI_READ_ONLY=1 "$BIN" --config "$TMP" dashboard delete dash1 --yes \
+  >"$TMP/ro.out" 2>"$TMP/ro.err"; code=$?
+set -e
+if [[ "$code" -eq 5 ]] && grep -q '"READONLY_BLOCKED"' "$TMP/ro.err"; then
+  echo "ok   - read-only mode blocks dashboard writes"
+  pass=$((pass + 1))
+else
+  echo "FAIL - read-only block (exit $code)"; head -5 "$TMP/ro.err"; exit 1
+fi
+
 echo ""
 echo "e2e: $pass checks passed"
 

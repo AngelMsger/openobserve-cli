@@ -1,7 +1,7 @@
 ---
 name: openobserve
-version: 0.3.11
-description: "Query OpenObserve (O2) logs, metrics, and traces: discover streams and fields, search SQL logs, inspect histograms, evaluate PromQL, reconstruct traces, and follow live logs. Use for an OpenObserve URL or an investigation whose backend is known to be OpenObserve, including errors, latency, request volume, and stream discovery. Supports self-hosted and Cloud instances. Remote operations are read-only; dashboards, alerts, pipelines, and user management are not supported."
+version: 0.4.0
+description: "Query OpenObserve (O2) logs, metrics, and traces: discover streams and fields, search SQL logs, inspect histograms, evaluate PromQL, reconstruct traces, and follow live logs. Use for an OpenObserve URL or an investigation whose backend is known to be OpenObserve, including errors, latency, request volume, and stream discovery. Supports self-hosted and Cloud instances. Telemetry operations are read-only. Dashboard management (list/get/create/update/delete with --dry-run, --yes and read-only-mode gating) is supported; alerts, pipelines and user management are not."
 metadata:
   requires:
     bins: ["openobserve-cli"]
@@ -13,7 +13,8 @@ metadata:
 `openobserve-cli` queries an OpenObserve (O2) backend for you across all three
 pillars — logs (SQL), metrics (PromQL) and traces (span trees). Output is JSON by
 default; errors are JSON on stderr with a `category`, a `hint` and `next_steps`.
-Everything is read-only.
+Telemetry commands are read-only. Dashboard writes are opt-in and gated
+(see [dashboards](references/dashboards.md)).
 
 ## Golden rule — discover before you query
 
@@ -59,6 +60,8 @@ Reuse discovery results within the same context. Prefer per-command `--org` and
   [metrics-and-traces.md](references/metrics-and-traces.md).
 - User asks **what streams / fields exist** → `stream list`, then
   `stream schema <name>`. See [streams.md](references/streams.md).
+- User wants to **back up, edit, recreate or clean up a dashboard** →
+  [dashboards.md](references/dashboards.md).
 - A query needs a column you're unsure of → `stream schema <name>` first.
 - Anything fails → read the error's `next_steps`; they name the exact command to
   run next. See [errors-and-exit-codes.md](references/errors-and-exit-codes.md).
@@ -93,6 +96,9 @@ browser window. It needs a display, so it only works where there is one. See
 - Prefer `--format ndjson` when piping hits into `jq`/`grep`; it streams one row
   per line. For very large result sets, `search run --all` pages through every
   matching row as ndjson (bound it with `--max`).
+- **Writes are opt-in.** Preview every dashboard change with `--dry-run`
+  first; never pass `--yes` or root-level `--allow-writes` without the user's
+  explicit confirmation in the same session.
 
 Report the finding first, then the org/stream, exact time window with timezone,
 and decisive evidence. Distinguish observations from likely causes and disclose
@@ -113,6 +119,11 @@ openobserve-cli metrics query --query 'sum by (service)(rate(http_requests_total
 openobserve-cli metrics query-range --query 'up' --since 1h --step 1m
 openobserve-cli trace search --stream <name> --since 1h    # recent traces (trace_id, duration, services)
 openobserve-cli trace get <trace_id> --stream <name> --since 1h    # span waterfall
+openobserve-cli dashboard list                    # discover dashboards (id, title, folder, hash)
+openobserve-cli dashboard get <id>                # full definition + the hash updates need
+openobserve-cli dashboard create --file def.json  # or --file - (stdin); --dry-run previews
+openobserve-cli dashboard update <id> --file def.json   # re-reads the hash itself
+openobserve-cli dashboard delete <id> --yes       # destructive: --yes is mandatory
 openobserve-cli config init|show               # configuration
 openobserve-cli config get-contexts|use-context <name>   # list / switch named server contexts
 openobserve-cli config delete-context <name>   # remove a context and its unused secret
@@ -127,7 +138,7 @@ current context.
 
 ## Agent-facing conventions
 
-- **Skill handshake — set `OPENOBSERVE_CLI_SKILL=0.3.11`.** Once you have
+- **Skill handshake — set `OPENOBSERVE_CLI_SKILL=0.4.0`.** Once you have
   loaded this Skill, export that exact value in the environment used to run the
   CLI. The CLI compares it with the embedded Skill version and emits a
   structured stderr notice when the Skill is missing, old, or uses the legacy

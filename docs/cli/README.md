@@ -27,6 +27,17 @@ is published at <https://angelmsger.github.io/openobserve-cli/cli/>.
 | [`openobserve-cli config show`](https://angelmsger.github.io/openobserve-cli/cli/#openobserve-cli-config-show) | Show the resolved configuration with field provenance |
 | [`openobserve-cli config use-context`](https://angelmsger.github.io/openobserve-cli/cli/#openobserve-cli-config-use-context) | Set the current context |
 
+## dashboard
+
+| Command | Description |
+| --- | --- |
+| [`openobserve-cli dashboard`](https://angelmsger.github.io/openobserve-cli/cli/#openobserve-cli-dashboard) | List, inspect and manage OpenObserve dashboards |
+| [`openobserve-cli dashboard create`](https://angelmsger.github.io/openobserve-cli/cli/#openobserve-cli-dashboard-create) | Create a dashboard from a JSON definition file |
+| [`openobserve-cli dashboard delete`](https://angelmsger.github.io/openobserve-cli/cli/#openobserve-cli-dashboard-delete) | Delete a dashboard permanently (requires --yes) |
+| [`openobserve-cli dashboard get`](https://angelmsger.github.io/openobserve-cli/cli/#openobserve-cli-dashboard-get) | Get a dashboard definition and its current hash |
+| [`openobserve-cli dashboard list`](https://angelmsger.github.io/openobserve-cli/cli/#openobserve-cli-dashboard-list) | List dashboards in the organization |
+| [`openobserve-cli dashboard update`](https://angelmsger.github.io/openobserve-cli/cli/#openobserve-cli-dashboard-update) | Replace a dashboard's definition from a JSON file |
+
 ## doctor
 
 | Command | Description |
