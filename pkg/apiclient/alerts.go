@@ -1,24 +1,24 @@
 package apiclient
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
 	"net/url"
-	"strconv"
 
 	cerrors "github.com/angelmsger/openobserve-cli/pkg/errors"
 )
 
-// AlertListOptions narrows ListAlerts. Without any filter the server lists the
-// "default" folder; the endpoint is unpaginated.
+// AlertListOptions narrows ListAlerts. Without a folder filter, the server
+// returns all visible folders. No pagination limit is requested.
 type AlertListOptions struct {
 	Folder string
 }
 
 // alertSummaryKeys is the curated, stable subset of a list item rendered by
-// `alert list`. The server embeds the full alert definition (query_condition,
+// `alert list`. The server embeds condition and trigger metadata (condition,
 // trigger_condition, ...) in each item; it stays in the raw map but is
 // intentionally dropped from list output — `alert get` fetches definitions.
 var alertSummaryKeys = []string{
@@ -46,11 +46,16 @@ type AlertSummary struct {
 // the identifiers the CLI relies on.
 func (a *AlertSummary) UnmarshalJSON(b []byte) error {
 	var m map[string]any
-	if err := json.Unmarshal(b, &m); err != nil {
+	decoder := json.NewDecoder(bytes.NewReader(b))
+	decoder.UseNumber()
+	if err := decoder.Decode(&m); err != nil {
 		return err
 	}
 	a.raw = m
-	a.AlertID, _ = m["id"].(string)
+	a.AlertID, _ = m["alert_id"].(string)
+	if a.AlertID == "" {
+		a.AlertID, _ = m["id"].(string)
+	}
 	a.Name, _ = m["name"].(string)
 	a.StreamName, _ = m["stream_name"].(string)
 	a.StreamType, _ = m["stream_type"].(string)
@@ -63,8 +68,7 @@ func (a *AlertSummary) UnmarshalJSON(b []byte) error {
 // MarshalJSON renders the curated subset, keeping the summary compact.
 func (a AlertSummary) MarshalJSON() ([]byte, error) {
 	out := map[string]any{}
-	// The summary id is surfaced under the stable "alert_id" key, not the
-	// server's unadorned "id".
+	// Keep the v2 alert_id key; also accept older fixtures using id.
 	if a.AlertID != "" {
 		out["alert_id"] = a.AlertID
 	}
@@ -82,11 +86,11 @@ func (a AlertSummary) MarshalJSON() ([]byte, error) {
 	return json.Marshal(out)
 }
 
-// Alert is a full alert definition as returned by get, create and update:
-// name, stream, query condition, trigger condition and so on. The raw map is
-// preserved verbatim so output round-trips into `alert update` without schema
-// coupling; only the pieces the CLI itself needs (id, name, stream, folder)
-// are extracted.
+// Alert preserves the JSON returned by GetAlert or a write acknowledgement.
+// Only GetAlert returns a complete definition. CreateAlert returns an ID/name
+// acknowledgement; UpdateAlert may return only a status message. The existing
+// return type is retained for public API compatibility. Numeric values are
+// preserved exactly for backup/edit/restore.
 type Alert struct {
 	raw        map[string]any
 	AlertID    string
@@ -99,7 +103,9 @@ type Alert struct {
 // fields the CLI relies on.
 func (a *Alert) UnmarshalJSON(b []byte) error {
 	var m map[string]any
-	if err := json.Unmarshal(b, &m); err != nil {
+	decoder := json.NewDecoder(bytes.NewReader(b))
+	decoder.UseNumber()
+	if err := decoder.Decode(&m); err != nil {
 		return err
 	}
 	a.raw = m
@@ -115,7 +121,7 @@ func (a Alert) MarshalJSON() ([]byte, error) {
 	return json.Marshal(a.raw)
 }
 
-// ListAlerts returns alert summaries via GET /api/{org}/alerts.
+// ListAlerts returns alert summaries via GET /api/v2/{org}/alerts.
 func (c *apiClient) ListAlerts(ctx context.Context, org string, opts AlertListOptions) ([]AlertSummary, error) {
 	q := url.Values{}
 	if opts.Folder != "" {
@@ -124,65 +130,56 @@ func (c *apiClient) ListAlerts(ctx context.Context, org string, opts AlertListOp
 	var env struct {
 		List []AlertSummary `json:"list"`
 	}
-	path := "/api/" + url.PathEscape(org) + "/alerts"
+	path := "/api/v2/" + url.PathEscape(org) + "/alerts"
 	if err := c.getJSON(ctx, path, q, &env); err != nil {
-		return nil, err
+		return nil, refineAlertError(err, "")
 	}
 	return env.List, nil
 }
 
 // GetAlert returns the full alert definition via
-// GET /api/{org}/alerts/{id}.
+// GET /api/v2/{org}/alerts/{id}.
 func (c *apiClient) GetAlert(ctx context.Context, org, id, folder string) (*Alert, error) {
-	path := "/api/" + url.PathEscape(org) + "/alerts/" + url.PathEscape(id)
+	path := "/api/v2/" + url.PathEscape(org) + "/alerts/" + url.PathEscape(id)
 	var a Alert
 	if err := c.getJSON(ctx, path, alertFolderQuery(folder), &a); err != nil {
-		return nil, refineAlertError(err, org, id)
+		return nil, refineAlertError(err, id)
 	}
 	return &a, nil
 }
 
 // CreateAlert stores body as a new alert in folder via
-// POST /api/{org}/alerts and returns it with its assigned ID.
+// POST /api/v2/{org}/alerts and returns the acknowledgement with its assigned ID.
 func (c *apiClient) CreateAlert(ctx context.Context, org, folder string, body json.RawMessage) (*Alert, error) {
-	path := "/api/" + url.PathEscape(org) + "/alerts"
 	var a Alert
-	if err := c.doJSON(ctx, http.MethodPost, path, alertFolderQuery(folder), body, &a); err != nil {
-		return nil, refineAlertError(err, org, "")
+	if err := c.executeAlertWrite(ctx, CreateAlertReq{org, folder, body}, &a); err != nil {
+		return nil, err
 	}
 	return &a, nil
 }
 
-// UpdateAlert replaces an alert's definition via
-// PUT /api/{org}/alerts/{id}.
+// UpdateAlert replaces a definition using the v2 ID-based API. The result is
+// the server's write acknowledgement, not a complete alert definition.
 func (c *apiClient) UpdateAlert(ctx context.Context, org, id, folder string, body json.RawMessage) (*Alert, error) {
-	path := "/api/" + url.PathEscape(org) + "/alerts/" + url.PathEscape(id)
 	var a Alert
-	if err := c.doJSON(ctx, http.MethodPut, path, alertFolderQuery(folder), body, &a); err != nil {
-		return nil, refineAlertError(err, org, id)
+	if err := c.executeAlertWrite(ctx, UpdateAlertReq{org, id, folder, body}, &a); err != nil {
+		return nil, err
+	}
+	// The v2 update acknowledgement does not repeat the target ID.
+	if a.AlertID == "" {
+		a.AlertID = id
 	}
 	return &a, nil
 }
 
-// DeleteAlert removes an alert via DELETE /api/{org}/alerts/{id}.
+// DeleteAlert removes an alert permanently.
 func (c *apiClient) DeleteAlert(ctx context.Context, org, id, folder string) error {
-	path := "/api/" + url.PathEscape(org) + "/alerts/" + url.PathEscape(id)
-	if err := c.doJSON(ctx, http.MethodDelete, path, alertFolderQuery(folder), nil, nil); err != nil {
-		return refineAlertError(err, org, id)
-	}
-	return nil
+	return c.executeAlertWrite(ctx, DeleteAlertReq{org, id, folder}, nil)
 }
 
-// SetAlertEnabled enables or disables an alert via
-// PATCH /api/{org}/alerts/{id}/enabled?value=<bool>.
+// SetAlertEnabled toggles an alert via PATCH /api/v2/{org}/alerts/{id}/enable.
 func (c *apiClient) SetAlertEnabled(ctx context.Context, org, id, folder string, value bool) error {
-	q := alertFolderQuery(folder)
-	q.Set("value", strconv.FormatBool(value))
-	path := "/api/" + url.PathEscape(org) + "/alerts/" + url.PathEscape(id) + "/enabled"
-	if err := c.doJSON(ctx, http.MethodPatch, path, q, nil, nil); err != nil {
-		return refineAlertError(err, org, id)
-	}
-	return nil
+	return c.executeAlertWrite(ctx, SetAlertEnabledReq{org, id, folder, value}, nil)
 }
 
 // alertFolderQuery builds the folder query parameter shared by every alert
@@ -202,12 +199,17 @@ func folderOrDefault(folder string) string {
 
 // refineAlertError retargets generic HTTP errors at the alert workflow: the
 // shared not-found guidance points at streams, and IDs are folder-scoped.
-func refineAlertError(err error, org, id string) error {
+func refineAlertError(err error, id string) error {
 	var ce *cerrors.CLIError
 	if !errors.As(err, &ce) {
 		return err
 	}
 	switch ce.Category {
+	case cerrors.CategoryPermission:
+		if ce.HTTPStatus == http.StatusForbidden {
+			return ce.WithHint("This credential lacks permission for alerts in the selected folder.").
+				WithNextSteps("In OpenObserve IAM, grant the required Alerts permissions for this folder to the user or service account.", "openobserve-cli alert list")
+		}
 	case cerrors.CategoryNotFound:
 		if id == "" {
 			// A create/update 404 means the folder (not the alert) is missing.

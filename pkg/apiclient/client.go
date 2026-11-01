@@ -26,6 +26,12 @@ import (
 
 // Client is the OpenObserve API surface used by the CLI.
 type Client interface {
+	Reader
+	Writer
+}
+
+// Reader contains operations that do not mutate remote state.
+type Reader interface {
 	BaseURL() string
 	// DefaultOrg returns the organization identifier the client was built with.
 	DefaultOrg() string
@@ -58,6 +64,13 @@ type Client interface {
 	ListAlerts(ctx context.Context, org string, opts AlertListOptions) ([]AlertSummary, error)
 	// GetAlert returns the full alert definition.
 	GetAlert(ctx context.Context, org, id, folder string) (*Alert, error)
+	// DescribeWrite builds a request plan offline, without credentials or HTTP.
+	DescribeWrite(ctx context.Context, op any) (WriteRequestPlan, error)
+}
+
+// Writer contains every remote mutation. Read-only clients implement these
+// explicitly so adding a write without blocking it is a compile-time error.
+type Writer interface {
 	// CreateAlert stores body as a new alert in folder ("" = "default").
 	CreateAlert(ctx context.Context, org, folder string, body json.RawMessage) (*Alert, error)
 	// UpdateAlert replaces an alert's definition.

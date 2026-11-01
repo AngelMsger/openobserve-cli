@@ -1,6 +1,6 @@
 ---
 name: openobserve
-version: 0.4.0
+version: 0.4.1
 description: "Query OpenObserve (O2) logs, metrics, and traces: discover streams and fields, search SQL logs, inspect histograms, evaluate PromQL, reconstruct traces, and follow live logs. Use for an OpenObserve URL or an investigation whose backend is known to be OpenObserve, including errors, latency, request volume, and stream discovery. Supports self-hosted and Cloud instances. Telemetry operations are read-only. Alert management (list/get/create/update/delete/enable/disable with --dry-run, --yes and read-only-mode gating) is supported; dashboards, pipelines and user management are not."
 metadata:
   requires:
@@ -13,7 +13,7 @@ metadata:
 `openobserve-cli` queries an OpenObserve (O2) backend for you across all three
 pillars — logs (SQL), metrics (PromQL) and traces (span trees). Output is JSON by
 default; errors are JSON on stderr with a `category`, a `hint` and `next_steps`.
-Telemetry commands are read-only. Alert writes are opt-in and gated
+Telemetry commands are read-only. Alert writes honor the configured read-only posture
 (see [alerts](references/alerts.md)).
 
 ## Golden rule — discover before you query

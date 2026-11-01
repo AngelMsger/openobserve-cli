@@ -34,10 +34,12 @@ Three layers, in precedence order:
 
 When the posture is read-only, the API client is wrapped by
 `apiclient.NewReadOnly` before any command runs (`pkg/apiclient/readonly.go`).
-The wrapper embeds the real client, so every **read** passes straight through.
-Each **write** method (`CreateAlert`, `UpdateAlert`, `DeleteAlert` and
-`SetAlertEnabled` today) overrides the embedded one to return a structured
-error instead of issuing a request:
+The public `Client` combines `Reader` and `Writer`. The wrapper embeds only
+`Reader`, so reads and offline `DescribeWrite` plans pass through. Each write
+method (`CreateAlert`, `UpdateAlert`, `DeleteAlert`, `SetAlertEnabled`) is
+implemented explicitly to return a structured error. A compile-time assertion
+requires the wrapper to satisfy `Client`; adding a new write without blocking
+it fails compilation:
 
 ```json
 {

@@ -65,9 +65,14 @@ from the meta store the query commands cannot see, while `create`, `update`,
 
 ## API client (`pkg/apiclient`)
 
-`Client` is an interface (`client.go`); `apiClient` is the single
-implementation. Methods are org-scoped (`/api/{org}/…`); `models.go` defines the
-returned types.
+`Client` combines `Reader` and `Writer` interfaces (`client.go`); `apiClient`
+is the single implementation. The read-only wrapper embeds only `Reader` and
+explicitly blocks every write. Methods are org-scoped (`/api/{org}/…`); `models.go` defines the
+returned types. Alert management uses `/api/v2/{org}/alerts`.
+`alerts_write.go` owns the shared execution/preview builders, exported typed
+write requests, and `DescribeWrite` offline plans. Payload normalization lives
+in `pkg/apiclient` so library users and CLI users share it; raw JSON preserves
+exact numeric values across backup/edit/restore.
 
 - `doJSON` builds the request, applies the transport, and on a non-2xx response
   calls `httpError`, which classifies the status into a category and — for 403 —

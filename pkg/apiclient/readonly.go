@@ -7,18 +7,17 @@ import (
 	cerrors "github.com/angelmsger/openobserve-cli/pkg/errors"
 )
 
-// readOnlyClient wraps a Client and blocks every mutating method before a
-// request leaves the process. Reads pass through the embedded Client; each
-// write method is overridden to return a structured READONLY_BLOCKED error
-// when the session read-only posture (defaults.read_only /
-// OPENOBSERVE_CLI_READ_ONLY / --allow-writes) is active.
+// readOnlyClient embeds only Reader. Writer methods must be blocked explicitly.
+// Never embed Client here: newly added writes would otherwise pass through.
 type readOnlyClient struct {
-	Client
+	Reader
 }
+
+var _ Client = (*readOnlyClient)(nil)
 
 // NewReadOnly returns a read-only view of c.
 func NewReadOnly(c Client) Client {
-	return &readOnlyClient{Client: c}
+	return &readOnlyClient{Reader: c}
 }
 
 // readonlyBlocked is the structured error every write returns under the

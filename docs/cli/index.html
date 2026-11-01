@@ -265,14 +265,14 @@ fields for you. Discover IDs with `alert list`.</p>
       <p class="short">List alerts in the organization</p>
       <pre>openobserve-cli alert list [flags]</pre>
       <p class="long">Lists alert summaries: alert_id, name, stream, folder, owner and
-whether the alert is enabled. Without filters the server lists the
-&#34;default&#34; folder; --folder picks another. Fetch the full definition
+whether the alert is enabled. Without --folder, lists all visible
+folders; --folder narrows the list. Fetch the full definition
 with `alert get &lt;id&gt;`.</p>
       <h3>Options</h3>
       <table>
         <thead><tr><th>Flag</th><th>Default</th><th>Description</th></tr></thead>
         <tbody>
-        <tr><td><code>--folder</code></td><td></td><td>folder ID to list (the server defaults to its &#34;default&#34; folder)</td></tr>
+        <tr><td><code>--folder</code></td><td></td><td>folder ID to list (omit to include all visible folders)</td></tr>
         </tbody>
       </table>
 
