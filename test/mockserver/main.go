@@ -120,7 +120,7 @@ func main() {
 	alertListItem := func(id string, a map[string]any) map[string]any {
 		return map[string]any{
 			"folder_id": "default", "folder_name": "default",
-			"id": id, "name": a["name"], "description": a["description"],
+			"alert_id": id, "name": a["name"], "description": a["description"],
 			"stream_type": a["stream_type"], "stream_name": a["stream_name"],
 			"enabled": a["enabled"], "owner": a["owner"],
 		}
@@ -137,7 +137,7 @@ func main() {
 		"query_condition":   map[string]any{"type": "promql", "conditions": []any{}},
 		"trigger_condition": map[string]any{"period": 10, "threshold": 1},
 	})
-	mux.HandleFunc("/api/default/alerts", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/api/v2/default/alerts", func(w http.ResponseWriter, r *http.Request) {
 		if !requireAuth(w, r) {
 			return
 		}
@@ -155,23 +155,23 @@ func main() {
 				http.Error(w, `{"message":"invalid alert body"}`, http.StatusBadRequest)
 				return
 			}
-			w.WriteHeader(http.StatusCreated)
-			writeJSON(w, saveAlert(fmt.Sprintf("alert%d", alertSeq+1), body))
+			saved := saveAlert(fmt.Sprintf("alert%d", alertSeq+1), body)
+			writeJSON(w, map[string]any{"code": 200, "message": "Alert saved", "id": saved["id"], "name": saved["name"]})
 		default:
 			w.WriteHeader(http.StatusMethodNotAllowed)
 		}
 	})
-	mux.HandleFunc("/api/default/alerts/", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/api/v2/default/alerts/", func(w http.ResponseWriter, r *http.Request) {
 		if !requireAuth(w, r) {
 			return
 		}
-		id := strings.TrimPrefix(r.URL.Path, "/api/default/alerts/")
-		if strings.HasSuffix(id, "/enabled") {
+		id := strings.TrimPrefix(r.URL.Path, "/api/v2/default/alerts/")
+		if strings.HasSuffix(id, "/enable") {
 			if r.Method != http.MethodPatch {
 				w.WriteHeader(http.StatusMethodNotAllowed)
 				return
 			}
-			a, ok := alerts[strings.TrimSuffix(id, "/enabled")]
+			a, ok := alerts[strings.TrimSuffix(id, "/enable")]
 			if !ok {
 				http.Error(w, `{"message":"Alert not found"}`, http.StatusNotFound)
 				return
@@ -195,7 +195,8 @@ func main() {
 				http.Error(w, `{"message":"invalid alert body"}`, http.StatusBadRequest)
 				return
 			}
-			writeJSON(w, saveAlert(id, body))
+			saveAlert(id, body)
+			writeJSON(w, map[string]any{"code": 200, "message": "Alert Updated"})
 		case http.MethodDelete:
 			delete(alerts, id)
 			writeJSON(w, map[string]any{"message": "Alert deleted"})

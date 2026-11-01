@@ -1,11 +1,10 @@
 package app
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
-	"net/http"
-	"net/url"
 	"os"
 	"strings"
 
@@ -49,8 +48,8 @@ func newAlertListCmd(s *appState) *cobra.Command {
 		Use:   "list",
 		Short: "List alerts in the organization",
 		Long: "Lists alert summaries: alert_id, name, stream, folder, owner and\n" +
-			"whether the alert is enabled. Without filters the server lists the\n" +
-			"\"default\" folder; --folder picks another. Fetch the full definition\n" +
+			"whether the alert is enabled. Without --folder, lists all visible\n" +
+			"folders; --folder narrows the list. Fetch the full definition\n" +
 			"with `alert get <id>`.",
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
@@ -67,7 +66,7 @@ func newAlertListCmd(s *appState) *cobra.Command {
 			return s.emitList(summaries, pageInfo{})
 		},
 	}
-	cmd.Flags().StringVar(&folder, "folder", "", "folder ID to list (the server defaults to its \"default\" folder)")
+	cmd.Flags().StringVar(&folder, "folder", "", "folder ID to list (omit to include all visible folders)")
 	return cmd
 }
 
@@ -119,17 +118,12 @@ func newAlertCreateCmd(s *appState) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			body, err = normalizeAlertBody(body)
+			body, err = apiclient.NormalizeAlertBody(body)
 			if err != nil {
 				return err
 			}
 			if dryRun {
-				return s.emit(map[string]any{
-					"dry_run": true,
-					"request": s.requestPlan(http.MethodPost,
-						"/api/"+url.PathEscape(s.org())+"/alerts",
-						alertPlanQuery(folder, ""), body),
-				})
+				return s.emitWritePlan(apiclient.CreateAlertReq{Org: s.org(), Folder: folder, Body: body})
 			}
 			ctx, cancel := cmdContext(s)
 			defer cancel()
@@ -169,17 +163,12 @@ func newAlertUpdateCmd(s *appState) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			body, err = normalizeAlertBody(body)
+			body, err = apiclient.NormalizeAlertBody(body)
 			if err != nil {
 				return err
 			}
 			if dryRun {
-				return s.emit(map[string]any{
-					"dry_run": true,
-					"request": s.requestPlan(http.MethodPut,
-						"/api/"+url.PathEscape(s.org())+"/alerts/"+url.PathEscape(id),
-						alertPlanQuery(folder, ""), body),
-				})
+				return s.emitWritePlan(apiclient.UpdateAlertReq{Org: s.org(), ID: id, Folder: folder, Body: body})
 			}
 			ctx, cancel := cmdContext(s)
 			defer cancel()
@@ -221,13 +210,7 @@ func newAlertDeleteCmd(s *appState) *cobra.Command {
 						"Back up first: openobserve-cli alert get "+id)
 			}
 			if dryRun {
-				return s.emit(map[string]any{
-					"dry_run": true,
-					"request": map[string]any{
-						"method": http.MethodDelete,
-						"url":    s.planURL("/api/"+url.PathEscape(s.org())+"/alerts/"+url.PathEscape(id), alertPlanQuery(folder, "")),
-					},
-				})
+				return s.emitWritePlan(apiclient.DeleteAlertReq{Org: s.org(), ID: id, Folder: folder})
 			}
 			ctx, cancel := cmdContext(s)
 			defer cancel()
@@ -270,20 +253,8 @@ func newAlertSetEnabledCmd(s *appState, enable bool) *cobra.Command {
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			id := args[0]
-			q := alertPlanQuery(folder, "")
-			if !enable {
-				q.Set("value", "false")
-			} else {
-				q.Set("value", "true")
-			}
 			if dryRun {
-				return s.emit(map[string]any{
-					"dry_run": true,
-					"request": map[string]any{
-						"method": http.MethodPatch,
-						"url":    s.planURL("/api/"+url.PathEscape(s.org())+"/alerts/"+url.PathEscape(id)+"/enabled", q),
-					},
-				})
+				return s.emitWritePlan(apiclient.SetAlertEnabledReq{Org: s.org(), ID: id, Folder: folder, Enabled: enable})
 			}
 			ctx, cancel := cmdContext(s)
 			defer cancel()
@@ -336,33 +307,6 @@ func readAlertBody(file string) (json.RawMessage, error) {
 	return json.RawMessage(data), nil
 }
 
-// alertServerManagedFields are the fields the server owns; `alert create` and
-// `update` strip them from a definition so an `alert get` backup feeds back in
-// unchanged.
-var alertServerManagedFields = []string{
-	"id", "owner", "created_at", "updated_at",
-	"last_triggered_at", "last_satisfied_at", "folder_id", "folder_name",
-}
-
-// normalizeAlertBody validates that body is a JSON object and strips the
-// server-managed fields down to the definition OpenObserve expects for
-// create/update.
-func normalizeAlertBody(body json.RawMessage) (json.RawMessage, error) {
-	var m map[string]any
-	if err := json.Unmarshal(body, &m); err != nil {
-		return nil, cerrors.Wrap(err, cerrors.CategoryUsage, "BAD_BODY",
-			"the alert definition is not valid JSON")
-	}
-	if m == nil {
-		return nil, cerrors.New(cerrors.CategoryUsage, "BAD_BODY",
-			"the alert definition must be a JSON object")
-	}
-	for _, k := range alertServerManagedFields {
-		delete(m, k)
-	}
-	return json.Marshal(m)
-}
-
 // alertWriteSummary is the compact, stable output of create/update:
 // identifiers, not the (potentially huge) definition.
 func alertWriteSummary(verb string, a *apiclient.Alert, folder string) map[string]any {
@@ -380,38 +324,19 @@ func alertWriteSummary(verb string, a *apiclient.Alert, folder string) map[strin
 	return out
 }
 
-// alertPlanQuery mirrors the query parameters the API client sends, so a
-// --dry-run plan shows the real URL.
-func alertPlanQuery(folder, value string) url.Values {
-	q := url.Values{}
-	q.Set("folder", folderOrDefault(folder))
-	if value != "" {
-		q.Set("value", value)
-	}
-	return q
-}
-
-// planURL renders the absolute URL a request would go to.
-func (s *appState) planURL(path string, q url.Values) string {
+// emitWritePlan delegates preview construction to the same API builders used
+// for execution. This client has no transport or credentials and cannot send HTTP.
+func (s *appState) emitWritePlan(op any) error {
 	base, err := apiclient.NormalizeBaseURL(s.cfg().BaseURL)
 	if err != nil {
-		return path
+		return err
 	}
-	if enc := q.Encode(); enc != "" {
-		return base + path + "?" + enc
+	client := apiclient.New(apiclient.Config{BaseURL: base})
+	plan, err := client.DescribeWrite(context.Background(), op)
+	if err != nil {
+		return err
 	}
-	return base + path
-}
-
-// requestPlan builds the plan object shared by create/update --dry-run.
-func (s *appState) requestPlan(method, path string, q url.Values, body json.RawMessage) map[string]any {
-	var parsed any
-	_ = json.Unmarshal(body, &parsed)
-	return map[string]any{
-		"method": method,
-		"url":    s.planURL(path, q),
-		"body":   parsed,
-	}
+	return s.emit(map[string]any{"dry_run": true, "request": plan})
 }
 
 func folderOrDefault(folder string) string {

@@ -3,6 +3,7 @@ package apiclient
 import (
 	"context"
 	"encoding/json"
+	"io"
 	"net/http"
 	"strings"
 	"testing"
@@ -10,20 +11,22 @@ import (
 	cerrors "github.com/angelmsger/openobserve-cli/pkg/errors"
 )
 
+// Fixtures follow OpenObserve v2 request handlers and alert response DTOs:
+// https://github.com/openobserve/openobserve/tree/2f010b8de363a07963d84e3e32f373309ee2e105/src/api/management/src
 func TestListAlerts(t *testing.T) {
 	client, _ := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/api/acme/alerts" {
+		if r.URL.Path != "/api/v2/acme/alerts" {
 			t.Errorf("unexpected path %q", r.URL.Path)
 		}
 		if got := r.URL.Query().Get("folder"); got != "prod" {
 			t.Errorf("folder = %q, want prod", got)
 		}
 		_, _ = w.Write([]byte(`{"list":[{
-			"id":"a1","name":"cpu-high","description":"cpu over 90%",
+			"alert_id":"a1","name":"cpu-high","description":"cpu over 90%",
 			"stream_type":"metrics","stream_name":"node","is_real_time":false,
 			"enabled":true,"owner":"ops@example.com","last_triggered_at":1700000000000000,
 			"folder_id":"prod","folder_name":"prod",
-			"query_condition":{"type":"promql","conditions":[]},
+			"condition":{"type":"promql","conditions":[]},
 			"trigger_condition":{"period":10,"threshold":1}
 		}]}`))
 	})
@@ -56,7 +59,7 @@ func TestListAlerts(t *testing.T) {
 
 func TestGetAlert(t *testing.T) {
 	client, _ := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/api/acme/alerts/a1" {
+		if r.URL.Path != "/api/v2/acme/alerts/a1" {
 			t.Errorf("unexpected path %q", r.URL.Path)
 		}
 		if got := r.URL.Query().Get("folder"); got != "default" {
@@ -90,11 +93,13 @@ func TestCreateAlertStripsAndSendsBody(t *testing.T) {
 		if got := r.URL.Query().Get("folder"); got != "default" {
 			t.Errorf("folder = %q, want default", got)
 		}
-		buf := make([]byte, r.ContentLength)
-		_, _ = r.Body.Read(buf)
+		buf, err := io.ReadAll(r.Body)
+		if err != nil {
+			t.Fatal(err)
+		}
 		gotBody = string(buf)
 		w.WriteHeader(http.StatusCreated)
-		_, _ = w.Write([]byte(`{"id":"a1","name":"cpu-high","stream_name":"node"}`))
+		_, _ = w.Write([]byte(`{"code":200,"message":"Alert saved","id":"a1","name":"cpu-high"}`))
 	})
 	a, err := client.CreateAlert(context.Background(), "default", "",
 		json.RawMessage(`{"name":"cpu-high","stream_name":"node","stream_type":"metrics"}`))
@@ -117,7 +122,7 @@ func TestUpdateAlert(t *testing.T) {
 		if got := r.URL.Query().Get("folder"); got != "prod" {
 			t.Errorf("folder = %q, want prod", got)
 		}
-		_, _ = w.Write([]byte(`{"id":"a1","name":"cpu-high","stream_name":"node"}`))
+		_, _ = w.Write([]byte(`{"code":200,"message":"Alert Updated"}`))
 	})
 	a, err := client.UpdateAlert(context.Background(), "default", "a1", "prod",
 		json.RawMessage(`{"name":"cpu-high","stream_name":"node","stream_type":"metrics"}`))
@@ -146,7 +151,7 @@ func TestSetAlertEnabled(t *testing.T) {
 		if r.Method != http.MethodPatch {
 			t.Errorf("method = %q, want PATCH", r.Method)
 		}
-		if r.URL.Path != "/api/default/alerts/a1/enabled" {
+		if r.URL.Path != "/api/v2/default/alerts/a1/enable" {
 			t.Errorf("unexpected path %q", r.URL.Path)
 		}
 		if got := r.URL.Query().Get("value"); got != "false" {

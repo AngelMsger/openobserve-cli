@@ -10,14 +10,15 @@ you query with the other nouns.
 `alert list` is the source of every identifier the other commands accept:
 
 ```
-openobserve-cli alert list                      # summaries in the "default" folder
+openobserve-cli alert list                      # summaries across visible folders
 openobserve-cli alert list --folder <id>        # another folder
 ```
 
 Each summary carries `alert_id`, `name`, `stream_name`, `stream_type`,
 `enabled`, `owner`, `folder_id` and `folder_name`. Folder IDs are discovered
-from these rows; the server lists only the `default` folder when no filter is
-given, so list a known folder before concluding an alert is missing. IDs are
+from these rows; without `--folder` the server lists all visible folders.
+For get/update/delete/enable/disable, pass the discovered `--folder` when it
+is not `default` (required for folder-scoped permissions). IDs are
 case-sensitive; reuse them verbatim. The `stream_name` of a summary (or the
 `stream list` output) is the only valid target for a new alert — never invent
 one.
@@ -32,7 +33,7 @@ openobserve-cli alert get <id> > backup.json
 
 The output is directly re-usable by `create` and `update`: both strip the
 server-managed fields (`id`, `owner`, `created_at`, `updated_at`,
-`last_triggered_at`, `last_satisfied_at`, `folder_id`, `folder_name`), so a
+`last_triggered_at`, `last_satisfied_at`, `last_edited_by`, `folder_id`, `folder_name`, `alert_id`), so a
 copy-edit-restore round trip needs no `jq` surgery.
 
 ## Writing safely
@@ -74,7 +75,7 @@ user's behalf without explicit confirmation in the same session.
 each definition:
 
 ```
-for id in $(openobserve-cli alert list | jq -r '.items[].alert_id'); do
+for id in $(openobserve-cli alert list --folder default | jq -r '.items[].alert_id'); do
   openobserve-cli alert get "$id" > "$id.json"
 done
 ```
@@ -116,3 +117,14 @@ destinations (emails / webhooks configured in the OpenObserve UI or API).
 Verify a new definition with `--dry-run`, then confirm it landed by listing or
 getting it after creation — never report an alert as working from a 2xx
 alone.
+
+## API compatibility
+
+Alert operations use OpenObserve's ID-based v2 API (`/api/v2/{org}/alerts`).
+Enable/disable uses `PATCH .../{id}/enable?value=true|false`. Servers exposing
+only the older stream/name API are not supported by these commands.
+
+Create/update return compact acknowledgements. Use `alert get` to fetch a full
+definition; an update acknowledgement need not contain an ID, so the CLI
+reports the ID supplied to the command. Dry-run validates and normalizes JSON
+but does not verify streams, destinations, permissions or other server rules.

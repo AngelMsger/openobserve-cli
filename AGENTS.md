@@ -107,8 +107,9 @@ that lists values of that kind.
 Write commands (alerts; later dashboards, functions/pipelines, users, ingest)
 must:
 add `--dry-run` (emit the would-be request plan), require `--yes` for destructive
-ops, route through `apiclient.NewReadOnly` (override the new method to return
-`READONLY_BLOCKED`), and keep the `{items,next,has_more}` + structured-error
+ops, route through `apiclient.NewReadOnly` (embed only `Reader`, implement each
+`Writer` method to return `READONLY_BLOCKED`, and retain the compile-time
+`Client` assertion), and keep the `{items,next,has_more}` + structured-error
 contract.
 
 **Keep the companion Skill in sync — it is the agent-facing source of truth.**
