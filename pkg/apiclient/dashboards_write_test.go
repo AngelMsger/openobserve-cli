@@ -1,7 +1,6 @@
 package apiclient
 
 import (
-	"context"
 	"encoding/json"
 	"strings"
 	"testing"
@@ -82,9 +81,7 @@ func TestDashboardBackupPreservesExactNumbers(t *testing.T) {
 	}
 }
 
-func TestDescribeDashboardWrite(t *testing.T) {
-	// Nil transport makes any accidental I/O fail; read-only planning must work.
-	c := NewReadOnly(New(Config{BaseURL: "https://example.test"}))
+func TestPlanDashboardWrite(t *testing.T) {
 	cases := []struct {
 		op      any
 		wantURL string
@@ -98,27 +95,25 @@ func TestDescribeDashboardWrite(t *testing.T) {
 			"https://example.test/api/org/dashboards/d1?folder=default"},
 	}
 	for _, tc := range cases {
-		plan, err := c.DescribeWrite(context.Background(), tc.op)
+		plan, err := PlanDashboardWrite("https://example.test", tc.op)
 		if err != nil || plan.URL != tc.wantURL {
 			t.Errorf("offline plan for %T: %+v %v, want URL %q", tc.op, plan, err, tc.wantURL)
 		}
 	}
 }
 
-func TestDescribeDashboardWriteValidation(t *testing.T) {
-	c := NewReadOnly(New(Config{BaseURL: "https://example.test"}))
+func TestPlanDashboardWriteValidation(t *testing.T) {
 	for _, op := range []any{
 		DeleteDashboardReq{Org: "org"},
 		UpdateDashboardReq{Org: "org", ID: "d1", Body: json.RawMessage(`null`)},
 		CreateDashboardReq{Org: "org", Body: json.RawMessage(`[]`)},
 		"unsupported",
 	} {
-		if _, err := c.DescribeWrite(context.Background(), op); err == nil {
+		if _, err := PlanDashboardWrite("https://example.test", op); err == nil {
 			t.Fatalf("accepted invalid operation: %#v", op)
 		}
 	}
-	bad := New(Config{BaseURL: "http://[invalid"})
-	if _, err := bad.DescribeWrite(context.Background(), DeleteDashboardReq{Org: "org", ID: "d1"}); err == nil {
+	if _, err := PlanDashboardWrite("http://[invalid", DeleteDashboardReq{Org: "org", ID: "d1"}); err == nil {
 		t.Fatal("invalid base URL was hidden")
 	}
 }

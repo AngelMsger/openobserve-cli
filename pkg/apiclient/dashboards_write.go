@@ -94,6 +94,21 @@ func (c *apiClient) executeDashboardWrite(ctx context.Context, op any, out any) 
 	return refineDashboardError(c.doJSON(ctx, r.method, r.path, r.query, body, out), org, r.id)
 }
 
+// PlanDashboardWrite returns a plan without accessing credentials or the
+// network. Supported operations are CreateDashboardReq, UpdateDashboardReq
+// and DeleteDashboardReq. Dry-run plans use the same builders as execution.
+func PlanDashboardWrite(baseURL string, op any) (WriteRequestPlan, error) {
+	r, err := buildDashboardWrite(op)
+	if err != nil {
+		return WriteRequestPlan{}, err
+	}
+	base, err := NormalizeBaseURL(baseURL)
+	if err != nil {
+		return WriteRequestPlan{}, err
+	}
+	return WriteRequestPlan{Method: r.method, URL: base + r.path + "?" + r.query.Encode(), Body: r.body}, nil
+}
+
 // NormalizeDashboardBody validates a definition and unwraps a `dashboard get`
 // envelope ({v5: {...}, version, hash, updated_at}) down to the body
 // OpenObserve expects for create/update. Keys are kept raw so exact numbers

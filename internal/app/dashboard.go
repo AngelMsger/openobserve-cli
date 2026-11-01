@@ -123,7 +123,7 @@ func newDashboardCreateCmd(s *appState) *cobra.Command {
 				return err
 			}
 			if dryRun {
-				return s.emitWritePlan(apiclient.CreateDashboardReq{Org: s.org(), Folder: folder, Body: body})
+				return s.emitDashboardWritePlan(apiclient.CreateDashboardReq{Org: s.org(), Folder: folder, Body: body})
 			}
 			ctx, cancel := cmdContext(s)
 			defer cancel()
@@ -169,7 +169,7 @@ func newDashboardUpdateCmd(s *appState) *cobra.Command {
 				return err
 			}
 			if dryRun {
-				return s.emitWritePlan(apiclient.UpdateDashboardReq{Org: s.org(), ID: id, Folder: folder, Hash: hash, Body: body})
+				return s.emitDashboardWritePlan(apiclient.UpdateDashboardReq{Org: s.org(), ID: id, Folder: folder, Hash: hash, Body: body})
 			}
 			ctx, cancel := cmdContext(s)
 			defer cancel()
@@ -221,7 +221,7 @@ func newDashboardDeleteCmd(s *appState) *cobra.Command {
 						"Back up first: openobserve-cli dashboard get "+id)
 			}
 			if dryRun {
-				return s.emitWritePlan(apiclient.DeleteDashboardReq{Org: s.org(), ID: id, Folder: folder})
+				return s.emitDashboardWritePlan(apiclient.DeleteDashboardReq{Org: s.org(), ID: id, Folder: folder})
 			}
 			ctx, cancel := cmdContext(s)
 			defer cancel()
@@ -270,6 +270,16 @@ func readDashboardBody(file string) (json.RawMessage, error) {
 			"the dashboard definition file is empty")
 	}
 	return json.RawMessage(data), nil
+}
+
+// emitDashboardWritePlan delegates preview construction to the same API
+// builders used for execution, so plans stay offline and credential-free.
+func (s *appState) emitDashboardWritePlan(op any) error {
+	plan, err := apiclient.PlanDashboardWrite(s.cfg().BaseURL, op)
+	if err != nil {
+		return err
+	}
+	return s.emit(map[string]any{"dry_run": true, "request": plan})
 }
 
 // dashboardWriteSummary is the compact, stable output of create/update:
