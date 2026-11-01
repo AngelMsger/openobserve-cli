@@ -1,14 +1,15 @@
 package apiclient
 
-// readOnlyClient wraps a Client and blocks every mutating method before a
-// request leaves the process. The v0.1 surface is entirely read-only, so the
-// wrapper currently only embeds the underlying Client and passes reads through.
+// readOnlyClient is the client the session read-only posture
+// (defaults.read_only / OPENOBSERVE_CLI_READ_ONLY / --allow-writes) hands out.
+// Every method today is a read, so it passes them all through.
 //
-// It exists so the session read-only posture (defaults.read_only /
-// OPENOBSERVE_CLI_READ_ONLY / --allow-writes) is wired end-to-end now: when P1
-// adds write methods (dashboards, alerts, functions, users, ingest) to Client,
-// each gets an override here that returns a structured READONLY_BLOCKED error,
-// with no other plumbing to change.
+// The first write method (dashboards, alerts, functions, users, ingest) must
+// not be added to Client and overridden here: an embedded Client lets a write
+// without an override pass through unblocked. Split Client the way the family
+// does (jira-cli first): Client = Reader + Writer, this wrapper embeds Reader
+// only and implements each Writer method with a READONLY_BLOCKED error, so a
+// write it does not block fails to compile.
 type readOnlyClient struct {
 	Client
 }

@@ -113,17 +113,26 @@ type SearchResponse struct {
 }
 
 // PromQLResponse is the Prometheus-compatible reply from OpenObserve's PromQL
-// endpoints (/api/{org}/prometheus/api/v1/query{,_range}). The envelope is
-// stable but `data` is kept raw: its shape depends on the result type
-// (matrix / vector / scalar / string), so decoding it eagerly would couple the
-// client to a shape it doesn't need to understand. On a query error the API
-// usually replies with a non-2xx status (handled by the client's httpError);
-// the Status/Error fields cover the rarer 200-with-error case.
+// endpoints (/api/{org}/prometheus/api/v1/query{,_range}). The client returns
+// one only when the envelope says "success" and its data names a result type;
+// a 200-with-error reply becomes PROMQL_ERROR and any other reply
+// PROMQL_RESPONSE_INVALID. The result itself is kept raw: its shape depends on
+// the result type (matrix / vector / scalar / string), so decoding it eagerly
+// would couple the client to a shape it doesn't need to understand. Warnings
+// and Infos are the server's advisories about this evaluation, such as a
+// truncated result; they change how the numbers should be read.
 type PromQLResponse struct {
 	Status    string          `json:"status"`
 	Data      json.RawMessage `json:"data,omitempty"`
 	ErrorType string          `json:"errorType,omitempty"`
 	Error     string          `json:"error,omitempty"`
+	Warnings  []string        `json:"warnings,omitempty"`
+	Infos     []string        `json:"infos,omitempty"`
+
+	// ResultType and Result are Data's payload, filled once the envelope is
+	// validated.
+	ResultType string          `json:"-"`
+	Result     json.RawMessage `json:"-"`
 }
 
 // TraceSummary is one trace returned by GET /api/{org}/{stream}/traces/latest.

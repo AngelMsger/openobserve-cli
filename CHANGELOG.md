@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- `metrics query` and `metrics query-range` accept only a reply that says
+  `status: success` and names its result type. A reply without them, such as a
+  proxy's page or a cut-short body, used to read as an empty result; it now fails
+  with `PROMQL_RESPONSE_INVALID` (parse, exit 10). A reply that is not JSON at
+  all keeps its `DECODE` error instead of being relabeled `PROMQL_ERROR` with
+  metric-name advice.
+- The server's PromQL `warnings` and `infos` are no longer dropped. The JSON
+  result carries them, and with `--format ndjson` or `--fields` they arrive on
+  stderr as a `query_advisories` notice, as in prometheus-cli.
+
 ## [0.17.0] - 2026-10-27
 
 ### Changed

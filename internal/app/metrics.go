@@ -2,9 +2,11 @@ package app
 
 import (
 	"encoding/json"
+	"os"
 	"strings"
 	"time"
 
+	"github.com/angelmsger/agent-cli-kit/output"
 	"github.com/angelmsger/openobserve-cli/internal/timeutil"
 	"github.com/angelmsger/openobserve-cli/pkg/apiclient"
 	cerrors "github.com/angelmsger/openobserve-cli/pkg/errors"
@@ -124,30 +126,57 @@ func newMetricsQueryRangeCmd(s *appState) *cobra.Command {
 	return cmd
 }
 
-// emitPromQL renders a PromQL reply. JSON returns a summary plus the result;
-// ndjson streams one series per line for piping. A 200-with-error envelope is
-// surfaced as a structured PROMQL_ERROR.
+// emitPromQL renders a validated PromQL reply. JSON returns a summary, the
+// result and the server's advisories; ndjson streams one series per line for
+// piping. As in prometheus-cli, the advisories are re-emitted on stderr
+// whenever stdout would not carry them: in ndjson mode, where only the series
+// are written, and under --fields, where the projection can drop them.
 func (s *appState) emitPromQL(promql string, resp *apiclient.PromQLResponse) error {
-	if resp.Status == "error" || resp.Error != "" {
-		return promQLError(resp.Error, resp.ErrorType)
-	}
-	var data struct {
-		ResultType string          `json:"resultType"`
-		Result     json.RawMessage `json:"result"`
-	}
-	_ = json.Unmarshal(resp.Data, &data)
-
 	if s.cfg().Defaults.Format == "ndjson" {
 		var series []any
-		if json.Unmarshal(data.Result, &series) == nil && series != nil {
+		if json.Unmarshal(resp.Result, &series) == nil && series != nil {
+			emitPromQLAdvisories(promql, resp)
 			return s.emitList(series, pageInfo{})
 		}
 	}
-	return s.emit(map[string]any{
+	if len(s.fieldList()) > 0 {
+		emitPromQLAdvisories(promql, resp)
+	}
+	doc := map[string]any{
 		"query":       promql,
-		"result_type": data.ResultType,
-		"result":      data.Result,
-	})
+		"result_type": resp.ResultType,
+		"result":      resp.Result,
+	}
+	if len(resp.Warnings) > 0 {
+		doc["warnings"] = resp.Warnings
+	}
+	if len(resp.Infos) > 0 {
+		doc["infos"] = resp.Infos
+	}
+	return s.emit(doc)
+}
+
+// emitPromQLAdvisories re-emits a reply's server warnings and infos on stderr
+// as a structured notice. A warning such as "results are truncated" changes how
+// the numbers should be read, so losing it silently would be a wrong answer.
+func emitPromQLAdvisories(promql string, resp *apiclient.PromQLResponse) {
+	if len(resp.Warnings) == 0 && len(resp.Infos) == 0 {
+		return
+	}
+	notice := map[string]any{"query": promql}
+	if len(resp.Warnings) > 0 {
+		notice["warnings"] = resp.Warnings
+	}
+	if len(resp.Infos) > 0 {
+		notice["infos"] = resp.Infos
+	}
+	output.EmitNotice(os.Stderr, map[string]any{"_notice": map[string]any{
+		"query_advisories": notice,
+		"next_steps": []string{
+			"Read the server advisories before treating this result as complete.",
+			"For a truncated result, narrow the selector or aggregate, then retry.",
+		},
+	}})
 }
 
 // resolvePromQL resolves the --query flag (supporting @file / @-) and rejects an
@@ -184,27 +213,13 @@ func instantSeconds(value string) (float64, error) {
 // endpoints take seconds, the _search API takes microseconds.
 func microsToSeconds(micros int64) float64 { return float64(micros) / 1e6 }
 
-// promQLError builds a structured error for a PromQL evaluation failure, pointing
-// the caller at metric-name discovery (the most common cause is a typo'd or
-// non-existent metric).
-func promQLError(msg, errType string) error {
-	if msg == "" {
-		msg = "PromQL query failed"
-	}
-	if errType != "" {
-		msg = errType + ": " + msg
-	}
-	return cerrors.New(cerrors.CategoryUsage, "PROMQL_ERROR", msg).
-		WithHint("Check the metric name and label matchers — PromQL is not SQL.").
-		WithNextSteps("openobserve-cli stream list --type metrics")
-}
-
-// enrichPromQLError adds metric-discovery guidance to a client-side (4xx) query
-// failure so an agent isn't left at a dead end; network/server errors pass
-// through unchanged.
+// enrichPromQLError points a rejected query (a 4xx, or a 200 whose envelope
+// reports an error) at metric discovery, since the most common cause is a
+// typo'd or non-existent metric. A reply that could not be read, and
+// network or server errors, keep their own diagnosis.
 func enrichPromQLError(err error) error {
 	ce := cerrors.AsCLIError(err)
-	if ce.Category == cerrors.CategoryUsage || ce.Category == cerrors.CategoryParse {
+	if ce.Category == cerrors.CategoryUsage {
 		ce.Code = "PROMQL_ERROR"
 		return ce.WithHint("Check the metric name and label matchers — PromQL is not SQL.").
 			WithNextSteps("openobserve-cli stream list --type metrics")
