@@ -114,9 +114,10 @@ fi
   (typo'd metric name or bad PromQL). Discover names with
   `stream list --type metrics`; remember metrics are PromQL, not SQL.
 - **`PROMQL_RESPONSE_INVALID` (parse/10)** — the server answered a metrics query
-  without a successful PromQL result (no `status: success`, or no result type),
-  so no result is reported. Usually the base URL points past the server root or
-  a proxy answers in its place; retry with `--verbose` to see the raw reply.
+  without a successful PromQL result (no `status: success`, no result type, or
+  a result missing or not shaped like its type), so no result is reported.
+  Usually the base URL points past the server root or a proxy answers in its
+  place; `openobserve-cli doctor` checks the server and credentials.
 - **`TRACE_NOT_FOUND` (not_found/6)** — `trace get` found no spans for that
   `trace_id` in the window; widen `--since` or confirm the id/stream with
   `trace search --stream <name>`.

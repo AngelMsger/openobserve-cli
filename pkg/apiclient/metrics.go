@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/url"
 	"strconv"
+	"strings"
 
 	cerrors "github.com/angelmsger/openobserve-cli/pkg/errors"
 )
@@ -67,8 +68,39 @@ func (c *apiClient) promQL(ctx context.Context, org, op string, q url.Values) (*
 	if data.ResultType == "" {
 		return nil, invalidPromQLResponse(path, "its data names no resultType")
 	}
+	if why := promQLResultProblem(data.ResultType, data.Result); why != "" {
+		return nil, invalidPromQLResponse(path, why)
+	}
 	resp.ResultType, resp.Result = data.ResultType, data.Result
 	return &resp, nil
+}
+
+// promQLResultProblem says why result cannot be the result of the named type,
+// or "" when it can. A missing result is never an answer: it would read as an
+// empty one. Vectors and matrices are JSON arrays (an explicit null is taken as
+// empty, pending a live OpenObserve check of how it reports no series); scalars
+// and strings are a [time, value] pair. A result type the API does not document
+// yet passes through unchecked, as in prometheus-cli.
+func promQLResultProblem(resultType string, result json.RawMessage) string {
+	trimmed := strings.TrimSpace(string(result))
+	if trimmed == "" {
+		return "its data has no result"
+	}
+	var items []json.RawMessage
+	switch resultType {
+	case "vector", "matrix":
+		if trimmed == "null" {
+			return ""
+		}
+		if json.Unmarshal(result, &items) != nil {
+			return fmt.Sprintf("its %s result is not a list", resultType)
+		}
+	case "scalar", "string":
+		if json.Unmarshal(result, &items) != nil || len(items) != 2 {
+			return fmt.Sprintf("its %s result is not a [time, value] pair", resultType)
+		}
+	}
+	return ""
 }
 
 func invalidPromQLResponse(path, why string) error {
@@ -76,7 +108,7 @@ func invalidPromQLResponse(path, why string) error {
 		"%s did not answer as a PromQL endpoint: %s", path, why).
 		WithHint("The reply was not a successful PromQL result, so no result is reported. " +
 			"Check that the base URL is the OpenObserve server root and that no proxy answers in its place.").
-		WithNextSteps("Retry with --verbose to inspect the raw response.")
+		WithNextSteps("openobserve-cli doctor")
 }
 
 // formatSeconds renders a Unix-seconds instant without a trailing-zero suffix,

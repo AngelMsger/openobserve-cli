@@ -10,9 +10,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - `metrics query` and `metrics query-range` accept only a reply that says
-  `status: success` and names its result type. A reply without them, such as a
-  proxy's page or a cut-short body, used to read as an empty result; it now fails
-  with `PROMQL_RESPONSE_INVALID` (parse, exit 10). A reply that is not JSON at
+  `status: success`, names its result type and carries a result shaped like it
+  (a list for vector and matrix, a `[time, value]` pair for scalar and string;
+  undocumented types pass through). A reply without them, such as a proxy's page
+  or a cut-short body, used to read as an empty result; it now fails with
+  `PROMQL_RESPONSE_INVALID` (parse, exit 10). A reply that is not JSON at
   all keeps its `DECODE` error instead of being relabeled `PROMQL_ERROR` with
   metric-name advice.
 - The server's PromQL `warnings` and `infos` are no longer dropped. The JSON
