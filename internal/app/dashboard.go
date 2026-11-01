@@ -371,9 +371,3 @@ func (s *appState) requestPlan(method, path string, q url.Values, body json.RawM
 	}
 }
 
-func folderOrDefault(folder string) string {
-	if folder == "" {
-		return "default"
-	}
-	return folder
-}

@@ -6,13 +6,13 @@ explore freely without risk" posture.
 
 ## Current status
 
-The **dashboard commands** (`dashboard create|update|delete`) are the first
-write commands: when the posture is read-only each is blocked before any HTTP
+The **alert commands** (`alert create|update|delete|enable|disable`) and the
+**dashboard commands** (`dashboard create|update|delete`) are the first write
+commands: when the posture is read-only each is blocked before any HTTP
 request is sent. Telemetry commands (logs search / histogram / tail, PromQL
 metrics, trace search / get) are pure reads and pass through either way. The
-remaining planned writes (alerts, functions / pipelines, users, ingestion)
-plug into the same wrapper without rework. This page documents how the
-gating works.
+remaining planned writes (functions / pipelines, users, ingestion) plug into
+the same wrapper without rework. This page documents how the gating works.
 
 ## Enabling it
 
@@ -34,10 +34,13 @@ Three layers, in precedence order:
 
 When the posture is read-only, the API client is wrapped by
 `apiclient.NewReadOnly` before any command runs (`pkg/apiclient/readonly.go`).
-The wrapper embeds the real client, so every **read** passes straight through.
-Each **write** method (`CreateDashboard`, `UpdateDashboard`,
-`DeleteDashboard` today) overrides the embedded one to return a structured
-error instead of issuing a request:
+The public `Client` combines `Reader` and `Writer`. The wrapper embeds only
+`Reader`, so reads and offline `DescribeWrite` plans pass through. Each write
+method (`CreateAlert`, `UpdateAlert`, `DeleteAlert`, `SetAlertEnabled`,
+`CreateDashboard`, `UpdateDashboard`, `DeleteDashboard`) is implemented
+explicitly to return a structured error. A compile-time assertion requires the
+wrapper to satisfy `Client`; adding a new write without blocking it fails
+compilation:
 
 ```json
 {

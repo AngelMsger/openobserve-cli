@@ -7,8 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Alert management now calls the ID-based v2 API and the `/enable` toggle
+  endpoint. List models read `alert_id`, and updates retain the requested ID
+  when the server returns only an acknowledgement. API tests and the mock
+  server now use upstream response shapes.
+- Alert previews and execution share API-layer request builders. Dry-run stays
+  offline and credential-free, and reports invalid base URLs. Backup/edit/restore
+  preserves exact JSON numbers and removes response metadata for library users
+  as well as CLI callers. Alert permission errors point at Alerts permissions.
+
+### Changed
+
+- The public client composes additive `Reader` and `Writer` interfaces. The
+  read-only wrapper embeds only `Reader`, so a future write without a blocking
+  implementation fails to compile. Existing alert method signatures are kept.
+- Alert list help and Skill guidance describe discovery across visible folders;
+  use `--folder` to restrict discovery or target a non-default folder.
+
 ### Added
 
+- Alert management: `alert list|get` discover alerts and their definitions
+  (the meta store is invisible to the query commands), and
+  `alert create|update|delete|enable|disable` manage them. Writes support
+  `--dry-run` request plans, deletion requires `--yes`, and all are blocked
+  by read-only mode with a structured `READONLY_BLOCKED` error (exit 5);
+  `create` and `update` accept a full `alert get` backup and strip
+  server-managed fields, and `enable`/`disable` toggle the alert without a
+  definition file. `pkg/apiclient` grows `ListAlerts`, `GetAlert`,
+  `CreateAlert`, `UpdateAlert`, `DeleteAlert` and `SetAlertEnabled`.
 - Dashboard management: `dashboard list|get` discover dashboards and their
   definitions (the meta store is invisible to the query commands), and
   `dashboard create|update|delete` manage them from JSON files. Writes
@@ -18,6 +46,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   concurrent-edit check, and a stale file fails with a `conflict` error
   (exit 7). `pkg/apiclient` grows `ListDashboards`, `GetDashboard`,
   `CreateDashboard`, `UpdateDashboard` and `DeleteDashboard`.
+
 
 ## [0.17.0] - 2026-10-27
 

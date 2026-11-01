@@ -4,6 +4,19 @@ This index is generated from the CLI command tree — do not edit it by
 hand; run `make docs`. The full reference, with every flag and example,
 is published at <https://angelmsger.github.io/openobserve-cli/cli/>.
 
+## alert
+
+| Command | Description |
+| --- | --- |
+| [`openobserve-cli alert`](https://angelmsger.github.io/openobserve-cli/cli/#openobserve-cli-alert) | List, inspect and manage OpenObserve alerts |
+| [`openobserve-cli alert create`](https://angelmsger.github.io/openobserve-cli/cli/#openobserve-cli-alert-create) | Create an alert from a JSON definition file |
+| [`openobserve-cli alert delete`](https://angelmsger.github.io/openobserve-cli/cli/#openobserve-cli-alert-delete) | Delete an alert permanently (requires --yes) |
+| [`openobserve-cli alert disable`](https://angelmsger.github.io/openobserve-cli/cli/#openobserve-cli-alert-disable) | Disable an alert without editing its definition |
+| [`openobserve-cli alert enable`](https://angelmsger.github.io/openobserve-cli/cli/#openobserve-cli-alert-enable) | Enable an alert without editing its definition |
+| [`openobserve-cli alert get`](https://angelmsger.github.io/openobserve-cli/cli/#openobserve-cli-alert-get) | Get an alert definition |
+| [`openobserve-cli alert list`](https://angelmsger.github.io/openobserve-cli/cli/#openobserve-cli-alert-list) | List alerts in the organization |
+| [`openobserve-cli alert update`](https://angelmsger.github.io/openobserve-cli/cli/#openobserve-cli-alert-update) | Replace an alert's definition from a JSON file |
+
 ## auth
 
 | Command | Description |

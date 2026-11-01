@@ -233,13 +233,6 @@ func dashboardFolderQuery(folder string) url.Values {
 	return q
 }
 
-func folderOrDefault(folder string) string {
-	if folder == "" {
-		return "default"
-	}
-	return folder
-}
-
 // refineDashboardError retrargets generic HTTP errors at the dashboard
 // workflow: the shared not-found guidance points at streams, and a 409 needs
 // the concurrent-edit recovery spelled out.
