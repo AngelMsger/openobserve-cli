@@ -370,4 +370,3 @@ func (s *appState) requestPlan(method, path string, q url.Values, body json.RawM
 		"body":   parsed,
 	}
 }
-
