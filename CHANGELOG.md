@@ -45,7 +45,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `update` re-reads the current hash before writing to feed OpenObserve's
   concurrent-edit check, and a stale file fails with a `conflict` error
   (exit 7). `pkg/apiclient` grows `ListDashboards`, `GetDashboard`,
-  `CreateDashboard`, `UpdateDashboard` and `DeleteDashboard`.
+  `CreateDashboard`, `UpdateDashboard` and `DeleteDashboard`, with write
+  previews and execution sharing the API-layer request builders
+  (`DescribeWrite`) so dry-run stays offline and credential-free and reports
+  invalid base URLs. Backup/edit/restore preserves exact JSON numbers and
+  unwraps the `dashboard get` envelope for library users as well as CLI
+  callers.
 
 
 ## [0.17.0] - 2026-10-27

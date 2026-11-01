@@ -86,18 +86,33 @@ func buildAlertWrite(op any) (alertWriteRequest, error) {
 }
 
 // DescribeWrite returns a plan without accessing credentials or the network.
-// Supported operations are CreateAlertReq, UpdateAlertReq, DeleteAlertReq and
-// SetAlertEnabledReq. It is available through read-only clients as well.
+// Supported operations are the alert writes (CreateAlertReq, UpdateAlertReq,
+// DeleteAlertReq, SetAlertEnabledReq) and the dashboard writes
+// (CreateDashboardReq, UpdateDashboardReq, DeleteDashboardReq). It is
+// available through read-only clients as well.
 func (c *apiClient) DescribeWrite(_ context.Context, op any) (WriteRequestPlan, error) {
-	r, err := buildAlertWrite(op)
+	method, path, query, body, err := buildWrite(op)
 	if err != nil {
 		return WriteRequestPlan{}, err
 	}
-	base, err := NormalizeBaseURL(c.baseURL)
-	if err != nil {
-		return WriteRequestPlan{}, err
+	if base, errURL := NormalizeBaseURL(c.baseURL); errURL != nil {
+		return WriteRequestPlan{}, errURL
+	} else {
+		return WriteRequestPlan{Method: method, URL: base + path + "?" + query.Encode(), Body: body}, nil
 	}
-	return WriteRequestPlan{Method: r.method, URL: base + r.path + "?" + r.query.Encode(), Body: r.body}, nil
+}
+
+// buildWrite dispatches to the per-noun builder so dry-run and execution
+// share one owner for API paths, parameters and payload normalization.
+func buildWrite(op any) (method, path string, query url.Values, body json.RawMessage, err error) {
+	if r, errAlert := buildAlertWrite(op); errAlert == nil {
+		return r.method, r.path, r.query, r.body, nil
+	}
+	r, errDash := buildDashboardWrite(op)
+	if errDash != nil {
+		return "", "", nil, nil, errDash
+	}
+	return r.method, r.path, r.query, r.body, nil
 }
 
 func (c *apiClient) executeAlertWrite(ctx context.Context, op any, out any) error {

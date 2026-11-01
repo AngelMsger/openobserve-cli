@@ -255,7 +255,6 @@ func main() {
 				return
 			}
 			id := fmt.Sprintf("dash%d", hashSeq+1)
-			w.WriteHeader(http.StatusCreated)
 			writeJSON(w, saveDash(id, body))
 		default:
 			w.WriteHeader(http.StatusMethodNotAllowed)
@@ -288,7 +287,7 @@ func main() {
 			writeJSON(w, saveDash(id, body))
 		case http.MethodDelete:
 			delete(dashes, id)
-			writeJSON(w, map[string]any{"message": "Dashboard deleted"})
+			writeJSON(w, map[string]any{"code": 200, "message": "Dashboard deleted"})
 		default:
 			w.WriteHeader(http.StatusMethodNotAllowed)
 		}

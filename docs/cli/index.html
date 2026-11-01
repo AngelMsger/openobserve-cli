@@ -583,9 +583,10 @@ with `dashboard get &lt;id&gt;`.</p>
       <pre>openobserve-cli dashboard update &lt;id&gt; [flags]</pre>
       <p class="long">Read-modify-write built in: unless --hash pins a revision, update
 first GETs the dashboard to learn its current hash, then PUTs the new
-body so the server&#39;s concurrent-edit check can run. A --dry-run plan
-shows both requests and sends nothing; it never contacts the server.
-Blocked by read-only mode unless you pass --allow-writes.</p>
+body so the server&#39;s concurrent-edit check can run. --dry-run prints
+the PUT plan only and never contacts the server; the prefetch GET
+happens at run time. Blocked by read-only mode unless you pass
+--allow-writes.</p>
       <h3>Options</h3>
       <table>
         <thead><tr><th>Flag</th><th>Default</th><th>Description</th></tr></thead>

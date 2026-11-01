@@ -4,8 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"net/http"
-	"net/url"
 	"os"
 
 	"github.com/angelmsger/openobserve-cli/pkg/apiclient"
@@ -120,17 +118,12 @@ func newDashboardCreateCmd(s *appState) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			body, err = normalizeDashboardBody(body)
+			body, err = apiclient.NormalizeDashboardBody(body)
 			if err != nil {
 				return err
 			}
 			if dryRun {
-				return s.emit(map[string]any{
-					"dry_run": true,
-					"request": s.requestPlan(http.MethodPost,
-						"/api/"+url.PathEscape(s.org())+"/dashboards",
-						dashboardPlanQuery(folder, ""), body),
-				})
+				return s.emitWritePlan(apiclient.CreateDashboardReq{Org: s.org(), Folder: folder, Body: body})
 			}
 			ctx, cancel := cmdContext(s)
 			defer cancel()
@@ -160,9 +153,10 @@ func newDashboardUpdateCmd(s *appState) *cobra.Command {
 		Short: "Replace a dashboard's definition from a JSON file",
 		Long: "Read-modify-write built in: unless --hash pins a revision, update\n" +
 			"first GETs the dashboard to learn its current hash, then PUTs the new\n" +
-			"body so the server's concurrent-edit check can run. A --dry-run plan\n" +
-			"shows both requests and sends nothing; it never contacts the server.\n" +
-			"Blocked by read-only mode unless you pass --allow-writes.",
+			"body so the server's concurrent-edit check can run. --dry-run prints\n" +
+			"the PUT plan only and never contacts the server; the prefetch GET\n" +
+			"happens at run time. Blocked by read-only mode unless you pass\n" +
+			"--allow-writes.",
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			id := args[0]
@@ -170,22 +164,12 @@ func newDashboardUpdateCmd(s *appState) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			body, err = normalizeDashboardBody(body)
+			body, err = apiclient.NormalizeDashboardBody(body)
 			if err != nil {
 				return err
 			}
 			if dryRun {
-				return s.emit(map[string]any{
-					"dry_run": true,
-					"request": s.requestPlan(http.MethodPut,
-						"/api/"+url.PathEscape(s.org())+"/dashboards/"+url.PathEscape(id),
-						dashboardPlanQuery(folder, hash), body),
-					"prefetch": map[string]any{
-						"method": http.MethodGet,
-						"url":    s.planURL("/api/"+url.PathEscape(s.org())+"/dashboards/"+url.PathEscape(id), dashboardPlanQuery(folder, "")),
-						"note":   "at run time (without --hash) the current hash is read from this GET and sent with the PUT",
-					},
-				})
+				return s.emitWritePlan(apiclient.UpdateDashboardReq{Org: s.org(), ID: id, Folder: folder, Hash: hash, Body: body})
 			}
 			ctx, cancel := cmdContext(s)
 			defer cancel()
@@ -237,13 +221,7 @@ func newDashboardDeleteCmd(s *appState) *cobra.Command {
 						"Back up first: openobserve-cli dashboard get "+id)
 			}
 			if dryRun {
-				return s.emit(map[string]any{
-					"dry_run": true,
-					"request": map[string]any{
-						"method": http.MethodDelete,
-						"url":    s.planURL("/api/"+url.PathEscape(s.org())+"/dashboards/"+url.PathEscape(id), dashboardPlanQuery(folder, "")),
-					},
-				})
+				return s.emitWritePlan(apiclient.DeleteDashboardReq{Org: s.org(), ID: id, Folder: folder})
 			}
 			ctx, cancel := cmdContext(s)
 			defer cancel()
@@ -294,29 +272,6 @@ func readDashboardBody(file string) (json.RawMessage, error) {
 	return json.RawMessage(data), nil
 }
 
-// normalizeDashboardBody validates that body is a JSON object and unwraps a
-// `dashboard get` envelope ({v<N>: {...}, version, hash, ...}) down to the
-// definition OpenObserve expects for create/update.
-func normalizeDashboardBody(body json.RawMessage) (json.RawMessage, error) {
-	var m map[string]any
-	if err := json.Unmarshal(body, &m); err != nil {
-		return nil, cerrors.Wrap(err, cerrors.CategoryUsage, "BAD_BODY",
-			"the dashboard definition is not valid JSON")
-	}
-	if m == nil {
-		return nil, cerrors.New(cerrors.CategoryUsage, "BAD_BODY",
-			"the dashboard definition must be a JSON object")
-	}
-	if _, hasHash := m["hash"]; hasHash {
-		for i := 1; i <= 8; i++ {
-			if inner, ok := m[fmt.Sprintf("v%d", i)].(map[string]any); ok {
-				return json.Marshal(inner)
-			}
-		}
-	}
-	return json.Marshal(m)
-}
-
 // dashboardWriteSummary is the compact, stable output of create/update:
 // identifiers and the new hash, not the (potentially huge) definition.
 func dashboardWriteSummary(verb string, d *apiclient.Dashboard, folder string) map[string]any {
@@ -335,38 +290,4 @@ func dashboardWriteSummary(verb string, d *apiclient.Dashboard, folder string) m
 		out["hash"] = d.Hash
 	}
 	return out
-}
-
-// dashboardPlanQuery mirrors the query parameters the API client sends, so a
-// --dry-run plan shows the real URL.
-func dashboardPlanQuery(folder, hash string) url.Values {
-	q := url.Values{}
-	q.Set("folder", folderOrDefault(folder))
-	if hash != "" {
-		q.Set("hash", hash)
-	}
-	return q
-}
-
-// planURL renders the absolute URL a request would go to.
-func (s *appState) planURL(path string, q url.Values) string {
-	base, err := apiclient.NormalizeBaseURL(s.cfg().BaseURL)
-	if err != nil {
-		return path
-	}
-	if enc := q.Encode(); enc != "" {
-		return base + path + "?" + enc
-	}
-	return base + path
-}
-
-// requestPlan builds the plan object shared by create/update --dry-run.
-func (s *appState) requestPlan(method, path string, q url.Values, body json.RawMessage) map[string]any {
-	var parsed any
-	_ = json.Unmarshal(body, &parsed)
-	return map[string]any{
-		"method": method,
-		"url":    s.planURL(path, q),
-		"body":   parsed,
-	}
 }

@@ -33,9 +33,12 @@ expects, so a copy-edit-restore round trip needs no `jq` surgery.
 ## Writing safely
 
 All three write commands support `--dry-run`, which prints the exact request
-plan (`method`, `url`, `body` — for updates also the read step that resolves
-the current hash) and sends nothing. `--dry-run` works under read-only mode;
-run it first and show the plan to the user before mutating anything.
+plan (`method`, `url`, `body`) and sends nothing; plans are built offline by
+the API client, so they work without credentials and report an invalid
+`base_url`. For `update` the plan shows the PUT; unless `--hash` pins a
+revision, the read step that resolves the current hash happens at run time.
+`--dry-run` also works under read-only mode — run it first and show the plan
+to the user before mutating anything.
 
 ```
 openobserve-cli dashboard create --file def.json            # body from file; --file - reads stdin

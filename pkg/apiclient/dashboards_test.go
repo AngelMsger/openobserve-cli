@@ -128,7 +128,6 @@ func TestCreateDashboardSendsFolderAndBody(t *testing.T) {
 		buf := make([]byte, r.ContentLength)
 		_, _ = r.Body.Read(buf)
 		gotBody = string(buf)
-		w.WriteHeader(http.StatusCreated)
 		_, _ = w.Write([]byte(`{"v5":{"dashboardId":"d1","title":"T","version":5},"version":5,"hash":"h1"}`))
 	})
 	d, err := client.CreateDashboard(context.Background(), "default", "",

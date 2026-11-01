@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"net/http"
 	"net/url"
 	"strconv"
 
@@ -89,11 +88,12 @@ func (d DashboardSummary) MarshalJSON() ([]byte, error) {
 
 // Dashboard is a full dashboard definition as returned by get, create and
 // update: the version-keyed body (v1..v8 — tabs, panels, queries, variables)
-// plus the top-level version and hash. The raw map is preserved verbatim so
-// output round-trips into `dashboard update` without schema coupling; only the
-// pieces the CLI itself needs (hash, version, id, title) are extracted.
+// plus the top-level version and hash. The raw keys are preserved verbatim so
+// output round-trips into `dashboard update` without schema coupling or
+// numeric drift; only the pieces the CLI itself needs (hash, version, id,
+// title) are extracted.
 type Dashboard struct {
-	raw         map[string]any
+	raw         map[string]json.RawMessage
 	Version     int
 	Hash        string
 	DashboardID string
@@ -103,23 +103,26 @@ type Dashboard struct {
 // UnmarshalJSON decodes the dashboard envelope and extracts the hash plus
 // the identifying fields of its version-keyed body.
 func (d *Dashboard) UnmarshalJSON(b []byte) error {
-	var m map[string]any
+	var m map[string]json.RawMessage
 	if err := json.Unmarshal(b, &m); err != nil {
 		return err
 	}
 	d.raw = m
-	d.Hash, _ = m["hash"].(string)
-	if v, ok := m["version"].(float64); ok {
-		d.Version = int(v)
-	}
+	_ = json.Unmarshal(m["hash"], &d.Hash)
+	var version float64
+	_ = json.Unmarshal(m["version"], &version)
+	d.Version = int(version)
 	if body, ok := d.bodyMap(); ok {
+		var fields map[string]json.RawMessage
+		_ = json.Unmarshal(body, &fields)
 		// Newer dashboard versions use camelCase keys; v1..v2 use snake_case.
-		if id, _ := body["dashboardId"].(string); id != "" {
-			d.DashboardID = id
-		} else if id, _ := body["dashboard_id"].(string); id != "" {
-			d.DashboardID = id
+		if id, ok := fields["dashboardId"]; ok {
+			_ = json.Unmarshal(id, &d.DashboardID)
 		}
-		d.Title, _ = body["title"].(string)
+		if d.DashboardID == "" {
+			_ = json.Unmarshal(fields["dashboard_id"], &d.DashboardID)
+		}
+		_ = json.Unmarshal(fields["title"], &d.Title)
 	}
 	return nil
 }
@@ -131,26 +134,26 @@ func (d Dashboard) MarshalJSON() ([]byte, error) {
 
 // WriteBody returns the version-keyed dashboard definition — the body
 // OpenObserve expects for create/update — with the hash/version envelope
-// removed.
+// removed. Raw bytes are passed through, so exact JSON numbers survive.
 func (d *Dashboard) WriteBody() (json.RawMessage, error) {
 	body, ok := d.bodyMap()
 	if !ok {
 		return nil, cerrors.New(cerrors.CategoryParse, "DASHBOARD_BODY",
 			"the response did not contain a version-keyed dashboard body")
 	}
-	return json.Marshal(body)
+	return body, nil
 }
 
 // bodyMap locates the v1..v8 definition inside the raw envelope.
-func (d *Dashboard) bodyMap() (map[string]any, bool) {
+func (d *Dashboard) bodyMap() (json.RawMessage, bool) {
 	if d.Version != 0 {
-		if m, ok := d.raw[fmt.Sprintf("v%d", d.Version)].(map[string]any); ok {
-			return m, true
+		if raw, ok := d.raw[fmt.Sprintf("v%d", d.Version)]; ok {
+			return raw, true
 		}
 	}
 	for i := 1; i <= 8; i++ {
-		if m, ok := d.raw[fmt.Sprintf("v%d", i)].(map[string]any); ok {
-			return m, true
+		if raw, ok := d.raw[fmt.Sprintf("v%d", i)]; ok {
+			return raw, true
 		}
 	}
 	return nil, false
@@ -191,11 +194,11 @@ func (c *apiClient) GetDashboard(ctx context.Context, org, id, folder string) (*
 
 // CreateDashboard stores body as a new dashboard in folder via
 // POST /api/{org}/dashboards and returns it with its assigned ID and hash.
+// Body may be a definition or a get backup; the envelope is unwrapped.
 func (c *apiClient) CreateDashboard(ctx context.Context, org, folder string, body json.RawMessage) (*Dashboard, error) {
-	path := "/api/" + url.PathEscape(org) + "/dashboards"
 	var d Dashboard
-	if err := c.doJSON(ctx, http.MethodPost, path, dashboardFolderQuery(folder), body, &d); err != nil {
-		return nil, refineDashboardError(err, org, "")
+	if err := c.executeDashboardWrite(ctx, CreateDashboardReq{org, folder, body}, &d); err != nil {
+		return nil, err
 	}
 	return &d, nil
 }
@@ -204,25 +207,16 @@ func (c *apiClient) CreateDashboard(ctx context.Context, org, folder string, bod
 // PUT /api/{org}/dashboards/{id}. hash, when non-empty, feeds the server's
 // concurrent-edit check; a stale hash fails with a conflict error.
 func (c *apiClient) UpdateDashboard(ctx context.Context, org, id, folder, hash string, body json.RawMessage) (*Dashboard, error) {
-	q := dashboardFolderQuery(folder)
-	if hash != "" {
-		q.Set("hash", hash)
-	}
-	path := "/api/" + url.PathEscape(org) + "/dashboards/" + url.PathEscape(id)
 	var d Dashboard
-	if err := c.doJSON(ctx, http.MethodPut, path, q, body, &d); err != nil {
-		return nil, refineDashboardError(err, org, id)
+	if err := c.executeDashboardWrite(ctx, UpdateDashboardReq{org, id, folder, hash, body}, &d); err != nil {
+		return nil, err
 	}
 	return &d, nil
 }
 
 // DeleteDashboard removes a dashboard via DELETE /api/{org}/dashboards/{id}.
 func (c *apiClient) DeleteDashboard(ctx context.Context, org, id, folder string) error {
-	path := "/api/" + url.PathEscape(org) + "/dashboards/" + url.PathEscape(id)
-	if err := c.doJSON(ctx, http.MethodDelete, path, dashboardFolderQuery(folder), nil, nil); err != nil {
-		return refineDashboardError(err, org, id)
-	}
-	return nil
+	return c.executeDashboardWrite(ctx, DeleteDashboardReq{org, id, folder}, nil)
 }
 
 // dashboardFolderQuery builds the folder query parameter shared by every
