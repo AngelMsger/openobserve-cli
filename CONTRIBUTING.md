@@ -79,7 +79,7 @@ together.
 
 ### Adding a write command (post-v0.1)
 
-v0.1 is read-only. Write commands (dashboards, alerts, functions, users,
+v0.1 is read-only. Write commands (alerts; later dashboards, functions, users,
 ingest) must: support `--dry-run` (emit the would-be request plan), require
 `--yes` for destructive operations, route through `apiclient.NewReadOnly` (which
 must override the new method to return a `READONLY_BLOCKED` error), and keep the

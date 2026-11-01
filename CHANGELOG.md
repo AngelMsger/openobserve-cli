@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Alert management: `alert list|get` discover alerts and their definitions
+  (the meta store is invisible to the query commands), and
+  `alert create|update|delete|enable|disable` manage them. Writes support
+  `--dry-run` request plans, deletion requires `--yes`, and all are blocked
+  by read-only mode with a structured `READONLY_BLOCKED` error (exit 5);
+  `create` and `update` accept a full `alert get` backup and strip
+  server-managed fields, and `enable`/`disable` toggle the alert without a
+  definition file. `pkg/apiclient` grows `ListAlerts`, `GetAlert`,
+  `CreateAlert`, `UpdateAlert`, `DeleteAlert` and `SetAlertEnabled`.
+
 ## [0.17.0] - 2026-10-27
 
 ### Changed
