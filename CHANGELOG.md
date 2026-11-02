@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `webauth.PingVerifierLogging`: `PingVerifier` with a `--verbose` request log
+  writer. `PingVerifier` keeps its signature and logs nothing.
+
 ### Fixed
 
 - SQL search now exposes `--type logs|metrics|traces` consistently on run,

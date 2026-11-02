@@ -28,9 +28,15 @@ const verifyTimeout = 20 * time.Second
 // capture: only an authenticated response proves the captured state works.
 //
 // It takes plain values rather than a config.Defaults so this package stays
-// free of pkg/config (and so of yaml.v3). Callers pass d.Timeout, d.MaxRetries
-// and the --verbose request log, or nil.
-func PingVerifier(baseURL, org string, timeout time.Duration, maxRetries int, verbose io.Writer) VerifyFunc {
+// free of pkg/config (and so of yaml.v3). Callers pass d.Timeout, d.MaxRetries.
+func PingVerifier(baseURL, org string, timeout time.Duration, maxRetries int) VerifyFunc {
+	return PingVerifierLogging(baseURL, org, timeout, maxRetries, nil)
+}
+
+// PingVerifierLogging is PingVerifier that writes the --verbose request log to
+// verbose: one line per request, never headers or bodies. A nil verbose logs
+// nothing.
+func PingVerifierLogging(baseURL, org string, timeout time.Duration, maxRetries int, verbose io.Writer) VerifyFunc {
 	return func(sess pkgauth.Session) bool {
 		blob, err := pkgauth.EncodeSession(sess)
 		if err != nil {

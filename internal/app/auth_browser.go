@@ -70,7 +70,7 @@ func runBrowserLoginWith(s *appState, driver webauth.Driver, replace bool) error
 		return err
 	}
 
-	verify := webauth.PingVerifier(baseURL, s.org(), s.cfg().Defaults.Timeout, s.cfg().Defaults.MaxRetries, s.verboseLog())
+	verify := webauth.PingVerifierLogging(baseURL, s.org(), s.cfg().Defaults.Timeout, s.cfg().Defaults.MaxRetries, s.verboseLog())
 
 	// The command then blocks for as long as the user takes to sign in — up to
 	// ten minutes — so say what is happening. stdout carries the result
