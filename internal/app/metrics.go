@@ -127,17 +127,21 @@ func newMetricsQueryRangeCmd(s *appState) *cobra.Command {
 }
 
 // emitPromQL renders a validated PromQL reply. JSON returns a summary, the
-// result and the server's advisories; ndjson streams one series per line for
-// piping. As in prometheus-cli, the advisories are re-emitted on stderr
+// result and the server's advisories; ndjson streams vector/matrix series
+// and keeps scalar/string pairs together in one summary record. As in prometheus-cli, the advisories are re-emitted on stderr
 // whenever stdout would not carry them: in ndjson mode, where only the series
 // are written, and under --fields, where the projection can drop them.
 func (s *appState) emitPromQL(promql string, resp *apiclient.PromQLResponse) error {
-	if s.cfg().Defaults.Format == "ndjson" {
-		var series []any
-		if json.Unmarshal(resp.Result, &series) == nil && series != nil {
-			emitPromQLAdvisories(promql, resp)
-			return s.emitList(series, pageInfo{})
+	if s.cfg().Defaults.Format == "ndjson" && (resp.ResultType == "vector" || resp.ResultType == "matrix") {
+		var series []json.RawMessage
+		if err := json.Unmarshal(resp.Result, &series); err != nil {
+			return cerrors.Wrap(err, cerrors.CategoryParse, "PROMQL_RESPONSE_INVALID", "could not decode PromQL series")
 		}
+		if err := s.emitList(series, pageInfo{}); err != nil {
+			return err
+		}
+		emitPromQLAdvisories(promql, resp)
+		return nil
 	}
 	if len(s.fieldList()) > 0 {
 		emitPromQLAdvisories(promql, resp)

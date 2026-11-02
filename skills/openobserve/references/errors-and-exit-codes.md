@@ -110,6 +110,9 @@ fi
   requires `--from`, and the end must be later than the start.
 - **`STREAM_NOT_FOUND` (not_found/6)** — run `stream list`; names are
   case-sensitive.
+- **`DASHBOARD_HASH_MISSING` (parse/10)** — a dashboard update needed to read
+  its revision but the response contained no hash. No PUT was sent. Fetch a valid
+  definition with `dashboard get <id>` (and its `--folder`) before retrying.
 - **`PROMQL_ERROR` (usage/2)** — a `metrics query` expression was rejected
   (typo'd metric name or bad PromQL). Discover names with
   `stream list --type metrics`; remember metrics are PromQL, not SQL.

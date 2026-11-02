@@ -1,6 +1,7 @@
 package app
 
 import (
+	"os"
 	"strings"
 	"testing"
 )
@@ -13,7 +14,7 @@ func TestReadDashboardBody(t *testing.T) {
 		t.Error("expected FILE_READ for a missing file")
 	}
 	file := t.TempDir() + "/dash.json"
-	if err := writeTestFile(file, `{"title":"T"}`); err != nil {
+	if err := os.WriteFile(file, []byte(`{"title":"T"}`), 0600); err != nil {
 		t.Fatal(err)
 	}
 	body, err := readDashboardBody(file)

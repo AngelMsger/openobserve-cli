@@ -31,14 +31,6 @@ type SetAlertEnabledReq struct {
 	Enabled         bool
 }
 
-// WriteRequestPlan is an offline preview of a remote mutation. Body is kept
-// as JSON to preserve exact numeric values in exported alert definitions.
-type WriteRequestPlan struct {
-	Method string          `json:"method"`
-	URL    string          `json:"url"`
-	Body   json.RawMessage `json:"body,omitempty"`
-}
-
 type alertWriteRequest struct {
 	method, path, id string
 	query            url.Values
@@ -83,21 +75,6 @@ func buildAlertWrite(op any) (alertWriteRequest, error) {
 		r.body = body
 	}
 	return r, nil
-}
-
-// DescribeWrite returns a plan without accessing credentials or the network.
-// Supported operations are CreateAlertReq, UpdateAlertReq, DeleteAlertReq and
-// SetAlertEnabledReq. It is available through read-only clients as well.
-func (c *apiClient) DescribeWrite(_ context.Context, op any) (WriteRequestPlan, error) {
-	r, err := buildAlertWrite(op)
-	if err != nil {
-		return WriteRequestPlan{}, err
-	}
-	base, err := NormalizeBaseURL(c.baseURL)
-	if err != nil {
-		return WriteRequestPlan{}, err
-	}
-	return WriteRequestPlan{Method: r.method, URL: base + r.path + "?" + r.query.Encode(), Body: r.body}, nil
 }
 
 func (c *apiClient) executeAlertWrite(ctx context.Context, op any, out any) error {

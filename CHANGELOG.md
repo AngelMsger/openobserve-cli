@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Dashboard imports select the declared version and skip inactive null version
+  slots. Malformed exports fail before sending a request. Updates retain backup
+  revisions (unless `--hash` overrides them), preventing stale exports from
+  silently overwriting newer edits; bare definitions prefetch a hash and stop
+  without writing if it is missing. Offline plans describe that prefetch.
+- Dashboard planning uses the shared `DescribeWrite` entry point, and the
+  read-only wrapper blocks updates before their prefetch. List page-size and
+  permission guidance follow the Dashboard API contract.
+- PromQL NDJSON preserves scalar/string pairs in one summary record and emits
+  no series rows for empty/null vectors and matrices; advisories remain visible.
+
 - `metrics query` and `metrics query-range` accept only a reply that says
   `status: success`, names its result type and carries a result shaped like it
   (a list for vector and matrix, a `[time, value]` pair for scalar and string;
@@ -53,8 +64,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `dashboard create|update|delete` manage them from JSON files. Writes
   support `--dry-run` request plans, deletion requires `--yes`, and all
   three respect read-only mode with a structured `READONLY_BLOCKED` error;
-  `update` re-reads the current hash before writing to feed OpenObserve's
-  concurrent-edit check, and a stale file fails with a `conflict` error
+  `update` uses an explicit or saved revision, or prefetches the current hash
+  for a bare definition; a stale revision fails with a `conflict` error
   (exit 7). `pkg/apiclient` grows `ListDashboards`, `GetDashboard`,
   `CreateDashboard`, `UpdateDashboard` and `DeleteDashboard`, with write
   previews and execution sharing the API-layer request builders

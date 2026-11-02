@@ -220,6 +220,11 @@ func main() {
 		v := versionOf(body)
 		body["dashboardId"] = id
 		d := map[string]any{fmt.Sprintf("v%d", v): body, "version": v, "hash": fmt.Sprintf("h%d", hashSeq)}
+		for version := 1; version <= 8; version++ {
+			if version != v {
+				d[fmt.Sprintf("v%d", version)] = nil
+			}
+		}
 		dashes[id] = d
 		return d
 	}

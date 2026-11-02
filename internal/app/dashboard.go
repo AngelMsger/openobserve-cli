@@ -3,15 +3,13 @@ package app
 import (
 	"encoding/json"
 	"fmt"
-	"io"
-	"os"
 
 	"github.com/angelmsger/openobserve-cli/pkg/apiclient"
 	cerrors "github.com/angelmsger/openobserve-cli/pkg/errors"
 	"github.com/spf13/cobra"
 )
 
-// newDashboardCmd wires the dashboard group — the first write surface of the
+// newDashboardCmd wires the dashboard group — a write surface of the
 // CLI. Reads (`list`, `get`) pass through the read-only wrapper like any other
 // command; writes (`create`, `update`, `delete`) are blocked by it with a
 // READONLY_BLOCKED error unless the invocation lifted the posture. All writes
@@ -123,7 +121,7 @@ func newDashboardCreateCmd(s *appState) *cobra.Command {
 				return err
 			}
 			if dryRun {
-				return s.emitDashboardWritePlan(apiclient.CreateDashboardReq{Org: s.org(), Folder: folder, Body: body})
+				return s.emitWritePlan(apiclient.CreateDashboardReq{Org: s.org(), Folder: folder, Body: body})
 			}
 			ctx, cancel := cmdContext(s)
 			defer cancel()
@@ -151,12 +149,12 @@ func newDashboardUpdateCmd(s *appState) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "update <id>",
 		Short: "Replace a dashboard's definition from a JSON file",
-		Long: "Read-modify-write built in: unless --hash pins a revision, update\n" +
-			"first GETs the dashboard to learn its current hash, then PUTs the new\n" +
-			"body so the server's concurrent-edit check can run. --dry-run prints\n" +
-			"the PUT plan only and never contacts the server; the prefetch GET\n" +
-			"happens at run time. Blocked by read-only mode unless you pass\n" +
-			"--allow-writes.",
+		Long: "Update uses --hash when supplied, otherwise the exported backup's hash.\n" +
+			"For a bare definition without a hash, it first GETs the current revision.\n" +
+			"A stale backup fails with a conflict; fetch and re-apply your edits.\n" +
+			"--dry-run stays offline and includes a prefetch GET when the PUT hash\n" +
+			"must be resolved at run time. Blocked by read-only mode unless you\n" +
+			"pass --allow-writes.",
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			id := args[0]
@@ -164,12 +162,12 @@ func newDashboardUpdateCmd(s *appState) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			body, err = apiclient.NormalizeDashboardBody(body)
-			if err != nil {
+			// Validate without dropping the exported revision hash.
+			if _, err := apiclient.NormalizeDashboardBody(body); err != nil {
 				return err
 			}
 			if dryRun {
-				return s.emitDashboardWritePlan(apiclient.UpdateDashboardReq{Org: s.org(), ID: id, Folder: folder, Hash: hash, Body: body})
+				return s.emitWritePlan(apiclient.UpdateDashboardReq{Org: s.org(), ID: id, Folder: folder, Hash: hash, Body: body})
 			}
 			ctx, cancel := cmdContext(s)
 			defer cancel()
@@ -177,15 +175,7 @@ func newDashboardUpdateCmd(s *appState) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			if hash == "" {
-				// Read the current hash (a read, so it also passes through the
-				// read-only wrapper) to feed the concurrent-edit check.
-				current, err := client.GetDashboard(ctx, s.org(), id, folder)
-				if err != nil {
-					return err
-				}
-				hash = current.Hash
-			}
+
 			d, err := client.UpdateDashboard(ctx, s.org(), id, folder, hash, body)
 			if err != nil {
 				return err
@@ -196,7 +186,7 @@ func newDashboardUpdateCmd(s *appState) *cobra.Command {
 	f := cmd.Flags()
 	f.StringVar(&file, "file", "", "dashboard definition file (- for stdin); required")
 	f.StringVar(&folder, "folder", "", "folder ID the dashboard lives in (default: \"default\")")
-	f.StringVar(&hash, "hash", "", "expected current hash (skips the read-modify-write GET)")
+	f.StringVar(&hash, "hash", "", "expected revision hash (overrides the backup hash; skips prefetch)")
 	f.BoolVar(&dryRun, "dry-run", false, "print the request plan without sending anything")
 	return cmd
 }
@@ -221,7 +211,7 @@ func newDashboardDeleteCmd(s *appState) *cobra.Command {
 						"Back up first: openobserve-cli dashboard get "+id)
 			}
 			if dryRun {
-				return s.emitDashboardWritePlan(apiclient.DeleteDashboardReq{Org: s.org(), ID: id, Folder: folder})
+				return s.emitWritePlan(apiclient.DeleteDashboardReq{Org: s.org(), ID: id, Folder: folder})
 			}
 			ctx, cancel := cmdContext(s)
 			defer cancel()
@@ -242,44 +232,8 @@ func newDashboardDeleteCmd(s *appState) *cobra.Command {
 	return cmd
 }
 
-// readDashboardBody loads the --file value: "-" reads stdin, a leading "@" is
-// tolerated for consistency with --sql @file, anything else is a path.
 func readDashboardBody(file string) (json.RawMessage, error) {
-	if file == "" {
-		return nil, cerrors.New(cerrors.CategoryUsage, "BODY_FILE_REQUIRED",
-			"a dashboard definition file is required").
-			WithNextSteps("--file dashboard.json", "--file -  (read from stdin)")
-	}
-	var data []byte
-	var err error
-	if file == "-" {
-		data, err = io.ReadAll(os.Stdin)
-	} else {
-		name := file
-		if len(name) > 1 && name[0] == '@' {
-			name = name[1:]
-		}
-		data, err = os.ReadFile(name)
-	}
-	if err != nil {
-		return nil, cerrors.Wrap(err, cerrors.CategoryUsage, "FILE_READ",
-			"could not read "+file)
-	}
-	if len(data) == 0 {
-		return nil, cerrors.New(cerrors.CategoryUsage, "EMPTY_BODY",
-			"the dashboard definition file is empty")
-	}
-	return json.RawMessage(data), nil
-}
-
-// emitDashboardWritePlan delegates preview construction to the same API
-// builders used for execution, so plans stay offline and credential-free.
-func (s *appState) emitDashboardWritePlan(op any) error {
-	plan, err := apiclient.PlanDashboardWrite(s.cfg().BaseURL, op)
-	if err != nil {
-		return err
-	}
-	return s.emit(map[string]any{"dry_run": true, "request": plan})
+	return readDefinitionBody(file, "dashboard")
 }
 
 // dashboardWriteSummary is the compact, stable output of create/update:

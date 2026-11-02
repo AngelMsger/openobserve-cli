@@ -81,3 +81,58 @@ func TestMetricsAdvisories(t *testing.T) {
 		t.Fatalf("want the warning on stderr, got %s", stderr)
 	}
 }
+
+func TestPromQLNDJSONResultShapes(t *testing.T) {
+	for _, tc := range []struct {
+		kind, result string
+		lines        int
+	}{
+		{"vector", "null", 0}, {"matrix", "null", 0}, {"vector", "[]", 0},
+		{"scalar", `[1700000000,"42"]`, 1}, {"string", `[1700000000,"hello"]`, 1},
+	} {
+		t.Run(tc.kind+tc.result, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				_, _ = w.Write([]byte(`{"status":"success","warnings":["partial"],"infos":["info"],"data":{"resultType":"` + tc.kind + `","result":` + tc.result + `}}`))
+			}))
+			defer server.Close()
+			paginationEnvironment(t, server.URL)
+			stdout, stderr, err := capturePaginationCommand(t, "metrics", "query", "--query", "up", "--format", "ndjson")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if tc.lines == 0 {
+				if stdout != "" || !strings.Contains(stderr, "query_advisories") || !strings.Contains(stderr, "info") {
+					t.Fatalf("empty series contract: stdout=%s stderr=%s", stdout, stderr)
+				}
+			} else {
+				if strings.Count(stdout, "\n") != 1 {
+					t.Fatalf("split pair: %s", stdout)
+				}
+				var doc struct {
+					Result   json.RawMessage `json:"result"`
+					Warnings []string        `json:"warnings"`
+				}
+				if err := json.Unmarshal([]byte(stdout), &doc); err != nil {
+					t.Fatal(err)
+				}
+				if string(doc.Result) != tc.result || len(doc.Warnings) != 1 {
+					t.Fatalf("lost result: %s", stdout)
+				}
+			}
+		})
+	}
+}
+
+func TestPromQLProjectionKeepsAdvisories(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`{"status":"success","warnings":["partial"],"infos":["info"],"data":{"resultType":"vector","result":[{"metric":{"service":"web"},"value":[1,"2"]}]}}`))
+	}))
+	defer server.Close()
+	paginationEnvironment(t, server.URL)
+	for _, format := range []string{"json", "ndjson"} {
+		_, stderr, err := capturePaginationCommand(t, "metrics", "query", "--query", "up", "--format", format, "--fields", "metric.service")
+		if err != nil || !strings.Contains(stderr, "partial") || !strings.Contains(stderr, "info") {
+			t.Fatalf("projection lost advisories: %s %v", stderr, err)
+		}
+	}
+}
