@@ -11,6 +11,17 @@ func TestSkillHandshakeMatchesVersion(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	lf := strings.ReplaceAll(string(data), "\r\n", "\n")
+	for _, newline := range []string{"\n", "\r\n"} {
+		t.Run("newline="+strings.ReplaceAll(newline, "\n", "LF"), func(t *testing.T) {
+			checkSkillHandshake(t, strings.ReplaceAll(lf, "\n", newline))
+		})
+	}
+}
+
+func checkSkillHandshake(t *testing.T, markdown string) {
+	t.Helper()
+	data := []byte(strings.ReplaceAll(markdown, "\r\n", "\n"))
 	version := regexp.MustCompile(`(?m)^version: ([0-9]+\.[0-9]+\.[0-9]+)$`).FindSubmatch(data)
 	handshakes := regexp.MustCompile(`OPENOBSERVE_CLI_SKILL=([0-9]+\.[0-9]+\.[0-9]+)`).FindAllSubmatch(data, -1)
 	if len(version) != 2 || len(handshakes) == 0 {

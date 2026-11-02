@@ -18,7 +18,18 @@ func TestSkillCommandIndexMatchesTree(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, commands, ok := strings.Cut(string(data), "## Commands\n")
+	lf := strings.ReplaceAll(string(data), "\r\n", "\n")
+	for _, newline := range []string{"\n", "\r\n"} {
+		t.Run("newline="+strings.ReplaceAll(newline, "\n", "LF"), func(t *testing.T) {
+			checkSkillCommandIndex(t, strings.ReplaceAll(lf, "\n", newline))
+		})
+	}
+}
+
+func checkSkillCommandIndex(t *testing.T, markdown string) {
+	t.Helper()
+	markdown = strings.ReplaceAll(markdown, "\r\n", "\n")
+	_, commands, ok := strings.Cut(markdown, "## Commands\n")
 	if !ok {
 		t.Fatal("missing Commands index")
 	}
