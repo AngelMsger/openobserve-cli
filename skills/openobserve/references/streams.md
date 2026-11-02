@@ -2,7 +2,9 @@
 
 A **stream** is a named collection of records of one type — `logs`, `metrics` or
 `traces` — inside an organization. You query streams with `search`; you discover
-them and their columns with `stream`.
+them and their columns with `stream`. SQL search defaults to `logs`; retain the
+discovered type with `search ... --type metrics|traces` for those raw records.
+Use `metrics` for PromQL and `trace` for trace-oriented views.
 
 ## List streams (the map)
 
@@ -52,8 +54,9 @@ openobserve-cli stream get <name>     # full stream: schema + settings + stats
 openobserve-cli stream stats <name>   # just document count, time range, size
 ```
 
-`--type logs|metrics|traces` is a hint on any of these; if a name is ambiguous
-across types, pass it.
+`--type logs|metrics|traces` selects the namespace on any of these. Keep the
+discovered type on schema/get/stats calls; names can exist in more than one type.
+An ambiguous lookup fails with `STREAM_AMBIGUOUS` instead of picking one type.
 
 ## No dead ends
 

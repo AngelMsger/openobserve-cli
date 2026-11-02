@@ -28,7 +28,7 @@ server) or not. Environment changes use the optional `recovery` object instead.
 | `internal`   | 1    | Unexpected bug; retry with `--verbose`. |
 | `usage`      | 2    | Bad flag/argument; check `--help`. Missing time range, bad `--order`, etc. |
 | `config`     | 3    | Config/credential resolution failed; inspect `code` and `recovery` before reconfiguring. |
-| `auth`       | 4    | Credentials rejected → `auth status`, re-run `config init`. |
+| `auth`       | 4    | Follow `next_steps`: reuse a matching login before signing in again. |
 | `permission` | 5    | Authenticated but not allowed (OpenObserve RBAC) → grant the credential a role; see below. |
 | `not_found`  | 6    | Unknown org / stream → `org list`, `stream list`. |
 | `rate_limit` | 7    | Too many requests; retryable. Narrow the time range / lower `--limit`. |
@@ -65,8 +65,9 @@ fi
   `OPENOBSERVE_PASSWORD` or `OPENOBSERVE_TOKEN`.
 - **`NO_BASE_URL` (config/3)** — no server configured. Run `config init` or set
   `OPENOBSERVE_URL`.
-- **`AUTH_LOGIN_NEEDS_TTY` (auth/4)** — `auth login`/`config init` need a
-  terminal. In CI/agents set `OPENOBSERVE_EMAIL`+`OPENOBSERVE_PASSWORD` (or
+- **`AUTH_LOGIN_NEEDS_TTY` (auth/4)** — plain `auth login` requires an
+  interactive terminal. `config init` can read a pipe, but its `--pretty` mode
+  requires a terminal. In CI/agents set `OPENOBSERVE_EMAIL`+`OPENOBSERVE_PASSWORD` (or
   `OPENOBSERVE_TOKEN`).
 - **`AUTH_BAD_SESSION` (config/3)** — the browser-captured session is malformed
   or contains no cookies. Sign in again with `auth login --browser` to replace it.
@@ -110,12 +111,16 @@ fi
   requires `--from`, and the end must be later than the start.
 - **`STREAM_NOT_FOUND` (not_found/6)** — run `stream list`; names are
   case-sensitive.
+- **`STREAM_AMBIGUOUS` (usage/2)** — discovery found the same name in multiple
+  namespaces. Repeat stream get/schema/stats with the discovered `--type`.
+- **`BAD_STREAM_TYPE` (usage/2)** — SQL search accepts `--type logs`, `metrics`
+  or `traces`; use the `stream_type` from discovery.
 - **`DASHBOARD_HASH_MISSING` (parse/10)** — a dashboard update needed to read
   its revision but the response contained no hash. No PUT was sent. Fetch a valid
   definition with `dashboard get <id>` (and its `--folder`) before retrying.
 - **`PROMQL_ERROR` (usage/2)** — a `metrics query` expression was rejected
   (typo'd metric name or bad PromQL). Discover names with
-  `stream list --type metrics`; remember metrics are PromQL, not SQL.
+  `stream list --type metrics`; `metrics query` accepts PromQL, not SQL.
 - **`PROMQL_RESPONSE_INVALID` (parse/10)** — the server answered a metrics query
   without a successful PromQL result (no `status: success`, no result type, or
   a result missing or not shaped like its type), so no result is reported.
@@ -124,7 +129,9 @@ fi
 - **`TRACE_NOT_FOUND` (not_found/6)** — `trace get` found no spans for that
   `trace_id` in the window; widen `--since` or confirm the id/stream with
   `trace search --stream <name>`.
-- **`HTTP_UNAUTHORIZED` (auth/4)** — wrong password/token → re-run `config init`.
+- **`HTTP_UNAUTHORIZED` (auth/4)** — rejected or expired credentials. Follow
+  `next_steps`; use `auth reuse` when offered before fresh sign-in. A session
+  context refreshes through `auth login --browser`; preserve the service preset.
 - **`HTTP_FORBIDDEN` (permission/5)** — the credential authenticates but has no
   role for the resource. This is the classic **service account** case: under
   OpenObserve RBAC (Enterprise/Cloud) a new user / service account is granted

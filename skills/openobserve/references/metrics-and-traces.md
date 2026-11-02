@@ -1,8 +1,9 @@
 # Metrics (PromQL) and traces (span trees)
 
-Logs are queried with SQL (`search run` — see [searching.md](searching.md)).
-**Metrics and traces are not.** OpenObserve queries metrics with PromQL and gives
-traces a dedicated span model, so this CLI exposes them as their own commands.
+Use SQL for record inspection (`search run` — see [searching.md](searching.md)),
+PromQL for metric calculations, and `trace` for trace summaries and span trees.
+Raw metric and trace records remain queryable with SQL when `--type metrics`
+or `--type traces` selects their namespace.
 
 ## Metrics — `metrics query` and `metrics query-range`
 
@@ -12,8 +13,8 @@ Metric names are the `metrics`-type streams. Discover them when unknown:
 openobserve-cli stream list --type metrics
 ```
 
-Then write PromQL against those names. Don't try to `search run` a metrics stream
-— PromQL is the right tool for rates, quantiles and arithmetic over series.
+Then write PromQL against those names. Prefer PromQL for rates, quantiles and
+arithmetic over series; raw SQL records are a different view of the data.
 
 **Instant** — evaluate an expression at one moment (defaults to now):
 
@@ -37,7 +38,8 @@ openobserve-cli metrics query-range \
   works in seconds; the CLI converts for you, so never pass raw epochs.
 
 Output is `{ query, result_type, result }` where `result_type` is
-`vector` (instant) or `matrix` (range); `--format ndjson` streams one series per
+usually `vector` (instant) or `matrix` (range); an instant expression can also
+produce a matrix, scalar or string. `--format ndjson` streams one series per
 line. Empty or null series lists write no rows. Scalar/string results stay in
 one summary record, retaining the timestamp/value pair together. When the server
 attaches advisories, summary documents also carry `warnings` / `infos`. Series
@@ -97,7 +99,15 @@ JSON returns a nested tree:
 
 `--format ndjson` streams the spans flat, one per line. The waterfall is kept
 token-lean (well-known span fields only); for the full attribute set of a trace,
-query the stream directly with `search run --where "trace_id = '<id>'"`.
+query its raw records with:
+
+```
+openobserve-cli search run --type traces --stream <name> --since 1h \
+  --where "trace_id = '<id>'" --limit 100
+```
+
+Keep the trace's known time window. `trace get` selects the traces namespace
+automatically; raw SQL needs the explicit `--type traces`.
 
 ## Tips
 

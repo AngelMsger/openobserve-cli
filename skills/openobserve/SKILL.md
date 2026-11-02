@@ -1,212 +1,172 @@
 ---
 name: openobserve
-version: 0.5.2
-description: "Query OpenObserve (O2) logs, metrics, and traces: discover streams and fields, search SQL logs, inspect histograms, evaluate PromQL, reconstruct traces, and follow live logs. Use for an OpenObserve URL or an investigation whose backend is known to be OpenObserve, including errors, latency, request volume, and stream discovery. Supports self-hosted and Cloud instances. Telemetry operations are read-only. Alert management (list/get/create/update/delete/enable/disable with --dry-run, --yes and read-only-mode gating) and dashboard management (list/get/create/update/delete with --dry-run, --yes and read-only-mode gating) are supported; pipelines and user management are not."
+version: 0.6.0
+description: "Query OpenObserve (O2) telemetry and manage alert and dashboard definitions. Use for an OpenObserve URL, a known OpenObserve investigation, stream/schema discovery, SQL logs, PromQL metrics, trace inspection, live logs, or alert/dashboard backup and editing. Supports self-hosted and Cloud instances. Telemetry queries are read-only; remote changes support dry-run and read-only gating. Pipelines, user management and ingestion are not supported."
 metadata:
   requires:
     bins: ["openobserve-cli"]
-  cliHelp: "openobserve-cli --help; openobserve-cli search run --help; openobserve-cli stream schema --help"
+  cliHelp: "openobserve-cli --help; openobserve-cli search run --help"
 ---
 
 # openobserve
 
-`openobserve-cli` queries an OpenObserve (O2) backend for you across all three
-pillars — logs (SQL), metrics (PromQL) and traces (span trees). Output is JSON by
-default; errors are JSON on stderr with a `category`, a `hint` and `next_steps`.
-Telemetry commands are read-only. Alert and dashboard writes honor the configured
-read-only posture (see [alerts](references/alerts.md) and
-[dashboards](references/dashboards.md)).
+Use `openobserve-cli` for OpenObserve. stdout is data; structured errors and
+notices go to stderr. After loading this Skill, set
+`OPENOBSERVE_CLI_SKILL=0.6.0` in the environment used for CLI commands.
 
-## Golden rule — discover before you query
+## Choose the shortest useful path
 
-The single biggest mistake is **inventing a stream name, a column name, or a raw
-microsecond timestamp**. Don't. The CLI gives you discovery commands for each:
+Reuse the user's server, org, stream, schema and resource IDs when already
+verified in that context. Discover only what is missing; do not run `doctor`,
+list every resource, or read every reference before each task.
 
-1. **Org** — `org list` shows the organizations you can use. The default is
-   `default`. Pass `--org` or set it once with `org use <id>`.
-2. **Stream** — reuse a name supplied by the user or already verified in the
-   same server and org; otherwise discover it with `stream list`.
-3. **Columns** — `stream schema <name>` shows the queryable fields and the
-   full-text-search keys, so your SQL `WHERE`/`SELECT` reference real columns.
-4. **Time** — never compute epochs by hand. Use `--since 1h` (or `--from`/`--to`
-   with RFC3339, a date, or `now-30m`); the CLI converts to the microseconds the
-   API needs. Use one form: `--since` cannot be combined with `--from`/`--to`,
-   and `--to` requires `--from`.
+| Task | Start here | Details when needed |
+| --- | --- | --- |
+| Known request, log excerpt or narrow incident | `search run --stream <name> --since 1h --limit 20` | [Searching](references/searching.md) |
+| Broad volume or error-spike investigation | `search histogram`, then query the interesting window | [Searching](references/searching.md) |
+| Requested live monitoring | `search tail --stream <name>`; choose a stopping condition first | [Live monitoring](references/searching.md#live-monitoring) |
+| Metric rate, quantile or series arithmetic | `metrics query` or `metrics query-range` (PromQL) | [Metrics and traces](references/metrics-and-traces.md) |
+| Trace inspection | Known ID → `trace get`; otherwise `trace search` | [Metrics and traces](references/metrics-and-traces.md) |
+| Unknown stream or field | `stream list`, then `stream schema <name> --type <type>` | [Streams](references/streams.md) |
+| Alert backup, editing or enable/disable | `alert list`, then `alert get` | [Alerts](references/alerts.md) |
+| Dashboard backup or editing | `dashboard list --title <text>`, then `dashboard get` | [Dashboards](references/dashboards.md) |
+| Configuration/auth failure | Inspect the error's `code`, `recovery` and `next_steps` | [Getting started](references/getting-started.md), [errors](references/errors-and-exit-codes.md) |
+| Preset a team service without credentials | `config set-context`, then `auth guide` / `auth reuse` | [Team setup](references/team-setup.md) |
 
-Reuse discovery results within the same context. Prefer per-command `--org` and
-`--use-context`; persist a different default only when the user asks for it.
+## Scope, cost and correctness
 
-## Decision tree
+- Prefer per-command `--use-context <name>` and `--org <id>`. Persist a different
+  default with `config use-context` or `org use` only when requested. `org list`
+  and `config get-contexts` discover those IDs.
+- `stream list` returns names **and types**. SQL `search run|histogram|tail`
+  defaults to `--type logs`; select `metrics` or `traces` explicitly for raw
+  records in those namespaces. Prefer PromQL for metric calculations and
+  `trace get` for a span tree; SQL remains useful for full record attributes.
+- Confirm unfamiliar columns with `stream schema`; use the same stream type.
+  Reuse discovery results rather than inventing identifiers or repeating calls.
+- Bound queries with `--since` or `--from` and optional `--to`; never combine
+  the two forms. `--to` requires `--from`. Human times such as `1h`, RFC3339 and
+  `now-30m` avoid hand-computed epochs. Instant PromQL uses `--time` instead.
+- Keep retrieval small (`search run --limit 20` is a useful start). Use
+  `--fields a,b.c` to project output. `search run --all --max N` traverses one
+  resolved window as NDJSON; `--limit` then means page size. Keep truncation and
+  PromQL warnings/infos in the conclusion.
+- Tail runs until stopped; `--since` is backfill and `--timeout` bounds each
+  request, not the loop. Use the host's process controls to enforce a deadline
+  or observed stopping condition and stop it before finishing the task.
 
-- User asks to **look at / search / grep logs** → discover the stream if unknown,
-  then `search run --stream <name> --since <window>`.
-  Add `--where "<sql condition>"` to filter (e.g. `--where "level = 'ERROR'"`).
-- User asks **"why is X erroring / how much / what's the volume"** → start with
-  `search histogram --stream <name> --since <window> --interval <bucket>` to see
-  the shape over time (the *map*), then pull the interesting window with
-  `search run` (the *terrain*). See [searching.md](references/searching.md).
-- User asks to **follow / tail logs live** → `search tail --stream <name>`
-  (optionally `--where ...`, `--since 5m` to backfill); it streams new rows as
-  ndjson until interrupted. Before starting, choose a deadline or stopping
-  condition from the request; see [Live monitoring](references/searching.md#live-monitoring).
-- User asks about **metrics / a PromQL expression / rate / error rate / p99** →
-  metrics are PromQL, not SQL. `stream list --type metrics` to find the metric
-  names, then `metrics query --query '<promql>'` (instant) or
-  `metrics query-range --query '<promql>' --since 1h --step 1m` (over time). See
-  [metrics-and-traces.md](references/metrics-and-traces.md).
-- User asks to **inspect a trace / why a request is slow / a span** → traces are
-  first-class. `stream list --type traces` to find the trace stream, then
-  `trace search --stream <name> --since 1h` to find the trace, then
-  `trace get <trace_id> --stream <name> --since 1h` for the span waterfall. See
-  [metrics-and-traces.md](references/metrics-and-traces.md).
-- User asks **what streams / fields exist** → `stream list`, then
-  `stream schema <name>`. See [streams.md](references/streams.md).
-- User wants to **back up, edit, toggle or clean up an alert** →
-  [alerts.md](references/alerts.md).
-- User wants to **back up, edit, recreate or clean up a dashboard** →
-  [dashboards.md](references/dashboards.md).
-- A query needs a column you're unsure of → `stream schema <name>` first.
-- Anything fails → read the error's `next_steps`; they name the exact command to
-  run next. See [errors-and-exit-codes.md](references/errors-and-exit-codes.md).
-- Nothing configured yet / auth fails → [getting-started.md](references/getting-started.md).
+## Remote writes
 
-## Configuration & credentials (agents)
+Alert and dashboard writes are **enabled by default**. Preview the intended
+change with `--dry-run`; it is offline and checks request construction, not
+server permissions, schema validity, alert delivery or dashboard rendering.
+Execute within the user's authorized scope; existing authorization in this
+session does not need to be requested again.
 
-Assume an already-configured user wants you to reuse their host config and OS
-keychain. If an error is `CREDENTIAL_STORE_INACCESSIBLE` or
-`CREDENTIAL_NOT_VISIBLE_OR_MISSING`, or has `recovery.scope=host`, request host
-access and retry the same command once. Do not run `config init` / `auth login`
-inside the sandbox; only ask the user to configure credentials when the host
-retry also reports them missing. In a sandbox, use `OPENOBSERVE_EMAIL` /
-`OPENOBSERVE_PASSWORD` (or `OPENOBSERVE_TOKEN`) env vars. An instance behind
-SSO has no local password; on the user's own host (never in a sandbox) they
-can run `openobserve-cli auth login --browser` to sign in through a real
-browser window. It needs a display, so it only works where there is one. See
-[getting-started.md](references/getting-started.md).
+`OPENOBSERVE_CLI_READ_ONLY=1` or `defaults.read_only: true` blocks remote writes.
+Use `--allow-writes` only when overriding that posture is authorized, not as a
+routine prefix. Actual deletion also requires `--yes`; deletion previews do
+not. Local config, login and Skill management are outside this remote gate.
+`auth reuse --dry-run` may verify credentials over the network; it is not an
+offline remote-write preview.
 
-## Guardrails
-
-- **Always bound the time range.** `search run` and `search histogram` require `--since` or
-  `--from`/`--to`. Default to a narrow window (e.g. `1h`) and widen only if
-  needed — unbounded scans are slow and flood your context.
-- **Keep `--limit` small** (default 100). Use a histogram for broad volume
-  investigations; go directly to a known request or narrow incident window.
-- **Reference real names only.** Use known stream names and confirmed schema
-  fields. Discover unknown metrics with `stream list --type metrics` and trace
-  streams with `--type traces`.
-- **Metrics are PromQL, not SQL.** Use `metrics query` / `query-range` with a
-  PromQL expression; don't try to `search run` a metrics stream.
-- Prefer `--format ndjson` when piping hits into `jq`/`grep`; it streams one row
-  per line. For very large result sets, `search run --all` pages through every
-  matching row as ndjson (bound it with `--max`).
-- **Writes are opt-in.** Preview every alert or dashboard change with `--dry-run`
-  first; never pass `--yes` or root-level `--allow-writes` without the user's
-  explicit confirmation in the same session.
-
-Report the finding first, then the org/stream, exact time window with timezone,
-and decisive evidence. Distinguish observations from likely causes and disclose
-sampling or truncation that limits the conclusion. Quote short, relevant log
-excerpts with credentials and personal data removed, not whole responses.
+Retain discovered folders when fetching or modifying an alert/dashboard.
+Dashboard updates use `--hash`, then the backup hash, otherwise a GET prefetch;
+after a conflict, fetch the current definition and re-apply the intended edit.
+Get the resource after a write to verify stored state. Working alert delivery
+or dashboard rendering needs separate evidence; a successful save is not proof.
 
 ## Commands
 
+These are canonical command paths. Read the linked reference or a command's
+`--help` for optional flags; placeholders must come from the current context.
+
+```text
+openobserve-cli org list
+openobserve-cli org use <id>
+openobserve-cli stream list [--type logs|metrics|traces]
+openobserve-cli stream get <name> [--type <type>]
+openobserve-cli stream schema <name> [--type <type>]
+openobserve-cli stream stats <name> [--type <type>]
+openobserve-cli search run --stream <name> --type logs --since 1h --limit 20
+openobserve-cli search run --sql @query.sql --type traces --since 1h
+openobserve-cli search histogram --stream <name> --type logs --since 6h --interval 5m
+openobserve-cli search tail --stream <name> --type logs --since 5m --interval 2s
+openobserve-cli metrics query --query '<promql>'
+openobserve-cli metrics query-range --query '<promql>' --since 1h --step 1m
+openobserve-cli trace search --stream <name> --since 1h --limit 20
+openobserve-cli trace get <trace_id> --stream <name> --since 1h
+openobserve-cli alert list [--folder <folder-id>]
+openobserve-cli alert get <id> [--folder <folder-id>]
+openobserve-cli alert create --file alert.json --dry-run
+openobserve-cli alert update <id> --file alert.json --dry-run
+openobserve-cli alert enable <id> --dry-run
+openobserve-cli alert disable <id> --dry-run
+openobserve-cli alert delete <id> --dry-run
+openobserve-cli dashboard list [--folder <folder-id>] [--title <text>]
+openobserve-cli dashboard get <id> [--folder <folder-id>]
+openobserve-cli dashboard create --file dashboard.json --dry-run
+openobserve-cli dashboard update <id> --file dashboard.json --dry-run
+openobserve-cli dashboard delete <id> --dry-run
+openobserve-cli config init
+openobserve-cli config show
+openobserve-cli config get-contexts
+openobserve-cli config use-context <name>
+openobserve-cli config set-context <name> --base-url <url> --org <id> --dry-run
+openobserve-cli config delete-context <name>
+openobserve-cli auth guide
+openobserve-cli auth reuse --dry-run
+openobserve-cli auth login
+openobserve-cli auth status
+openobserve-cli auth logout
+openobserve-cli doctor
+openobserve-cli skill status
+openobserve-cli skill install
+openobserve-cli skill path
+openobserve-cli skill show
+openobserve-cli skill uninstall
+openobserve-cli version
+openobserve-cli completion bash|zsh|fish|powershell
 ```
-openobserve-cli org list                       # discover organizations
-openobserve-cli stream list [--type logs|metrics|traces]   # discover streams (the map)
-openobserve-cli stream schema <name>           # queryable columns + settings
-openobserve-cli search run --stream <name> --since 1h --where "level='ERROR'" --limit 20
-openobserve-cli search run --sql @query.sql --since 24h    # read a long query from a file (@- = stdin)
-openobserve-cli search histogram --stream <name> --since 6h --interval 5m
-openobserve-cli search tail --stream <name> --where "level='ERROR'"   # follow live (Ctrl-C to stop)
-openobserve-cli metrics query --query 'sum by (service)(rate(http_requests_total[5m]))'
-openobserve-cli metrics query-range --query 'up' --since 1h --step 1m
-openobserve-cli trace search --stream <name> --since 1h    # recent traces (trace_id, duration, services)
-openobserve-cli trace get <trace_id> --stream <name> --since 1h    # span waterfall
-openobserve-cli alert list                      # discover alerts (id, name, stream, folder)
-openobserve-cli alert get <id>                  # full definition
-openobserve-cli alert create --file def.json    # or --file - (stdin); --dry-run previews
-openobserve-cli alert update <id> --file def.json
-openobserve-cli alert enable|disable <id>       # toggle without a definition file
-openobserve-cli alert delete <id> --yes         # destructive: --yes is mandatory
-openobserve-cli dashboard list                    # discover dashboards (id, title, folder, hash)
-openobserve-cli dashboard get <id>                # full definition + the hash updates need
-openobserve-cli dashboard create --file def.json  # or --file - (stdin); --dry-run previews
-openobserve-cli dashboard update <id> --file def.json   # re-reads the hash itself
-openobserve-cli dashboard delete <id> --yes       # destructive: --yes is mandatory
-openobserve-cli config init|show               # configuration
-openobserve-cli config get-contexts|use-context <name>   # list / switch named server contexts
-openobserve-cli config delete-context <name>   # remove a context and its unused secret
-openobserve-cli auth status                    # who am I / can I reach the server
-openobserve-cli doctor                         # diagnose config / creds / connectivity
-openobserve-cli skill status|install|path|show|uninstall   # manage the companion Skill
-```
 
-`--format` accepts `json` (default), `table` (human-readable), or `ndjson` (one
-row per line, for piping). A per-invocation `--use-context <name>` overrides the
-current context.
+`--sql` / `--query` / trace `--filter` accept `@file` and `@-` for stdin.
+Alert/dashboard `--file` takes a path or `-` for stdin. `config contexts` is a
+legacy alias for `config get-contexts`; prefer the canonical spelling.
 
-## Agent-facing conventions
+## Output and continuation
 
-- **Skill handshake — set `OPENOBSERVE_CLI_SKILL=0.4.0`.** Once you have
-  loaded this Skill, export that exact value in the environment used to run the
-  CLI. The CLI compares it with the embedded Skill version and emits a
-  structured stderr notice when the Skill is missing, old, or uses the legacy
-  unversioned handshake. `openobserve-cli skill status` reports loaded,
-  installed, and embedded versions. To suppress the notice without loading the
-  Skill, set `OPENOBSERVE_CLI_NO_SKILL_HINT=1`.
-- **Update notices on stderr.** When a newer release exists, commands print a
-  one-line `{"_notice":{"update":{…}}}` to **stderr** (never stdout) — on failed
-  commands too, not just successful ones. Follow every `next_steps` entry:
-  upgrade the CLI, run `openobserve-cli skill install`, then reload the agent
-  context. `doctor` reports CLI and Skill status too. Silence update notices
-  with `OPENOBSERVE_CLI_NO_UPDATE_NOTIFIER=1`, or skip the check per-run with
-  `doctor --no-update-check`.
-- stdout is data only; diagnostics and errors go to stderr.
-- Exit codes are stable and categorized (0 ok, 2 usage, 3 config, 4 auth, …);
-  see [errors-and-exit-codes.md](references/errors-and-exit-codes.md).
-- JSON lists use `{ "items": [...], "next": "...", "has_more": true }`
-  when more results exist; completed lists omit `next` and set `has_more: false`.
-  NDJSON keeps only rows on stdout and reports continuation separately on
-  stderr as `_notice.pagination` with `next`, `has_more`, and sibling
-  `next_steps`. Pass `next` as `--offset`. Keep the same query and fixed absolute
-  `--from` **and** `--to` values for manual paging; repeating `--since` shifts
-  the window and can duplicate or skip rows. Single-page SQL search may make
-  one extra single-row read to verify continuation when a full page's total is
-  page-local. Use bounded `search run --all --max N` for automatic traversal
-  of one resolved time window; preserve any truncation notice in conclusions.
-- `--fields a,b.c` projects output to just those dot-paths to save tokens.
+`--format` accepts `json` (default), `table` or `ndjson`. Lists use
+`{items, has_more, next?}`; SQL search returns `{hits, total, returned, ...}`,
+and other commands return their own summary. NDJSON emits rows for lists,
+SQL hits, trace spans and PromQL vector/matrix series; scalar/string PromQL
+results stay together in a summary record. Empty lists emit no NDJSON rows.
 
-## Team service presets and authentication
+Paginated NDJSON puts continuation on stderr as `_notice.pagination`, with
+`next`, `has_more` and sibling `next_steps`. Pass `next` as `--offset`, keeping
+the same query, type, org and fixed absolute `--from` **and** `--to`. Repeating
+`--since` changes the window. JSON SQL summaries provide `start_micros` and
+`end_micros` that can be reused unchanged as those flags. A full SQL page can
+need one extra single-row read to check continuation.
 
-- Inspect existing configuration and reuse it. `config set-context <name>` is the
-  offline installer entrypoint; it accepts `--base-url`, `--auth-scheme`,
-  `--credential-url`, `--activate`, `--overwrite`, and `--dry-run`, plus `--org`.
-- `OPENOBSERVE_AUTH_SCHEME` and `OPENOBSERVE_CREDENTIAL_URL` complement the existing
-  service variables. Presets never copy a personal username or secret from the
-  environment. Conflicts preserve existing values unless explicitly overwritten.
-- Run `auth guide` to obtain the current instance's credential page, its source,
-  navigation steps, and limitations. Links are hints, not evidence of server
-  capabilities. Follow the returned product-specific instructions; do not invent
-  a token URL or assume ingestion credentials authorize queries.
-- Once a service is preset, direct the member to `auth login` in their terminal
-  (or `auth login --browser` for OpenObserve SSO) to save their verified personal identity and secret. Do not ask for secrets in
-  chat. In non-interactive environments use transient credential variables.
-- Preserve host-keychain recovery for inaccessible credentials. A server/context
-  mismatch requires selecting or creating a matching context; a partial login
-  write error identifies what was stored and provides recovery steps.
+Report the finding first, then org/stream, exact time window with timezone and
+decisive evidence. Distinguish observations from likely causes, disclose sampling
+or truncation, and quote short excerpts with secrets and personal data removed.
 
-See [team setup](references/team-setup.md) for the output fields, conflict
-semantics, credential URL overrides, and failure recovery.
+## Authentication and maintenance
 
+Reuse host config and the OS keychain. For `CREDENTIAL_STORE_INACCESSIBLE`,
+`CREDENTIAL_NOT_VISIBLE_OR_MISSING` or `recovery.scope=host`, retry the same
+command once with host access when available. Do not replace inaccessible
+credentials with new setup. Follow `auth reuse` guidance before fresh sign-in;
+never collect secrets in chat. Headless sessions use transient credential
+variables. Browser login needs a host browser and display. Details, including
+`--from-context`, `--from-scheme` and browser `--replace`, are in
+[getting started](references/getting-started.md).
 
-## Reuse existing authentication
-
-A context without a working login can adopt one already verified for the same
-service, preferring a long-lived password or token over a browser session.
-Workspace tools apply this during setup. Elsewhere the CLI lists `auth reuse`
-ahead of any sign-in step, including after an HTTP 401, and its result names the
-next step and the login it used (`scheme`, `username`). A working login is never
-replaced automatically; `--from-context` and `--from-scheme` select one
-explicitly. `auth login --browser` asks for `--replace` before replacing a
-password or token login that still works: do not add `--replace` for the user.
-See [reuse and ambiguity recovery](references/getting-started.md#reuse-existing-authentication).
+`skill status` reports loaded/installed/embedded versions. After a CLI upgrade,
+run `skill install` and reload the agent context. Update notices are
+informational; do not interrupt an investigation to upgrade automatically.
+`OPENOBSERVE_CLI_NO_SKILL_HINT=1` suppresses Skill notices;
+`OPENOBSERVE_CLI_NO_UPDATE_NOTIFIER=1` suppresses update notices, and
+`doctor --no-update-check` skips that check once. See
+[getting started](references/getting-started.md) for installation options.

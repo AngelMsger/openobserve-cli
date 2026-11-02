@@ -1,9 +1,27 @@
 package openobservecli
 
 import (
+	"regexp"
 	"strings"
 	"testing"
 )
+
+func TestSkillHandshakeMatchesVersion(t *testing.T) {
+	data, err := SkillFS.ReadFile(SkillRoot + "/SKILL.md")
+	if err != nil {
+		t.Fatal(err)
+	}
+	version := regexp.MustCompile(`(?m)^version: ([0-9]+\.[0-9]+\.[0-9]+)$`).FindSubmatch(data)
+	handshakes := regexp.MustCompile(`OPENOBSERVE_CLI_SKILL=([0-9]+\.[0-9]+\.[0-9]+)`).FindAllSubmatch(data, -1)
+	if len(version) != 2 || len(handshakes) == 0 {
+		t.Fatal("Skill must declare its version and a versioned handshake")
+	}
+	for _, handshake := range handshakes {
+		if string(handshake[1]) != string(version[1]) {
+			t.Errorf("handshake %s differs from Skill version %s", handshake[1], version[1])
+		}
+	}
+}
 
 // codexDescriptionLimit is the maximum Skill `description` length Codex accepts;
 // a longer one fails to load with "invalid description: exceeds maximum length

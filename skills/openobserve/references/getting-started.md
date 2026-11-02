@@ -1,7 +1,7 @@
 # Getting started: configuration and auth
 
-`openobserve-cli` talks to either a self-hosted OpenObserve (default
-`http://localhost:5080`) or OpenObserve Cloud (`https://api.openobserve.ai`).
+`openobserve-cli` talks to self-hosted OpenObserve (configure its server URL)
+or OpenObserve Cloud (use the API URL for the user's region).
 Authentication is HTTP Basic — email + password — or a pre-generated token.
 A context can instead carry a browser-captured session, established by `auth
 login --browser`.
@@ -77,12 +77,12 @@ openobserve-cli auth login --browser
 A browser window opens on the instance's own login page (a one-line notice on
 stderr says so, since the command then waits); once you sign in, the CLI
 captures the session, verifies it with an authenticated request, stores it in
-the OS keychain, and records `auth.scheme: session` plus the captured email on
+the OS keychain, and records `auth.scheme: session` while preserving any saved username on
 the active context in `config.yaml` — creating that context when the server
 came from `OPENOBSERVE_URL`. Only that context's `auth` block is rewritten. The
 CLI can then use the context normally, including `auth status`, `doctor`, and
-all read commands. This is the path for instances behind SSO, where neither a
-password nor a generated token works.
+all authorized commands. This supports interactive SSO when a local password
+is unavailable; a supported service account is another option for headless use.
 
 Requires a Chromium-family browser (Chrome, Chromium, Edge or Brave) and a
 graphical session — it does not work over SSH or inside an agent sandbox. Set
@@ -156,8 +156,19 @@ key ones came from.
 ## Read-only posture
 
 Set `OPENOBSERVE_CLI_READ_ONLY=1` (or `defaults.read_only: true` in the config
-file) to assert a read-only session. The CLI has no write commands yet, so this
-is a forward-looking guard; `--allow-writes` is the per-call escape hatch.
+file) to block remote alert and dashboard mutations. Writes are enabled by
+default. `--allow-writes` overrides this gate once when that override is
+authorized. Remote `--dry-run` previews remain offline and usable under the
+gate; local config, authentication and Skill management are unaffected.
+
+## Companion Skill installation
+
+`skill install` and `skill uninstall` accept `--project` (current project),
+`--agent codex` (or a comma-separated set), and `--dir <skills-directory>` for
+an explicit destination. `skill path` accepts the same selectors; `skill status`
+accepts `--project`. Use `skill show` to read the embedded entrypoint without
+installing it. After upgrading the CLI, refresh the installed Skill and reload
+the agent context before setting its versioned handshake.
 
 For preset team services, use `config set-context` and `auth guide` before personal login; see [team setup](team-setup.md).
 

@@ -78,9 +78,10 @@ func newRootCmdWithState() (*cobra.Command, *appState) {
 
 	root := &cobra.Command{
 		Use:   constants.AppName,
-		Short: "Query an OpenObserve (O2) backend as a coding agent",
-		Long: "openobserve-cli discovers streams and runs SQL searches over logs,\n" +
-			"metrics and traces in OpenObserve (O2). It emits agent-friendly JSON\n" +
+		Short: "Query OpenObserve telemetry and manage alerts and dashboards",
+		Long: "openobserve-cli discovers streams, searches records with SQL, evaluates\n" +
+			"PromQL and reconstructs traces. It also manages alert and dashboard\n" +
+			"definitions with offline write previews and read-only mode. It emits JSON\n" +
 			"with structured errors, and works with self-hosted and Cloud instances.\n\n" +
 			"NDJSON writes one item per line to stdout and pagination notices to stderr.\n" +
 			"For paginated search results, pass the notice next value as --offset.\n\n" +
@@ -205,6 +206,7 @@ func versionString() string {
 func newVersionCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "version",
+		Args:  cobra.NoArgs,
 		Short: "Print version information",
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			fmt.Fprintf(os.Stdout, "%s %s\n", constants.AppName, versionString())

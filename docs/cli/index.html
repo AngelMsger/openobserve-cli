@@ -118,8 +118,9 @@
   <main class="cli-main">
     <span class="eyebrow">Reference</span>
     <h1>CLI reference</h1>
-    <p class="lead">openobserve-cli discovers streams and runs SQL searches over logs,
-metrics and traces in OpenObserve (O2). It emits agent-friendly JSON
+    <p class="lead">openobserve-cli discovers streams, searches records with SQL, evaluates
+PromQL and reconstructs traces. It also manages alert and dashboard
+definitions with offline write previews and read-only mode. It emits JSON
 with structured errors, and works with self-hosted and Cloud instances.
 
 NDJSON writes one item per line to stdout and pagination notices to stderr.
@@ -623,7 +624,7 @@ It also reports whether a newer openobserve-cli release is available.</p>
       <h2>openobserve-cli metrics</h2>
       <p class="short">Query metrics with PromQL (instant and range)</p>
       <pre>openobserve-cli metrics</pre>
-      <p class="long">Metrics in OpenObserve are queried with PromQL, not SQL. `metrics query`
+      <p class="long">Use PromQL for metric rates, quantiles and series arithmetic. `metrics query`
 evaluates an expression at a single instant; `metrics query-range` evaluates
 it across a time window at a step resolution (the shape you graph). Discover
 the metric names you can use with `stream list --type metrics`.</p>
@@ -635,8 +636,8 @@ the metric names you can use with `stream list --type metrics`.</p>
       <h2>openobserve-cli metrics query</h2>
       <p class="short">Evaluate a PromQL expression at a single instant</p>
       <pre>openobserve-cli metrics query [flags]</pre>
-      <p class="long">Runs an instant PromQL query. The result is a vector (one value per
-series) at the evaluation time, which defaults to now. Pass --query @file
+      <p class="long">Runs an instant PromQL query at the evaluation time, which defaults to now.
+The expression determines the result type (vector, matrix, scalar or string). Pass --query @file
 or --query @- to read a long expression from a file or stdin.</p>
       <h3>Options</h3>
       <table>
@@ -713,6 +714,8 @@ default so later commands need no --org.</p>
       <p class="long">Search is the heart of the CLI. `search run` returns matching rows;
 `search histogram` returns time-bucketed counts so you can see volume
 and shape before pulling raw rows; `search tail` follows a stream live.
+Select the stream namespace with --type logs|metrics|traces (default logs).
+For series rates and quantiles use `metrics`; for span trees use `trace`.
 Time ranges are given in human form (--since 1h, or --from/--to); the CLI
 converts them to the microsecond epochs OpenObserve needs.</p>
 
@@ -735,6 +738,7 @@ deciding which window to pull raw rows from with `search run`.</p>
         <tr><td><code>--since</code></td><td></td><td>look back this far from now, e.g. 15m, 1h, 24h, 7d (not with --from/--to)</td></tr>
         <tr><td><code>--stream</code></td><td></td><td>stream to aggregate (required)</td></tr>
         <tr><td><code>--to</code></td><td></td><td>range end, same forms (default now); requires --from</td></tr>
+        <tr><td><code>--type</code></td><td><code>logs</code></td><td>stream type to query: logs, metrics or traces (use the discovered stream_type)</td></tr>
         <tr><td><code>--where</code></td><td></td><td>WHERE clause to filter, e.g. &#34;level = &#39;ERROR&#39;&#34;</td></tr>
         </tbody>
       </table>
@@ -760,7 +764,7 @@ page through every matching row as ndjson (bound it with --max).</p>
         <tbody>
         <tr><td><code>--all</code></td><td><code>false</code></td><td>page through every matching row, streamed as ndjson</td></tr>
         <tr><td><code>--from</code></td><td></td><td>range start: RFC3339, an epoch, 2006-01-02, or now-1h</td></tr>
-        <tr><td><code>--limit</code></td><td><code>0</code></td><td>max rows to return (default 100, max 10000); with --all, the page size</td></tr>
+        <tr><td><code>--limit</code></td><td><code>0</code></td><td>max rows (default 100, max 10000); with --all, page size (default 10000)</td></tr>
         <tr><td><code>--max</code></td><td><code>0</code></td><td>with --all, stop after this many rows (0 = no cap); a cap is reported on stderr</td></tr>
         <tr><td><code>--offset</code></td><td><code>0</code></td><td>row offset for pagination (maps to the search &#39;from&#39;)</td></tr>
         <tr><td><code>--order</code></td><td><code>desc</code></td><td>_timestamp ordering for the auto-built query: desc or asc</td></tr>
@@ -768,6 +772,7 @@ page through every matching row as ndjson (bound it with --max).</p>
         <tr><td><code>--sql</code></td><td></td><td>full SQL query (overrides --stream/--where/--order)</td></tr>
         <tr><td><code>--stream</code></td><td></td><td>stream to query (builds SELECT * FROM &#34;&lt;stream&gt;&#34;)</td></tr>
         <tr><td><code>--to</code></td><td></td><td>range end, same forms (default now); requires --from</td></tr>
+        <tr><td><code>--type</code></td><td><code>logs</code></td><td>stream type to query: logs, metrics or traces (use the discovered stream_type)</td></tr>
         <tr><td><code>--where</code></td><td></td><td>WHERE clause to filter the auto-built query, e.g. &#34;level = &#39;ERROR&#39;&#34;</td></tr>
         </tbody>
       </table>
@@ -795,6 +800,7 @@ backfill a window first; otherwise only rows arriving after start are shown.</p>
         <tr><td><code>--interval</code></td><td><code>2s</code></td><td>poll interval, e.g. 2s, 5s, 1m</td></tr>
         <tr><td><code>--since</code></td><td></td><td>backfill this window before following, e.g. 5m</td></tr>
         <tr><td><code>--stream</code></td><td></td><td>stream to follow (required)</td></tr>
+        <tr><td><code>--type</code></td><td><code>logs</code></td><td>stream type to query: logs, metrics or traces (use the discovered stream_type)</td></tr>
         <tr><td><code>--where</code></td><td></td><td>WHERE clause to filter, e.g. &#34;level = &#39;ERROR&#39;&#34;</td></tr>
         </tbody>
       </table>
@@ -915,7 +921,7 @@ learn which columns exist before writing SQL.</p>
       <table>
         <thead><tr><th>Flag</th><th>Default</th><th>Description</th></tr></thead>
         <tbody>
-        <tr><td><code>--type</code></td><td></td><td>stream type hint: logs, metrics or traces</td></tr>
+        <tr><td><code>--type</code></td><td></td><td>stream namespace: logs, metrics or traces; required when the name is ambiguous</td></tr>
         </tbody>
       </table>
 
@@ -949,7 +955,7 @@ partition settings — what you need to write a correct SQL query.</p>
       <table>
         <thead><tr><th>Flag</th><th>Default</th><th>Description</th></tr></thead>
         <tbody>
-        <tr><td><code>--type</code></td><td></td><td>stream type hint: logs, metrics or traces</td></tr>
+        <tr><td><code>--type</code></td><td></td><td>stream namespace: logs, metrics or traces; required when the name is ambiguous</td></tr>
         </tbody>
       </table>
 
@@ -964,7 +970,7 @@ partition settings — what you need to write a correct SQL query.</p>
       <table>
         <thead><tr><th>Flag</th><th>Default</th><th>Description</th></tr></thead>
         <tbody>
-        <tr><td><code>--type</code></td><td></td><td>stream type hint: logs, metrics or traces</td></tr>
+        <tr><td><code>--type</code></td><td></td><td>stream namespace: logs, metrics or traces; required when the name is ambiguous</td></tr>
         </tbody>
       </table>
 

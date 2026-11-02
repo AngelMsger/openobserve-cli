@@ -17,7 +17,7 @@ func newMetricsCmd(s *appState) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "metrics",
 		Short: "Query metrics with PromQL (instant and range)",
-		Long: "Metrics in OpenObserve are queried with PromQL, not SQL. `metrics query`\n" +
+		Long: "Use PromQL for metric rates, quantiles and series arithmetic. `metrics query`\n" +
 			"evaluates an expression at a single instant; `metrics query-range` evaluates\n" +
 			"it across a time window at a step resolution (the shape you graph). Discover\n" +
 			"the metric names you can use with `stream list --type metrics`.",
@@ -34,8 +34,8 @@ func newMetricsQueryCmd(s *appState) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "query",
 		Short: "Evaluate a PromQL expression at a single instant",
-		Long: "Runs an instant PromQL query. The result is a vector (one value per\n" +
-			"series) at the evaluation time, which defaults to now. Pass --query @file\n" +
+		Long: "Runs an instant PromQL query at the evaluation time, which defaults to now.\n" +
+			"The expression determines the result type (vector, matrix, scalar or string). Pass --query @file\n" +
 			"or --query @- to read a long expression from a file or stdin.",
 		Example: "  # current request rate per service\n" +
 			"  openobserve-cli metrics query --query 'sum by (service)(rate(http_requests_total[5m]))'\n\n" +

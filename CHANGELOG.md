@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- SQL search now exposes `--type logs|metrics|traces` consistently on run,
+  histogram and tail, retaining it across paging. `trace get` explicitly queries
+  the traces namespace instead of the server's default logs namespace. Stream
+  inspection rejects ambiguous names across types with `STREAM_AMBIGUOUS`.
+- Skill management and `version` reject unexpected positional arguments instead
+  of silently ignoring them.
+- Align the companion Skill (`0.6.0`) with the command tree, handshake version,
+  authentication recovery, write defaults and folder/revision handling. Correct
+  alert threshold semantics and distinguish stored definitions from working
+  delivery/rendering. Shorten the entrypoint and make backup examples fail on errors.
+
 ## [0.18.0] - 2026-11-02
 
 ### Fixed

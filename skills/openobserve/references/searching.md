@@ -26,6 +26,9 @@ openobserve-cli search run --stream default \
 Builds and runs a SQL query, or runs one you supply.
 
 - `--stream <name>` builds `SELECT * FROM "<name>" ORDER BY _timestamp DESC`.
+- `--type logs|metrics|traces` selects the stream namespace (default `logs`),
+  including with `--sql`. Use the `stream_type` from discovery. PromQL is
+  preferable for metric calculations; SQL can inspect raw metric or trace records.
 - `--where "<cond>"` adds a `WHERE` clause: `--where "code >= 500"`,
   `--where "level = 'ERROR' AND service = 'api'"`.
 - `--order asc|desc` controls `_timestamp` ordering (default `desc`, newest first).
@@ -34,6 +37,8 @@ Builds and runs a SQL query, or runs one you supply.
 - `--limit N` caps rows (default 100, max 10000); `--offset N` paginates.
 
 Time range is **required** — pass `--since` or `--from`/`--to` (see below).
+`--sql` accepts `@file` or `@-` for stdin. `--where` is an inline SQL predicate;
+trace search calls its predicate `--filter` (and also accepts `@file` / `@-`).
 
 Output (JSON) is a summary plus the hits:
 
@@ -50,7 +55,7 @@ Output (JSON) is a summary plus the hits:
 `| jq` / `| grep`. When more rows exist, stderr includes
 `{"_notice":{"pagination":{"next":"20","has_more":true},"next_steps":["Pass next as --offset to retrieve the next page."]}}`.
 Read `_notice.pagination.next` and pass it as `--offset`; retain the same query
-and fixed absolute `--from` **and** `--to` values on each invocation. Repeating
+and the same `--type`, org and fixed absolute `--from` **and** `--to` values on each invocation. Repeating
 `--since` recalculates the window and can duplicate or skip rows. NDJSON output
 does not echo the resolved window, so begin a listing you intend to page with
 explicit bounds. To continue a window first read with `--since` in JSON, pass
@@ -65,7 +70,8 @@ above.
 
 `--all` requests every page and always emits NDJSON; use it only when the task
 needs complete rows and supply `--max` as a budget. With `--all`, `--limit` is
-the page size, not the total. A `--max` cap is reported on stderr; retain that
+the page size, not the total (default 10000 per page; set `--limit` explicitly
+for smaller requests). A `--max` cap is reported on stderr; retain that
 limitation in any conclusion. Keep the same absolute window when paginating or
 comparing queries so new events do not move the target between requests.
 
@@ -74,6 +80,7 @@ comparing queries so new events do not move the target between requests.
 Runs `histogram(_timestamp, '<interval>')` with `count(*)`, grouped per bucket.
 
 - `--stream <name>` (required) and optional `--where`.
+- `--type logs|metrics|traces` chooses the namespace, as for `search run`.
 - `--interval` accepts compact widths: `30s`, `1m`, `5m`, `1h`, `1d` (default `1m`).
 
 Returns `{ buckets: [ { bucket, count }, … ] }`.
@@ -84,6 +91,8 @@ Use finite `search run` snapshots for ordinary inspection. Use `search tail`
 only for requested live monitoring; `--since` backfills history but does not
 limit how long it runs. The global `--timeout` bounds each request, not the
 follow loop. There is no built-in duration or row cap for tail.
+`--type` chooses the namespace (default `logs`); `--interval` is the poll
+frequency (default `2s`), whereas histogram's `--interval` is a bucket width.
 
 Choose a deadline or observable stopping condition from the request and enforce
 it through the agent host's process controls. If none is specified, state a

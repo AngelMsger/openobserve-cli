@@ -96,10 +96,13 @@ type SearchQuery struct {
 	Size      int    `json:"size"`
 }
 
-// SearchRequest is the body POSTed to /api/{org}/_search.
+// SearchRequest supplies the SQL body and stream namespace for /api/{org}/_search.
 type SearchRequest struct {
 	Query      SearchQuery `json:"query"`
 	SearchType string      `json:"search_type,omitempty"`
+	// StreamType is the URL query parameter "type", not part of the JSON body.
+	// Empty preserves the server's default logs namespace.
+	StreamType string `json:"-"`
 }
 
 // SearchResponse is the search API's reply.

@@ -54,6 +54,10 @@ Each noun lives in its own file (`org.go`, `stream.go`, `search.go`, `metrics.go
 logs path: it converts human time ranges to microseconds (via `timeutil`) and
 builds `SELECT` / `histogram` queries so the API client only ever receives a ready
 query; it also hosts `search tail` (poll-and-stream) and `--all` paging.
+Search commands retain `--type` as `SearchRequest.StreamType`, encoded in the
+URL query rather than the JSON body; absent library values preserve the server's
+logs default. `trace get` explicitly selects traces. Stream inspection requires
+a type when discovery returns multiple streams with the same name.
 `metrics.go` queries the Prometheus-compatible PromQL endpoints (times in
 **seconds**, not microseconds — `metrics.go` owns that conversion); `trace.go`
 lists traces and reassembles a trace's spans into a parent/child waterfall.

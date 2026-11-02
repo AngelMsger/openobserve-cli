@@ -48,6 +48,7 @@ func newSkillStatusCmd(s *appState) *cobra.Command {
 	var project bool
 	cmd := &cobra.Command{
 		Use:   "status",
+		Args:  cobra.NoArgs,
 		Short: "Report loaded, installed and embedded Skill versions",
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			load := currentSkillLoadState()
@@ -189,6 +190,7 @@ func newSkillInstallCmd(s *appState) *cobra.Command {
 	)
 	cmd := &cobra.Command{
 		Use:   "install",
+		Args:  cobra.NoArgs,
 		Short: "Deploy the embedded Skill into a coding agent's skills directory",
 		Long: "Write the companion `openobserve` Skill — bundled inside this binary —\n" +
 			"into a coding agent's skills directory. With no flags it probes for\n" +
@@ -231,6 +233,7 @@ func newSkillUninstallCmd(s *appState) *cobra.Command {
 	)
 	cmd := &cobra.Command{
 		Use:   "uninstall",
+		Args:  cobra.NoArgs,
 		Short: "Remove the companion Skill from a coding agent's skills directory",
 		Long: "Delete a previously installed `openobserve` Skill. With no flags it\n" +
 			"probes for installed agents (" + strings.Join(skill.AgentIDs(), ", ") + ")\n" +
@@ -276,6 +279,7 @@ func newSkillPathCmd(s *appState) *cobra.Command {
 	)
 	cmd := &cobra.Command{
 		Use:   "path",
+		Args:  cobra.NoArgs,
 		Short: "Print Skill paths, installation state and version alignment",
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			var dests []skillDest
@@ -314,6 +318,7 @@ func newSkillPathCmd(s *appState) *cobra.Command {
 func newSkillShowCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "show",
+		Args:  cobra.NoArgs,
 		Short: "Print the embedded SKILL.md to stdout",
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			data, err := openobservecli.SkillFS.ReadFile(openobservecli.SkillRoot + "/SKILL.md")
