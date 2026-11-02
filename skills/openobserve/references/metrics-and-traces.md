@@ -38,9 +38,14 @@ openobserve-cli metrics query-range \
 
 Output is `{ query, result_type, result }` where `result_type` is
 `vector` (instant) or `matrix` (range); `--format ndjson` streams one series per
-line. A rejected expression returns `PROMQL_ERROR`. An empty successful result
-does not establish that a metric is absent: check the metric, labels, org, and
-time window before drawing that conclusion.
+line. When the server attaches advisories, the document also carries
+`warnings` / `infos`; with `--format ndjson` or `--fields` they arrive on
+stderr as a `query_advisories` notice instead. Read them before trusting the
+numbers: a warning such as a truncated result changes their meaning. A rejected
+expression returns `PROMQL_ERROR`; a reply that is not a successful PromQL
+result returns `PROMQL_RESPONSE_INVALID` rather than an empty result. An empty
+successful result does not establish that a metric is absent: check the metric,
+labels, org, and time window before drawing that conclusion.
 
 ## Traces — `trace search` and `trace get`
 
