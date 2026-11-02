@@ -3,8 +3,7 @@ package app
 import (
 	"context"
 	"errors"
-	"fmt"
-	"net/http"
+	"io"
 	"os"
 	"strings"
 	"time"
@@ -110,6 +109,7 @@ func (s *appState) newClient() (apiclient.Client, error) {
 		AuthDecorator: cred.Decorator(),
 		Timeout:       cfg.Defaults.Timeout,
 		MaxRetries:    cfg.Defaults.MaxRetries,
+		Verbose:       s.verboseLog(),
 	})
 	if err != nil {
 		return nil, err
@@ -127,19 +127,20 @@ func (s *appState) probeTransport(dec transport.Decorator) *transport.Client {
 	if dec != nil {
 		decs = append(decs, dec)
 	}
-	if s.gflags.verbose {
-		decs = append(decs, verboseDecorator)
-	}
 	return transport.New(transport.Options{
 		Timeout:    s.timeout(),
 		MaxRetries: s.cfg().Defaults.MaxRetries,
 		Decorators: decs,
+		Verbose:    s.verboseLog(),
 	})
 }
 
-// verboseDecorator logs each outgoing request line to stderr.
-func verboseDecorator(req *http.Request) {
-	fmt.Fprintf(os.Stderr, "> %s %s\n", req.Method, req.URL.String())
+// verboseLog is where --verbose writes its request log, or nil without it.
+func (s *appState) verboseLog() io.Writer {
+	if s.gflags.verbose {
+		return os.Stderr
+	}
+	return nil
 }
 
 // readOnly reports whether the effective posture for this invocation is
