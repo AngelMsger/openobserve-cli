@@ -77,7 +77,7 @@ func TestCaptureAgainstRealBrowser(t *testing.T) {
 	// GET /api/organizations, which is exactly what the fake instance serves
 	// and gates on credentials. So this exercises the whole chain — injected
 	// script, binding, cookie sampling, Tracker, authenticated probe.
-	verify := webauth.PingVerifier(srv.URL, "default", 5*time.Second, 0)
+	verify := webauth.PingVerifier(srv.URL, "default", 5*time.Second, 0, nil)
 
 	d := New(Options{Timeout: 90 * time.Second})
 
@@ -209,7 +209,7 @@ setTimeout(function(){ location.href = '/web/logs'; }, 200);
 	instanceBase = "http://localhost:" + port
 	idpBase = idp.URL
 
-	verify := webauth.PingVerifier(instanceBase, "default", 5*time.Second, 0)
+	verify := webauth.PingVerifier(instanceBase, "default", 5*time.Second, 0, nil)
 	d := New(Options{Timeout: 90 * time.Second})
 
 	done := make(chan struct{})

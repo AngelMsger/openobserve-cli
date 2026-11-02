@@ -2,6 +2,7 @@ package webauth
 
 import (
 	"context"
+	"io"
 	"time"
 
 	"github.com/angelmsger/openobserve-cli/pkg/apiclient"
@@ -27,8 +28,9 @@ const verifyTimeout = 20 * time.Second
 // capture: only an authenticated response proves the captured state works.
 //
 // It takes plain values rather than a config.Defaults so this package stays
-// free of pkg/config (and so of yaml.v3). Callers pass d.Timeout, d.MaxRetries.
-func PingVerifier(baseURL, org string, timeout time.Duration, maxRetries int) VerifyFunc {
+// free of pkg/config (and so of yaml.v3). Callers pass d.Timeout, d.MaxRetries
+// and the --verbose request log, or nil.
+func PingVerifier(baseURL, org string, timeout time.Duration, maxRetries int, verbose io.Writer) VerifyFunc {
 	return func(sess pkgauth.Session) bool {
 		blob, err := pkgauth.EncodeSession(sess)
 		if err != nil {
@@ -48,6 +50,7 @@ func PingVerifier(baseURL, org string, timeout time.Duration, maxRetries int) Ve
 			AuthDecorator: cred.Decorator(),
 			Timeout:       timeout,
 			MaxRetries:    maxRetries,
+			Verbose:       verbose,
 		})
 		if err != nil {
 			return false
