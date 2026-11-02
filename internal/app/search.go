@@ -26,6 +26,8 @@ func newSearchCmd(s *appState) *cobra.Command {
 		Long: "Search is the heart of the CLI. `search run` returns matching rows;\n" +
 			"`search histogram` returns time-bucketed counts so you can see volume\n" +
 			"and shape before pulling raw rows; `search tail` follows a stream live.\n" +
+			"Select the stream namespace with --type logs|metrics|traces (default logs).\n" +
+			"For series rates and quantiles use `metrics`; for span trees use `trace`.\n" +
 			"Time ranges are given in human form (--since 1h, or --from/--to); the CLI\n" +
 			"converts them to the microsecond epochs OpenObserve needs.",
 	}
@@ -65,15 +67,16 @@ func (t timeFlags) resolve() (start, end int64, err error) {
 
 func newSearchRunCmd(s *appState) *cobra.Command {
 	var (
-		tf      timeFlags
-		stream  string
-		sql     string
-		where   string
-		order   string
-		limit   int
-		offset  int
-		all     bool
-		maxRows int
+		streamType string
+		tf         timeFlags
+		stream     string
+		sql        string
+		where      string
+		order      string
+		limit      int
+		offset     int
+		all        bool
+		maxRows    int
 	)
 	cmd := &cobra.Command{
 		Use:   "run",
@@ -95,6 +98,9 @@ func newSearchRunCmd(s *appState) *cobra.Command {
 			"  openobserve-cli search run --stream default --since 24h --all --max 50000",
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
+			if err := validateSearchStreamType(streamType); err != nil {
+				return err
+			}
 			start, end, err := tf.resolve()
 			if err != nil {
 				return err
@@ -116,7 +122,7 @@ func newSearchRunCmd(s *appState) *cobra.Command {
 			}
 
 			if all {
-				return s.runSearchAll(ctx, client, query, start, end, offset, limit, maxRows)
+				return s.runSearchAll(ctx, client, query, streamType, start, end, offset, limit, maxRows)
 			}
 
 			size := limit
@@ -127,6 +133,7 @@ func newSearchRunCmd(s *appState) *cobra.Command {
 				size = constants.MaxSearchLimit
 			}
 			req := apiclient.SearchRequest{
+				StreamType: streamType,
 				Query: apiclient.SearchQuery{
 					SQL:       query,
 					StartTime: start,
@@ -160,11 +167,12 @@ func newSearchRunCmd(s *appState) *cobra.Command {
 		},
 	}
 	f := cmd.Flags()
+	addSearchStreamTypeFlag(cmd, &streamType)
 	f.StringVar(&stream, "stream", "", "stream to query (builds SELECT * FROM \"<stream>\")")
 	f.StringVar(&sql, "sql", "", "full SQL query (overrides --stream/--where/--order)")
 	f.StringVar(&where, "where", "", "WHERE clause to filter the auto-built query, e.g. \"level = 'ERROR'\"")
 	f.StringVar(&order, "order", "desc", "_timestamp ordering for the auto-built query: desc or asc")
-	f.IntVar(&limit, "limit", 0, fmt.Sprintf("max rows to return (default %d, max %d); with --all, the page size", constants.DefaultSearchLimit, constants.MaxSearchLimit))
+	f.IntVar(&limit, "limit", 0, fmt.Sprintf("max rows (default %d, max %d); with --all, page size (default %d)", constants.DefaultSearchLimit, constants.MaxSearchLimit, constants.MaxSearchLimit))
 	f.IntVar(&offset, "offset", 0, "row offset for pagination (maps to the search 'from')")
 	f.BoolVar(&all, "all", false, "page through every matching row, streamed as ndjson")
 	f.IntVar(&maxRows, "max", 0, "with --all, stop after this many rows (0 = no cap); a cap is reported on stderr")
@@ -207,7 +215,7 @@ func searchContinuation(ctx context.Context, client apiclient.Client, org string
 // defeat the purpose, so output is always ndjson here. Paging is from/size based;
 // a future large-scan path can use OpenObserve's _search_partition. When --max is
 // reached, the truncation is announced on stderr — never silently.
-func (s *appState) runSearchAll(ctx context.Context, client apiclient.Client, query string, start, end int64, from, limit, maxRows int) error {
+func (s *appState) runSearchAll(ctx context.Context, client apiclient.Client, query, streamType string, start, end int64, from, limit, maxRows int) error {
 	pageSize := constants.MaxSearchLimit
 	if limit > 0 && limit < pageSize {
 		pageSize = limit
@@ -222,7 +230,8 @@ func (s *appState) runSearchAll(ctx context.Context, client apiclient.Client, qu
 			break
 		}
 		resp, err := client.Search(ctx, s.org(), apiclient.SearchRequest{
-			Query: apiclient.SearchQuery{SQL: query, StartTime: start, EndTime: end, From: from, Size: size},
+			StreamType: streamType,
+			Query:      apiclient.SearchQuery{SQL: query, StartTime: start, EndTime: end, From: from, Size: size},
 		})
 		if err != nil {
 			return err
@@ -251,10 +260,11 @@ func (s *appState) runSearchAll(ctx context.Context, client apiclient.Client, qu
 
 func newSearchTailCmd(s *appState) *cobra.Command {
 	var (
-		stream   string
-		where    string
-		interval string
-		backfill string
+		streamType string
+		stream     string
+		where      string
+		interval   string
+		backfill   string
 	)
 	cmd := &cobra.Command{
 		Use:   "tail",
@@ -268,6 +278,9 @@ func newSearchTailCmd(s *appState) *cobra.Command {
 			"  openobserve-cli search tail --stream app --since 5m --interval 3s",
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
+			if err := validateSearchStreamType(streamType); err != nil {
+				return err
+			}
 			if strings.TrimSpace(stream) == "" {
 				return cerrors.New(cerrors.CategoryUsage, "NO_STREAM",
 					"--stream is required for tail").
@@ -308,7 +321,8 @@ func newSearchTailCmd(s *appState) *cobra.Command {
 				if now > watermark {
 					reqCtx, cancel := context.WithTimeout(ctx, s.timeout())
 					resp, serr := client.Search(reqCtx, s.org(), apiclient.SearchRequest{
-						Query: apiclient.SearchQuery{SQL: query, StartTime: watermark, EndTime: now, Size: constants.MaxSearchLimit},
+						StreamType: streamType,
+						Query:      apiclient.SearchQuery{SQL: query, StartTime: watermark, EndTime: now, Size: constants.MaxSearchLimit},
 					})
 					cancel()
 					if serr != nil {
@@ -339,6 +353,7 @@ func newSearchTailCmd(s *appState) *cobra.Command {
 		},
 	}
 	f := cmd.Flags()
+	addSearchStreamTypeFlag(cmd, &streamType)
 	f.StringVar(&stream, "stream", "", "stream to follow (required)")
 	f.StringVar(&where, "where", "", "WHERE clause to filter, e.g. \"level = 'ERROR'\"")
 	f.StringVar(&interval, "interval", "2s", "poll interval, e.g. 2s, 5s, 1m")
@@ -348,10 +363,11 @@ func newSearchTailCmd(s *appState) *cobra.Command {
 
 func newSearchHistogramCmd(s *appState) *cobra.Command {
 	var (
-		tf       timeFlags
-		stream   string
-		where    string
-		interval string
+		streamType string
+		tf         timeFlags
+		stream     string
+		where      string
+		interval   string
 	)
 	cmd := &cobra.Command{
 		Use:   "histogram",
@@ -362,6 +378,9 @@ func newSearchHistogramCmd(s *appState) *cobra.Command {
 		Example: "  openobserve-cli search histogram --stream default --since 6h --interval 5m",
 		Args:    cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
+			if err := validateSearchStreamType(streamType); err != nil {
+				return err
+			}
 			if stream == "" {
 				return cerrors.New(cerrors.CategoryUsage, "NO_STREAM",
 					"--stream is required for histogram").
@@ -384,6 +403,7 @@ func newSearchHistogramCmd(s *appState) *cobra.Command {
 				return err
 			}
 			resp, err := client.Search(ctx, s.org(), apiclient.SearchRequest{
+				StreamType: streamType,
 				Query: apiclient.SearchQuery{
 					SQL:       query,
 					StartTime: start,
@@ -412,11 +432,27 @@ func newSearchHistogramCmd(s *appState) *cobra.Command {
 		},
 	}
 	f := cmd.Flags()
+	addSearchStreamTypeFlag(cmd, &streamType)
 	f.StringVar(&stream, "stream", "", "stream to aggregate (required)")
 	f.StringVar(&where, "where", "", "WHERE clause to filter, e.g. \"level = 'ERROR'\"")
 	f.StringVar(&interval, "interval", "1m", "bucket width: 30s, 1m, 5m, 1h, 1d")
 	addTimeFlags(cmd, &tf)
 	return cmd
+}
+
+func addSearchStreamTypeFlag(cmd *cobra.Command, streamType *string) {
+	cmd.Flags().StringVar(streamType, "type", "logs", "stream type to query: logs, metrics or traces (use the discovered stream_type)")
+	enumComplete(cmd, "type", "logs", "metrics", "traces")
+}
+
+func validateSearchStreamType(streamType string) error {
+	switch streamType {
+	case "logs", "metrics", "traces":
+		return nil
+	default:
+		return cerrors.Newf(cerrors.CategoryUsage, "BAD_STREAM_TYPE", "invalid --type %q (want logs, metrics or traces)", streamType).
+			WithNextSteps("openobserve-cli stream list")
+	}
 }
 
 // buildRunSQL returns the SQL to execute. An explicit --sql wins; otherwise a

@@ -82,6 +82,10 @@ func main() {
 		}
 		// A trace_id lookup (from `trace get`) returns a small span tree.
 		if strings.Contains(req.Query.SQL, "trace_id") {
+			if r.URL.Query().Get("type") != "traces" {
+				http.Error(w, "trace records require type=traces", http.StatusBadRequest)
+				return
+			}
 			writeJSON(w, map[string]any{
 				"took": 4, "total": 3, "scan_size": 0.2,
 				"hits": []map[string]any{

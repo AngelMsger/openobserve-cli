@@ -74,7 +74,7 @@ func newStreamGetCmd(s *appState) *cobra.Command {
 			return s.emit(st)
 		},
 	}
-	cmd.Flags().StringVar(&streamType, "type", "", "stream type hint: logs, metrics or traces")
+	cmd.Flags().StringVar(&streamType, "type", "", "stream namespace: logs, metrics or traces; required when the name is ambiguous")
 	enumComplete(cmd, "type", "logs", "metrics", "traces")
 	return cmd
 }
@@ -106,7 +106,7 @@ func newStreamSchemaCmd(s *appState) *cobra.Command {
 			})
 		},
 	}
-	cmd.Flags().StringVar(&streamType, "type", "", "stream type hint: logs, metrics or traces")
+	cmd.Flags().StringVar(&streamType, "type", "", "stream namespace: logs, metrics or traces; required when the name is ambiguous")
 	enumComplete(cmd, "type", "logs", "metrics", "traces")
 	return cmd
 }
@@ -135,7 +135,7 @@ func newStreamStatsCmd(s *appState) *cobra.Command {
 			return s.emit(out)
 		},
 	}
-	cmd.Flags().StringVar(&streamType, "type", "", "stream type hint: logs, metrics or traces")
+	cmd.Flags().StringVar(&streamType, "type", "", "stream namespace: logs, metrics or traces; required when the name is ambiguous")
 	enumComplete(cmd, "type", "logs", "metrics", "traces")
 	return cmd
 }

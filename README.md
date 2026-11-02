@@ -66,6 +66,11 @@ $ openobserve-cli search run --stream default --where "level = 'ERROR'" --since 
 > read-only mode; deletion requires `--yes`. Functions/pipelines, users and
 > ingestion remain planned.
 
+SQL `search run`, `search histogram` and `search tail` default to `--type logs`.
+For raw metric or trace records, pass the discovered `--type metrics` or
+`--type traces`. Use PromQL for metric calculations and `trace get` for span
+trees; `trace get` selects the traces namespace automatically.
+
 ### Manage alerts and dashboards
 
 ```bash

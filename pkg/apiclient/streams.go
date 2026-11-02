@@ -39,10 +39,20 @@ func (c *apiClient) GetStream(ctx context.Context, org, name, streamType string)
 	if err != nil {
 		return nil, err
 	}
+	var match *Stream
 	for i := range streams {
 		if strings.EqualFold(streams[i].Name, name) {
-			return &streams[i], nil
+			if match != nil {
+				return nil, cerrors.Newf(cerrors.CategoryUsage, "STREAM_AMBIGUOUS",
+					"more than one stream named %q in org %q; specify --type", name, org).
+					WithHint("Stream names are scoped by type. Use the stream_type returned by discovery.").
+					WithNextSteps("openobserve-cli stream list --org " + org)
+			}
+			match = &streams[i]
 		}
+	}
+	if match != nil {
+		return match, nil
 	}
 	return nil, cerrors.Newf(cerrors.CategoryNotFound, "STREAM_NOT_FOUND",
 		"no stream named %q in org %q", name, org).

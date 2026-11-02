@@ -131,7 +131,8 @@ func newTraceGetCmd(s *appState) *cobra.Command {
 			sql := fmt.Sprintf(`SELECT * FROM "%s" WHERE trace_id = '%s' ORDER BY start_time`,
 				stream, strings.ReplaceAll(traceID, "'", "''"))
 			resp, err := client.Search(ctx, s.org(), apiclient.SearchRequest{
-				Query: apiclient.SearchQuery{SQL: sql, StartTime: start, EndTime: end, Size: -1},
+				StreamType: "traces",
+				Query:      apiclient.SearchQuery{SQL: sql, StartTime: start, EndTime: end, Size: -1},
 			})
 			if err != nil {
 				return err

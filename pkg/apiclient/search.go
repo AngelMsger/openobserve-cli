@@ -12,8 +12,12 @@ func (c *apiClient) Search(ctx context.Context, org string, req SearchRequest) (
 		req.SearchType = "ui"
 	}
 	path := "/api/" + url.PathEscape(org) + "/_search"
+	q := url.Values{}
+	if req.StreamType != "" {
+		q.Set("type", req.StreamType)
+	}
 	var resp SearchResponse
-	if err := c.doJSON(ctx, http.MethodPost, path, nil, req, &resp); err != nil {
+	if err := c.doJSON(ctx, http.MethodPost, path, q, req, &resp); err != nil {
 		return nil, err
 	}
 	return &resp, nil
