@@ -203,9 +203,14 @@ check "alert list"     '"alert_id": "alert1"' -- run alert list
 check "alert get"      '"name": "cpu-high"'   -- run alert get alert1
 check "alert dry-run"  '"dry_run": true'      -- run alert create --dry-run --file "$TMP/alert.json"
 check "alert create"   '"created": true'      -- run alert create --file "$TMP/alert.json"
-check "alert update"   '"updated": true'      -- run alert update alert1 --file "$TMP/alert.json"
+# Use a changed name so the readback verifies persistence, not just an ack.
+sed 's/cpu-high/cpu-high-updated/g' "$TMP/alert.json" >"$TMP/alert-update.json"
+check "alert update"   '"updated": true'      -- run alert update alert1 --file "$TMP/alert-update.json"
+check "alert update persists" '"name": "cpu-high-updated"' -- run alert get alert1
 check "alert disable"  '"disabled": true'     -- run alert disable alert1
+check "alert disable persists" '"enabled": false' -- run alert get alert1
 check "alert enable"   '"enabled": true'      -- run alert enable alert1
+check "alert enable persists" '"enabled": true' -- run alert get alert1
 check "alert delete"   '"deleted": true'      -- run alert delete alert1 --yes
 
 # Deletion refuses without --yes (exit 2, CONFIRM_REQUIRED, nothing sent).
@@ -226,8 +231,21 @@ JSON
 check "dashboard list"    '"dashboard_id": "dash1"' -- run dashboard list
 check "dashboard get"     '"hash": "h1"'            -- run dashboard get dash1
 check "dashboard dry-run" '"dry_run": true'         -- run dashboard create --dry-run --file "$TMP/dash.json"
+run dashboard get dash1 >"$TMP/dashboard-backup.json"
 check "dashboard create"  '"created": true'         -- run dashboard create --file "$TMP/dash.json"
 check "dashboard update"  '"updated": true'         -- run dashboard update dash1 --file "$TMP/dash.json"
+check "dashboard update persists" '"title": "Ops Board"' -- run dashboard get dash1
+# The saved revision predates the update and must not overwrite it.
+set +e
+run dashboard update dash1 --file "$TMP/dashboard-backup.json" >"$TMP/stale.out" 2>"$TMP/stale.err"; code=$?
+set -e
+if [[ "$code" -eq 11 ]] && grep -q '"category": "conflict"' "$TMP/stale.err"; then
+  echo "ok   - stale dashboard backup exits 11"
+  pass=$((pass + 1))
+else
+  echo "FAIL - stale dashboard backup (exit $code)"; head -5 "$TMP/stale.err"; exit 1
+fi
+check "dashboard backup imports" '"created": true' -- run dashboard create --file "$TMP/dashboard-backup.json"
 check "dashboard delete"  '"deleted": true'         -- run dashboard delete dash1 --yes
 
 # Deletion refuses without --yes (exit 2, CONFIRM_REQUIRED, nothing sent).
@@ -240,6 +258,21 @@ if [[ "$code" -eq 2 ]] && grep -q '"CONFIRM_REQUIRED"' "$TMP/del.err"; then
 else
   echo "FAIL - dashboard delete without --yes (exit $code)"; head -5 "$TMP/del.err"; exit 1
 fi
+
+# Successful deletions must remove the resource, not merely acknowledge it.
+for resource in alert dashboard; do
+  resource_id="alert1"
+  [[ "$resource" == "dashboard" ]] && resource_id="dash1"
+  set +e
+  run "$resource" get "$resource_id" >"$TMP/deleted.out" 2>"$TMP/deleted.err"; code=$?
+  set -e
+  if [[ "$code" -eq 6 ]] && grep -q '"category": "not_found"' "$TMP/deleted.err"; then
+    echo "ok   - $resource deletion persists"
+    pass=$((pass + 1))
+  else
+    echo "FAIL - $resource deletion readback (exit $code)"; head -5 "$TMP/deleted.err"; exit 1
+  fi
+done
 
 # Read-only mode blocks writes before any request (exit 5), even with --yes.
 set +e

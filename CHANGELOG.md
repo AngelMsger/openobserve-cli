@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.18.0] - 2026-11-02
+
 ### Fixed
 
 - Dashboard imports select the declared version and skip inactive null version
@@ -39,6 +41,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   offline and credential-free, and reports invalid base URLs. Backup/edit/restore
   preserves exact JSON numbers and removes response metadata for library users
   as well as CLI callers. Alert permission errors point at Alerts permissions.
+- Dashboard guidance reports the shared `conflict` exit code correctly (11).
+  Refresh the release scope documentation and companion Skill to `0.5.2`.
 
 ### Changed
 
@@ -66,7 +70,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   three respect read-only mode with a structured `READONLY_BLOCKED` error;
   `update` uses an explicit or saved revision, or prefetches the current hash
   for a bare definition; a stale revision fails with a `conflict` error
-  (exit 7). `pkg/apiclient` grows `ListDashboards`, `GetDashboard`,
+  (exit 11). `pkg/apiclient` grows `ListDashboards`, `GetDashboard`,
   `CreateDashboard`, `UpdateDashboard` and `DeleteDashboard`, with write
   previews and execution sharing the API-layer request builders
   (`DescribeWrite`) so dry-run stays offline and credential-free and reports
@@ -74,6 +78,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   unwraps the `dashboard get` envelope for library users as well as CLI
   callers.
 
+### Contributors
+
+- Thanks to @missedone, the project's first external contributor, for adding
+  Alert and Dashboard management in #11 and #10.
 
 ## [0.17.0] - 2026-10-27
 
@@ -671,7 +679,8 @@ Initial release — a read-only, agent-facing CLI for OpenObserve (O2).
   release binaries and `make install`. A generated CLI reference
   (`docs/cli/`) and a GitHub Pages landing page.
 
-[Unreleased]: https://github.com/AngelMsger/openobserve-cli/compare/v0.17.0...HEAD
+[Unreleased]: https://github.com/AngelMsger/openobserve-cli/compare/v0.18.0...HEAD
+[0.18.0]: https://github.com/AngelMsger/openobserve-cli/compare/v0.17.0...v0.18.0
 [0.17.0]: https://github.com/AngelMsger/openobserve-cli/compare/v0.16.1...v0.17.0
 [0.16.1]: https://github.com/AngelMsger/openobserve-cli/compare/v0.16.0...v0.16.1
 [0.16.0]: https://github.com/AngelMsger/openobserve-cli/compare/v0.15.0...v0.16.0
