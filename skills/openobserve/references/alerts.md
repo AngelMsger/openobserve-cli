@@ -113,9 +113,11 @@ openobserve-cli alert enable <id> --folder <folder-id>
 ## Definition gotchas
 
 When authoring or fixing a definition from scratch, keep to the shape the
-server accepts: `stream_type` is one of `logs` / `metrics` / `traces`;
-`query_condition.conditions` (SQL alerts) or `query_condition.promql`
-(metrics alerts) must reference the `stream_name` the alert is attached to;
+server accepts: `stream_type` is one of `logs` / `metrics` / `traces`.
+Match `query_condition.type` to its fields: `conditions` for `custom`, `sql`
+for `sql`, and `promql` plus its result condition for `promql`. Reuse a working
+definition of that type, and discover the target stream and fields before
+editing queries. Query type and stream type are different concepts.
 `trigger_condition.period` is the lookback window in minutes; `threshold`
 is compared with the query result using `operator`, not a count of successive
 evaluations. `destinations` reference existing alert
