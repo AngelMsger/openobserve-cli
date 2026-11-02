@@ -61,8 +61,9 @@ lists traces and reassembles a trace's spans into a parent/child waterfall.
 `get`) surface alerts and dashboards from the meta store the query commands
 cannot see, while `create`, `update`, `delete` (and, for alerts, `enable` and
 `disable`) carry `--dry-run` request plans, require `--yes` for deletion, and
-are gated by the read-only wrapper (dashboard `update` re-reads the current
-hash before writing to feed the server's concurrent-edit check).
+are gated by the read-only wrapper. Dashboard updates use the explicit or
+backup revision; bare definitions prefetch the current hash inside the API
+client, after the read-only gate. Missing hashes stop the write.
 `notify.go` emits the post-run update notice (agent-cli-kit `update`).
 
 ## API client (`pkg/apiclient`)
@@ -71,8 +72,10 @@ hash before writing to feed the server's concurrent-edit check).
 is the single implementation. The read-only wrapper embeds only `Reader` and
 explicitly blocks every write. Methods are org-scoped (`/api/{org}/…`); `models.go` defines the
 returned types. Alert management uses `/api/v2/{org}/alerts`.
-`alerts_write.go` owns the shared execution/preview builders, exported typed
-write requests, and `DescribeWrite` offline plans. Payload normalization lives
+`alerts_write.go` and `dashboards_write.go` own resource request builders.
+`write.go` exposes one `DescribeWrite` entry point for both, also available
+through read-only clients. `PlanDashboardWrite` remains a compatible helper.
+An update plan includes `prefetch` when its revision must be read at execution. Payload normalization lives
 in `pkg/apiclient` so library users and CLI users share it; raw JSON preserves
 exact numeric values across backup/edit/restore.
 

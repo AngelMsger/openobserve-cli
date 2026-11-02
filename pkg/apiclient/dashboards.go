@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
+	"net/http"
 	"net/url"
 	"strconv"
 
@@ -51,7 +51,7 @@ func (d *DashboardSummary) UnmarshalJSON(b []byte) error {
 	if err := json.Unmarshal(b, &m); err != nil {
 		return err
 	}
-	d.raw = m
+	*d = DashboardSummary{raw: m}
 	d.DashboardID, _ = m["dashboard_id"].(string)
 	d.Title, _ = m["title"].(string)
 	d.FolderID, _ = m["folder_id"].(string)
@@ -107,7 +107,7 @@ func (d *Dashboard) UnmarshalJSON(b []byte) error {
 	if err := json.Unmarshal(b, &m); err != nil {
 		return err
 	}
-	d.raw = m
+	*d = Dashboard{raw: m}
 	_ = json.Unmarshal(m["hash"], &d.Hash)
 	var version float64
 	_ = json.Unmarshal(m["version"], &version)
@@ -146,14 +146,20 @@ func (d *Dashboard) WriteBody() (json.RawMessage, error) {
 
 // bodyMap locates the v1..v8 definition inside the raw envelope.
 func (d *Dashboard) bodyMap() (json.RawMessage, bool) {
-	if d.Version != 0 {
-		if raw, ok := d.raw[fmt.Sprintf("v%d", d.Version)]; ok {
-			return raw, true
-		}
+	raw, err := json.Marshal(d.raw)
+	if err != nil {
+		return nil, false
 	}
-	for i := 1; i <= 8; i++ {
-		if raw, ok := d.raw[fmt.Sprintf("v%d", i)]; ok {
-			return raw, true
+	body, _, err := dashboardBody(raw)
+	if err != nil {
+		return nil, false
+	}
+	// Dashboard responses must contain a version envelope, not a bare definition.
+	for key := range d.raw {
+		if len(key) > 1 && key[0] == 'v' {
+			if _, err := strconv.Atoi(key[1:]); err == nil {
+				return body, true
+			}
 		}
 	}
 	return nil, false
@@ -169,14 +175,14 @@ func (c *apiClient) ListDashboards(ctx context.Context, org string, opts Dashboa
 		q.Set("title", opts.Title)
 	}
 	if opts.PageSize > 0 {
-		q.Set("page_size", strconv.Itoa(opts.PageSize))
+		q.Set("pageSize", strconv.Itoa(opts.PageSize))
 	}
 	var env struct {
 		Dashboards []DashboardSummary `json:"dashboards"`
 	}
 	path := "/api/" + url.PathEscape(org) + "/dashboards"
 	if err := c.getJSON(ctx, path, q, &env); err != nil {
-		return nil, err
+		return nil, refineDashboardError(err, "")
 	}
 	return env.Dashboards, nil
 }
@@ -187,7 +193,7 @@ func (c *apiClient) GetDashboard(ctx context.Context, org, id, folder string) (*
 	path := "/api/" + url.PathEscape(org) + "/dashboards/" + url.PathEscape(id)
 	var d Dashboard
 	if err := c.getJSON(ctx, path, dashboardFolderQuery(folder), &d); err != nil {
-		return nil, refineDashboardError(err, org, id)
+		return nil, refineDashboardError(err, id)
 	}
 	return &d, nil
 }
@@ -204,11 +210,29 @@ func (c *apiClient) CreateDashboard(ctx context.Context, org, folder string, bod
 }
 
 // UpdateDashboard replaces a dashboard's definition via
-// PUT /api/{org}/dashboards/{id}. hash, when non-empty, feeds the server's
-// concurrent-edit check; a stale hash fails with a conflict error.
+// PUT /api/{org}/dashboards/{id}. An explicit hash overrides the backup hash.
+// When neither exists, it reads the current revision first. Missing hashes
+// prevent the PUT; stale hashes fail with a conflict error.
 func (c *apiClient) UpdateDashboard(ctx context.Context, org, id, folder, hash string, body json.RawMessage) (*Dashboard, error) {
+	req := UpdateDashboardReq{org, id, folder, hash, body}
+	r, err := buildDashboardWrite(req)
+	if err != nil {
+		return nil, err
+	}
+	req.Body, req.Hash = r.body, r.query.Get("hash")
+	if req.Hash == "" {
+		current, err := c.GetDashboard(ctx, org, id, folder)
+		if err != nil {
+			return nil, err
+		}
+		req.Hash = current.Hash
+		if req.Hash == "" {
+			return nil, cerrors.New(cerrors.CategoryParse, "DASHBOARD_HASH_MISSING", "the dashboard response contains no revision hash").
+				WithHint("No update was sent. Fetch a valid dashboard revision before retrying.").WithNextSteps("openobserve-cli dashboard get " + id)
+		}
+	}
 	var d Dashboard
-	if err := c.executeDashboardWrite(ctx, UpdateDashboardReq{org, id, folder, hash, body}, &d); err != nil {
+	if err := c.executeDashboardWrite(ctx, req, &d); err != nil {
 		return nil, err
 	}
 	return &d, nil
@@ -230,12 +254,17 @@ func dashboardFolderQuery(folder string) url.Values {
 // refineDashboardError retrargets generic HTTP errors at the dashboard
 // workflow: the shared not-found guidance points at streams, and a 409 needs
 // the concurrent-edit recovery spelled out.
-func refineDashboardError(err error, org, id string) error {
+func refineDashboardError(err error, id string) error {
 	var ce *cerrors.CLIError
 	if !errors.As(err, &ce) {
 		return err
 	}
 	switch ce.Category {
+	case cerrors.CategoryPermission:
+		if ce.HTTPStatus == http.StatusForbidden {
+			return ce.WithHint("This credential lacks permission for dashboards in the selected folder.").
+				WithNextSteps("In OpenObserve IAM, grant the required Dashboards permissions for this folder.", "openobserve-cli dashboard list")
+		}
 	case cerrors.CategoryNotFound:
 		if id == "" {
 			// A create/update 404 means the folder (not the dashboard) is missing.
@@ -249,7 +278,7 @@ func refineDashboardError(err error, org, id string) error {
 		return ce.WithHint("The dashboard changed since the hash was taken; "+
 			"the concurrent-edit check rejected the update.").
 			WithNextSteps(
-				"Re-run the update — `dashboard update` re-reads the current hash before writing.",
+				"Fetch the current definition and re-apply your intended changes before updating; do not blindly retry an old backup.",
 				"Inspect the current state first: openobserve-cli dashboard get "+id)
 	}
 	return err

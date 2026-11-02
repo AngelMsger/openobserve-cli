@@ -38,9 +38,11 @@ openobserve-cli metrics query-range \
 
 Output is `{ query, result_type, result }` where `result_type` is
 `vector` (instant) or `matrix` (range); `--format ndjson` streams one series per
-line. When the server attaches advisories, the document also carries
-`warnings` / `infos`; with `--format ndjson` or `--fields` they arrive on
-stderr as a `query_advisories` notice instead. Read them before trusting the
+line. Empty or null series lists write no rows. Scalar/string results stay in
+one summary record, retaining the timestamp/value pair together. When the server
+attaches advisories, summary documents also carry `warnings` / `infos`. Series
+NDJSON and `--fields` projections also emit them on stderr as a
+`query_advisories` notice. Read them before trusting the
 numbers: a warning such as a truncated result changes their meaning. A rejected
 expression returns `PROMQL_ERROR`; a reply that is not a successful PromQL
 result returns `PROMQL_RESPONSE_INVALID` rather than an empty result. An empty

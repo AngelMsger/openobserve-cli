@@ -86,8 +86,8 @@ type Writer interface {
 	SetAlertEnabled(ctx context.Context, org, id, folder string, value bool) error
 	// CreateDashboard stores body as a new dashboard in folder ("" = "default").
 	CreateDashboard(ctx context.Context, org, folder string, body json.RawMessage) (*Dashboard, error)
-	// UpdateDashboard replaces a dashboard's definition. hash, when non-empty,
-	// feeds the server's concurrent-edit check.
+	// UpdateDashboard replaces a definition using the explicit hash, backup
+	// hash, or a prefetch of the current revision, in that order.
 	UpdateDashboard(ctx context.Context, org, id, folder, hash string, body json.RawMessage) (*Dashboard, error)
 	// DeleteDashboard removes a dashboard permanently.
 	DeleteDashboard(ctx context.Context, org, id, folder string) error

@@ -28,21 +28,23 @@ openobserve-cli dashboard get <id> > backup.json
 
 The output is directly re-usable by `create` and `update`: both unwrap a
 get-response envelope (`{v5: {...}, hash: ...}`) down to the body OpenObserve
-expects, so a copy-edit-restore round trip needs no `jq` surgery.
+expects, selecting the active version and ignoring inactive `vN: null` entries.
+Malformed or ambiguous envelopes are rejected; exact numeric values are retained.
 
 ## Writing safely
 
 All three write commands support `--dry-run`, which prints the exact request
 plan (`method`, `url`, `body`) and sends nothing; plans are built offline by
 the API client, so they work without credentials and report an invalid
-`base_url`. For `update` the plan shows the PUT; unless `--hash` pins a
-revision, the read step that resolves the current hash happens at run time.
+`base_url`. Update uses the explicit `--hash`, then the backup hash. If neither
+is available, `request.prefetch` describes a GET whose response supplies the
+PUT hash at execution time; the preview itself makes no requests.
 `--dry-run` also works under read-only mode — run it first and show the plan
 to the user before mutating anything.
 
 ```
 openobserve-cli dashboard create --file def.json            # body from file; --file - reads stdin
-openobserve-cli dashboard update <id> --file def.json       # read-modify-write, built in
+openobserve-cli dashboard update <id> --file def.json       # backup hash, or prefetch for a bare definition
 openobserve-cli dashboard delete <id> --yes                 # permanent; --yes is mandatory
 ```
 
@@ -50,11 +52,13 @@ openobserve-cli dashboard delete <id> --yes                 # permanent; --yes i
   is set, writes fail with `READONLY_BLOCKED` (exit 5) before any request.
   Confirm with the user, then re-run the same command with `--allow-writes`
   in front: `openobserve-cli --allow-writes dashboard update …`.
-- **Concurrent-edit protection.** `update` re-reads the current hash and sends
-  it with the PUT; the server rejects a stale dashboard with a `conflict`
-  error (exit 7). Do not blind-retry: `dashboard get` the current definition,
-  re-apply the intended change, and update again. Pass `--hash` explicitly only
-  to pin a specific known revision.
+- **Concurrent-edit protection.** An exported backup retains its hash. The
+  server rejects it with `conflict` (exit 7) if another edit has happened since
+  export. Do not blind-retry: fetch the current definition, re-apply the intended
+  change, then update. `--hash` explicitly overrides the backup revision.
+  A bare definition has no saved revision, so the client fetches the current
+  hash before PUT; this protects only the interval between those two requests.
+  A response missing its hash stops the update without a PUT.
 - **Deletion needs `--yes`.** Without it the command exits 2
   (`CONFIRM_REQUIRED`) without touching the server. Never add `--yes` on the
   user's behalf without explicit confirmation in the same session.

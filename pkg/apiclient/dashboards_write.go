@@ -1,24 +1,28 @@
 package apiclient
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/url"
+	"strconv"
+	"strings"
 
 	cerrors "github.com/angelmsger/openobserve-cli/pkg/errors"
 )
 
 // CreateDashboardReq describes a new dashboard. Body may be a definition or a
-// get backup; normalizeDashboardWrite unwraps the envelope.
+// get backup; NormalizeDashboardBody unwraps the envelope.
 type CreateDashboardReq struct {
 	Org, Folder string
 	Body        json.RawMessage
 }
 
 // UpdateDashboardReq describes a replacement definition for an existing
-// dashboard. Hash, when non-empty, feeds the server's concurrent-edit check.
+// dashboard. Hash overrides the backup revision; when neither is available, execution
+// fetches the current hash and the offline plan describes that prefetch.
 type UpdateDashboardReq struct {
 	Org, ID, Folder, Hash string
 	Body                  json.RawMessage
@@ -43,7 +47,14 @@ func buildDashboardWrite(op any) (dashboardWriteRequest, error) {
 	case CreateDashboardReq:
 		r.method, org, folder, r.body = http.MethodPost, v.Org, v.Folder, v.Body
 	case UpdateDashboardReq:
-		r.method, org, r.id, folder, r.body, hash = http.MethodPut, v.Org, v.ID, v.Folder, v.Body, v.Hash
+		normalized, backupHash, err := dashboardBody(v.Body)
+		if err != nil {
+			return r, badDashboardBody(err)
+		}
+		r.method, org, r.id, folder, r.body, hash = http.MethodPut, v.Org, v.ID, v.Folder, normalized, v.Hash
+		if hash == "" {
+			hash = backupHash
+		}
 	case DeleteDashboardReq:
 		r.method, org, r.id, folder = http.MethodDelete, v.Org, v.ID, v.Folder
 	default:
@@ -82,16 +93,7 @@ func (c *apiClient) executeDashboardWrite(ctx context.Context, op any, out any) 
 	if r.body != nil {
 		body = r.body
 	}
-	var org string
-	switch v := op.(type) {
-	case CreateDashboardReq:
-		org = v.Org
-	case UpdateDashboardReq:
-		org = v.Org
-	case DeleteDashboardReq:
-		org = v.Org
-	}
-	return refineDashboardError(c.doJSON(ctx, r.method, r.path, r.query, body, out), org, r.id)
+	return refineDashboardError(c.doJSON(ctx, r.method, r.path, r.query, body, out), r.id)
 }
 
 // PlanDashboardWrite returns a plan without accessing credentials or the
@@ -102,11 +104,14 @@ func PlanDashboardWrite(baseURL string, op any) (WriteRequestPlan, error) {
 	if err != nil {
 		return WriteRequestPlan{}, err
 	}
-	base, err := NormalizeBaseURL(baseURL)
+	plan, err := planWriteRequest(baseURL, r.method, r.path, r.query, r.body)
 	if err != nil {
 		return WriteRequestPlan{}, err
 	}
-	return WriteRequestPlan{Method: r.method, URL: base + r.path + "?" + r.query.Encode(), Body: r.body}, nil
+	if r.method == http.MethodPut && r.query.Get("hash") == "" {
+		plan.Prefetch = &WriteRequestPlan{Method: http.MethodGet, URL: plan.URL}
+	}
+	return plan, nil
 }
 
 // NormalizeDashboardBody validates a definition and unwraps a `dashboard get`
@@ -114,20 +119,68 @@ func PlanDashboardWrite(baseURL string, op any) (WriteRequestPlan, error) {
 // OpenObserve expects for create/update. Keys are kept raw so exact numbers
 // survive backup/edit/restore for library users as well as CLI callers.
 func NormalizeDashboardBody(body json.RawMessage) (json.RawMessage, error) {
+	normalized, _, err := dashboardBody(body)
+	if err != nil {
+		return nil, badDashboardBody(err)
+	}
+	return normalized, nil
+}
+
+func badDashboardBody(err error) error {
+	return cerrors.Wrap(err, cerrors.CategoryUsage, "BAD_BODY", "invalid dashboard definition").
+		WithHint("Use a JSON object or an exported dashboard with one valid active version body.")
+}
+
+// dashboardBody selects the version named by the envelope, ignoring null
+// inactive versions. Without version metadata, exactly one object is accepted.
+// Raw bytes preserve large numbers and unknown fields.
+func dashboardBody(body json.RawMessage) (json.RawMessage, string, error) {
 	var m map[string]json.RawMessage
 	if err := json.Unmarshal(body, &m); err != nil {
-		return nil, cerrors.Wrap(err, cerrors.CategoryUsage, "BAD_BODY", "the dashboard definition must be a JSON object")
+		return nil, "", err
 	}
 	if m == nil {
-		return nil, cerrors.New(cerrors.CategoryUsage, "BAD_BODY", "the dashboard definition must be a JSON object")
+		return nil, "", fmt.Errorf("expected a JSON object")
 	}
-	if _, isEnvelope := m["hash"]; isEnvelope {
-		for i := 1; i <= 8; i++ {
-			if raw, ok := m[fmt.Sprintf("v%d", i)]; ok {
-				return raw, nil
+	keys := make([]string, 0)
+	for key := range m {
+		if strings.HasPrefix(key, "v") {
+			if n, err := strconv.Atoi(key[1:]); err == nil && n > 0 {
+				keys = append(keys, key)
 			}
 		}
 	}
-	// Already a definition: pass the original bytes through untouched.
-	return body, nil
+	_, hasHash := m["hash"]
+	if len(keys) == 0 && !hasHash {
+		return body, "", nil
+	}
+	var hash string
+	if raw, ok := m["hash"]; ok {
+		if err := json.Unmarshal(raw, &hash); err != nil {
+			return nil, "", fmt.Errorf("invalid backup hash: %w", err)
+		}
+	}
+	var selected json.RawMessage
+	if raw, ok := m["version"]; ok {
+		var version int
+		if err := json.Unmarshal(raw, &version); err != nil || version < 1 {
+			return nil, "", fmt.Errorf("invalid envelope version")
+		}
+		selected = m[fmt.Sprintf("v%d", version)]
+	} else {
+		for _, key := range keys {
+			if bytes.Equal(bytes.TrimSpace(m[key]), []byte("null")) {
+				continue
+			}
+			if selected != nil {
+				return nil, "", fmt.Errorf("multiple active dashboard versions")
+			}
+			selected = m[key]
+		}
+	}
+	var definition map[string]json.RawMessage
+	if err := json.Unmarshal(selected, &definition); err != nil || definition == nil {
+		return nil, "", fmt.Errorf("active dashboard version must contain an object")
+	}
+	return selected, hash, nil
 }
