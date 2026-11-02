@@ -53,7 +53,7 @@ openobserve-cli dashboard delete <id> --yes                 # permanent; --yes i
   Confirm with the user, then re-run the same command with `--allow-writes`
   in front: `openobserve-cli --allow-writes dashboard update …`.
 - **Concurrent-edit protection.** An exported backup retains its hash. The
-  server rejects it with `conflict` (exit 7) if another edit has happened since
+  server rejects it with `conflict` (exit 11) if another edit has happened since
   export. Do not blind-retry: fetch the current definition, re-apply the intended
   change, then update. `--hash` explicitly overrides the backup revision.
   A bare definition has no saved revision, so the client fetches the current

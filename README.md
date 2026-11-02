@@ -60,10 +60,30 @@ $ openobserve-cli search run --stream default --where "level = 'ERROR'" --since 
 - **Companion Skill** — an `openobserve` Skill, embedded in the binary, that
   guides coding agents through the CLI.
 
-> **Scope (v0.2):** read-only — organizations, streams (discovery + schema), SQL
-> search / histogram / tail, PromQL metrics, and trace search / get. Dashboards,
-> alerts, functions/pipelines, users and ingestion are planned; the write-safety
-> gates (`--dry-run`, `--yes`, session read-only) are already wired for them.
+> **Scope (v0.18):** telemetry queries remain read-only. Alert and Dashboard
+> management supports discovery, JSON backup/restore, create/update/delete and
+> alert enable/disable. Every write supports `--dry-run` and honors session
+> read-only mode; deletion requires `--yes`. Functions/pipelines, users and
+> ingestion remain planned.
+
+### Manage alerts and dashboards
+
+```bash
+openobserve-cli alert list
+openobserve-cli dashboard list --title traffic
+openobserve-cli dashboard get <id> --folder <folder-id> > dashboard.json
+# Edit dashboard.json while retaining its hash, then preview and apply:
+openobserve-cli dashboard update <id> --folder <folder-id> --file dashboard.json --dry-run
+openobserve-cli dashboard update <id> --folder <folder-id> --file dashboard.json
+```
+
+Use the IDs and folders returned by the lists. A stale Dashboard backup is
+rejected with a conflict; fetch the current definition and re-apply your edits.
+Writes are allowed by default. Set `OPENOBSERVE_CLI_READ_ONLY=1` to block them,
+then use `--allow-writes` only for an intended mutation. Alert management needs
+OpenObserve's ID-based v2 API. See the [Alert guide](skills/openobserve/references/alerts.md),
+[Dashboard guide](skills/openobserve/references/dashboards.md) and
+[read-only mode](docs/read-only-mode.md).
 
 ## Installation
 

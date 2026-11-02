@@ -1,6 +1,6 @@
 ---
 name: openobserve
-version: 0.5.1
+version: 0.5.2
 description: "Query OpenObserve (O2) logs, metrics, and traces: discover streams and fields, search SQL logs, inspect histograms, evaluate PromQL, reconstruct traces, and follow live logs. Use for an OpenObserve URL or an investigation whose backend is known to be OpenObserve, including errors, latency, request volume, and stream discovery. Supports self-hosted and Cloud instances. Telemetry operations are read-only. Alert management (list/get/create/update/delete/enable/disable with --dry-run, --yes and read-only-mode gating) and dashboard management (list/get/create/update/delete with --dry-run, --yes and read-only-mode gating) are supported; pipelines and user management are not."
 metadata:
   requires:

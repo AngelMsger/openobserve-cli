@@ -3,7 +3,8 @@
 npm distribution of [`openobserve-cli`](https://github.com/AngelMsger/openobserve-cli)
 — a command-line tool that searches [OpenObserve](https://openobserve.ai) (O2)
 logs, metrics and traces from the terminal, built for coding agents (Claude
-Code and others) and humans alike.
+Code and others) and humans alike. It also manages alert and dashboard definitions,
+with offline write previews, read-only mode and explicit deletion confirmation.
 
 ```bash
 npm install -g @angelmsger/openobserve-cli
