@@ -104,7 +104,13 @@ that lists values of that kind.
 
 ## When extending (P1)
 
-Write commands (alerts; later dashboards, functions/pipelines, users, ingest)
+Write commands (alerts, dashboards; later functions/pipelines, users, ingest)
+must:
+add `--dry-run` (emit the would-be request plan), require `--yes` for destructive
+ops, route through `apiclient.NewReadOnly` (embed only `Reader`, implement each
+`Writer` method to return `READONLY_BLOCKED`, and retain the compile-time
+`Client` assertion), and keep the `{items,next,has_more}` + structured-error
+contract.
 must:
 add `--dry-run` (emit the would-be request plan), require `--yes` for destructive
 ops, route through `apiclient.NewReadOnly` (embed only `Reader`, implement each

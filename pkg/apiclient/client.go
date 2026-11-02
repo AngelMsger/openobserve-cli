@@ -64,6 +64,10 @@ type Reader interface {
 	ListAlerts(ctx context.Context, org string, opts AlertListOptions) ([]AlertSummary, error)
 	// GetAlert returns the full alert definition.
 	GetAlert(ctx context.Context, org, id, folder string) (*Alert, error)
+	// ListDashboards returns dashboard summaries visible under the given options.
+	ListDashboards(ctx context.Context, org string, opts DashboardListOptions) ([]DashboardSummary, error)
+	// GetDashboard returns the full dashboard definition and its current hash.
+	GetDashboard(ctx context.Context, org, id, folder string) (*Dashboard, error)
 	// DescribeWrite builds a request plan offline, without credentials or HTTP.
 	DescribeWrite(ctx context.Context, op any) (WriteRequestPlan, error)
 }
@@ -80,6 +84,13 @@ type Writer interface {
 	// SetAlertEnabled enables or disables an alert without replacing its
 	// definition.
 	SetAlertEnabled(ctx context.Context, org, id, folder string, value bool) error
+	// CreateDashboard stores body as a new dashboard in folder ("" = "default").
+	CreateDashboard(ctx context.Context, org, folder string, body json.RawMessage) (*Dashboard, error)
+	// UpdateDashboard replaces a dashboard's definition. hash, when non-empty,
+	// feeds the server's concurrent-edit check.
+	UpdateDashboard(ctx context.Context, org, id, folder, hash string, body json.RawMessage) (*Dashboard, error)
+	// DeleteDashboard removes a dashboard permanently.
+	DeleteDashboard(ctx context.Context, org, id, folder string) error
 }
 
 // apiClient is the single Client implementation.

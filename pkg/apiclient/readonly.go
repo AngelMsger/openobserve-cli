@@ -44,3 +44,15 @@ func (c *readOnlyClient) DeleteAlert(ctx context.Context, org, id, folder string
 func (c *readOnlyClient) SetAlertEnabled(ctx context.Context, org, id, folder string, value bool) error {
 	return readonlyBlocked()
 }
+
+func (c *readOnlyClient) CreateDashboard(ctx context.Context, org, folder string, body json.RawMessage) (*Dashboard, error) {
+	return nil, readonlyBlocked()
+}
+
+func (c *readOnlyClient) UpdateDashboard(ctx context.Context, org, id, folder, hash string, body json.RawMessage) (*Dashboard, error) {
+	return nil, readonlyBlocked()
+}
+
+func (c *readOnlyClient) DeleteDashboard(ctx context.Context, org, id, folder string) error {
+	return readonlyBlocked()
+}
