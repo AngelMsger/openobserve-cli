@@ -14,6 +14,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Mask passwords embedded in the server URL in `--verbose` request logs by
+  pinning agent-cli-kit's merged transport fix (`8e0dd08af52d`).
+
 - SQL search now exposes `--type logs|metrics|traces` consistently on run,
   histogram and tail, retaining it across paging. `trace get` explicitly queries
   the traces namespace instead of the server's default logs namespace. Stream
