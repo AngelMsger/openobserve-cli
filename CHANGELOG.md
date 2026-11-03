@@ -7,7 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `webauth.PingVerifierLogging`: `PingVerifier` with a `--verbose` request log
+  writer. `PingVerifier` keeps its signature and logs nothing.
+
 ### Fixed
+
+- Mask passwords embedded in the server URL in `--verbose` request logs by
+  pinning agent-cli-kit's merged transport fix (`8e0dd08af52d`).
 
 - SQL search now exposes `--type logs|metrics|traces` consistently on run,
   histogram and tail, retaining it across paging. `trace get` explicitly queries
@@ -19,6 +27,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   authentication recovery, write defaults and folder/revision handling. Correct
   alert threshold semantics and distinguish stored definitions from working
   delivery/rendering. Shorten the entrypoint and make backup examples fail on errors.
+- `--verbose` now logs each request to the server (method, URL and status) on
+  stderr for every command, `doctor`, the login check and the browser-session
+  check. It used to log a bare `> METHOD URL` line only for the connectivity
+  probes, so most commands logged nothing although the error guidance points at
+  the flag. It uses agent-cli-kit's transport log, which never writes headers or
+  bodies, so the parse-error guidance no longer says `--verbose` shows the raw
+  response; it says what `--verbose` shows: each request's URL and status. The
+  release check, which asks for a newer version, is not logged.
 
 ## [0.18.0] - 2026-11-02
 

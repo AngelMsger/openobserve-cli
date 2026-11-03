@@ -3,6 +3,7 @@ package webauth
 import (
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -71,5 +72,26 @@ func TestPingVerifierFailsClosedOnUnreachableHost(t *testing.T) {
 		}
 	case <-time.After(30 * time.Second):
 		t.Fatal("PingVerifier hung on an unreachable host")
+	}
+}
+
+// --verbose reaches the browser-session check: it logs the request the check
+// sends, and never the session's Authorization header.
+func TestPingVerifierLoggingLogsItsRequest(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"data":[{"identifier":"default","name":"default"}]}`))
+	}))
+	defer srv.Close()
+
+	var log strings.Builder
+	verify := PingVerifierLogging(srv.URL, "default", 5*time.Second, 0, &log)
+	if !verify(pkgauth.Session{Authorization: "Basic c2Vzc2lvbi1zZWNyZXQ="}) {
+		t.Fatal("a session the server accepts must verify")
+	}
+	got := log.String()
+	if !strings.Contains(got, "GET "+srv.URL+"/") || !strings.Contains(got, " -> 200") ||
+		strings.Contains(got, "c2Vzc2lvbi1zZWNyZXQ=") {
+		t.Fatalf("verbose log = %q, want the request line and no Authorization value", got)
 	}
 }

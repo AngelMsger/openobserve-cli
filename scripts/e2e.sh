@@ -58,6 +58,22 @@ check() { # check <label> <expected-substr> -- <command...>
 }
 
 check "org list"        '"default"'      -- run org list
+# --verbose logs one line per request (method, URL, status) on stderr: never on
+# stdout, which stays data, and never a header.
+verbose_out="$(OPENOBSERVE_URL="http://verbose-user:e2e-url-secret@${URL#http://}" run --verbose org list 2>"$TMP/verbose.err")"
+if grep -Eq '^[A-Z]+ http://verbose-user:xxxxx@[^ ]+ -> 200$' "$TMP/verbose.err" &&
+  grep -q '"default"' <<<"$verbose_out" && ! grep -q ' -> 200' <<<"$verbose_out" &&
+  ! grep -qF 'e2e-url-secret' "$TMP/verbose.err" &&
+  ! grep -qF 'e2e-url-secret' <<<"$verbose_out" &&
+  ! grep -qiE 'authorization|bearer |basic ' "$TMP/verbose.err"; then
+  echo "ok   - --verbose logs on stderr only and masks the URL password"
+  pass=$((pass + 1))
+else
+  echo "FAIL - --verbose logs on stderr only and masks the URL password"
+  head -5 "$TMP/verbose.err"
+  exit 1
+fi
+check "--verbose doctor logs its requests" ' -> 200' -- sh -c "\"$BIN\" --config \"$TMP\" --verbose doctor --no-update-check 2>&1 >/dev/null"
 check "stream list"     '"app"'          -- run stream list
 check "stream schema"   'full_text_search_keys' -- run stream schema app
 check "search run"      '"hits"'         -- run search run --stream app --since 1h --limit 5

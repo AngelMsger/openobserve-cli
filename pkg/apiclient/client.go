@@ -181,7 +181,7 @@ func decodeJSON(body []byte, out any) error {
 			WithHint("The server's JSON did not match what openobserve-cli expected; "+
 				"this is likely a client bug, not a failed request.").
 			WithNextSteps(
-				"Retry with --verbose to inspect the raw response.",
+				"Retry with --verbose to see each request's URL and status.",
 				"Report it with this snippet: "+snippet)
 	}
 	return nil
