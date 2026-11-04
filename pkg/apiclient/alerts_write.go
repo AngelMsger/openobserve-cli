@@ -88,7 +88,8 @@ func (c *apiClient) executeAlertWrite(ctx context.Context, op any, out any) erro
 	if r.body != nil {
 		body = r.body
 	}
-	return refineAlertError(c.doJSON(ctx, r.method, r.path, r.query, body, out), r.id)
+	return cerrors.FromWrite(refineAlertError(c.doJSON(ctx, r.method, r.path, r.query, body, out), r.id),
+		alertWriteTarget(op))
 }
 
 // NormalizeAlertBody validates a definition and removes response metadata.

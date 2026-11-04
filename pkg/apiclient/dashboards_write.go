@@ -93,7 +93,8 @@ func (c *apiClient) executeDashboardWrite(ctx context.Context, op any, out any) 
 	if r.body != nil {
 		body = r.body
 	}
-	return refineDashboardError(c.doJSON(ctx, r.method, r.path, r.query, body, out), r.id)
+	return cerrors.FromWrite(refineDashboardError(c.doJSON(ctx, r.method, r.path, r.query, body, out), r.id),
+		dashboardWriteTarget(op))
 }
 
 // PlanDashboardWrite returns a plan without accessing credentials or the

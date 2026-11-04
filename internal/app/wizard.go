@@ -106,13 +106,13 @@ func runInitForm(def initValues) (initValues, error) {
 func runInitPrompts(def initValues) (initValues, error) {
 	v := def.withDefaults()
 	var err error
-	if v.baseURL, err = promptLine("Server URL", v.baseURL); err != nil {
+	if v.baseURL, err = prompter().Line("Server URL", v.baseURL); err != nil {
 		return v, err
 	}
-	if v.org, err = promptLine("Organization", v.org); err != nil {
+	if v.org, err = prompter().Line("Organization", v.org); err != nil {
 		return v, err
 	}
-	if v.scheme, err = promptLine("Auth scheme (basic/token)", v.scheme); err != nil {
+	if v.scheme, err = prompter().Line("Auth scheme (basic/token)", v.scheme); err != nil {
 		return v, err
 	}
 	if g, e := wizardGuide(v); e != nil {
@@ -124,14 +124,14 @@ func runInitPrompts(def initValues) (initValues, error) {
 	}
 	switch v.scheme {
 	case auth.SchemeBasic:
-		if v.email, err = promptLine("Email", v.email); err != nil {
+		if v.email, err = prompter().Line("Email", v.email); err != nil {
 			return v, err
 		}
-		if v.secret, err = promptSecret("Password"); err != nil {
+		if v.secret, err = prompter().Secret("Password"); err != nil {
 			return v, err
 		}
 	case auth.SchemeToken:
-		if v.secret, err = promptSecret("Token"); err != nil {
+		if v.secret, err = prompter().Secret("Token"); err != nil {
 			return v, err
 		}
 	}

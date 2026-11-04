@@ -78,19 +78,19 @@ func newAuthLoginCmd(s *appState) *cobra.Command {
 			switch scheme {
 			case auth.SchemeBasic:
 				if cred.Username == "" {
-					u, err := promptLine("Email", "")
+					u, err := prompter().Line("Email", "")
 					if err != nil {
 						return err
 					}
 					cred.Username = u
 				}
-				pw, err := promptSecret("Password")
+				pw, err := prompter().Secret("Password")
 				if err != nil {
 					return err
 				}
 				cred.Secret = pw
 			case auth.SchemeToken:
-				tok, err := promptSecret("Token")
+				tok, err := prompter().Secret("Token")
 				if err != nil {
 					return err
 				}

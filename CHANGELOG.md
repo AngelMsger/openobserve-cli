@@ -12,7 +12,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `webauth.PingVerifierLogging`: `PingVerifier` with a `--verbose` request log
   writer. `PingVerifier` keeps its signature and logs nothing.
 
+### Changed
+
+- An alert or dashboard write that fails after it may have reached
+  OpenObserve (network error, 429, 5xx, redirect) now reports "Write outcome
+  is unknown for …", `retryable: false`, and the read that shows the result as
+  `next_steps` (`alert get` / `dashboard get` with the write's `--org` and
+  `--folder`, or `alert list` / `dashboard list --title` for a create), instead
+  of a retryable error that invited a second alert or dashboard. Definite
+  refusals such as 403, 404 and a stale dashboard hash are unchanged. This is
+  agent-cli-kit v0.6.0's shared write rule.
+- `READONLY_BLOCKED` uses agent-cli-kit's shared wording: the message names
+  the refused call (`operation "DeleteAlert" blocked: read-only mode is
+  enabled`), the hint says nothing was sent and that read-only mode is the
+  user's setting (`OPENOBSERVE_CLI_READ_ONLY`, `defaults.read_only`), and the
+  next steps are `--dry-run` and, only for a write the user authorized,
+  `--allow-writes`. Code, category and exit code are unchanged.
+- `pkg/errors` re-exports agent-cli-kit's `WriteTarget`, `FromWrite`,
+  `WriteSucceeded`, `MissingWriteIdentity`, `ShellArg`, `ReadOnlyBlocked` and
+  their codes. Terminal checks and prompts (`auth login`, `config init`) use
+  agent-cli-kit's `terminal` package; their wording is unchanged.
+
 ### Fixed
+
+- `alert create` and `dashboard create` no longer report success with an
+  empty ID when OpenObserve's response names none, or when it cannot be
+  decoded: the write happened, so they fail with
+  `WRITE_SUCCEEDED_RESPONSE_INVALID` and name the list that finds it.
+- Only a 2xx response counts as success: an unfollowed redirect is an error,
+  and a write answered through a followed redirect (a login page or single
+  sign-on proxy, or `http` to `https`) is an unknown outcome caused by
+  `HTTP_REDIRECTED`, instead of the page it landed on confirming the write.
+- `config init`'s plain prompts no longer take an answer cut short by a failed
+  read (not the end of input) as the answer.
 
 - Mask passwords embedded in the server URL in `--verbose` request logs, with
   agent-cli-kit v0.6.0's transport.

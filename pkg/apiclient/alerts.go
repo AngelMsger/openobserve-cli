@@ -151,9 +151,13 @@ func (c *apiClient) GetAlert(ctx context.Context, org, id, folder string) (*Aler
 // CreateAlert stores body as a new alert in folder via
 // POST /api/v2/{org}/alerts and returns the acknowledgement with its assigned ID.
 func (c *apiClient) CreateAlert(ctx context.Context, org, folder string, body json.RawMessage) (*Alert, error) {
+	req := CreateAlertReq{org, folder, body}
 	var a Alert
-	if err := c.executeAlertWrite(ctx, CreateAlertReq{org, folder, body}, &a); err != nil {
+	if err := c.executeAlertWrite(ctx, req, &a); err != nil {
 		return nil, err
+	}
+	if a.AlertID == "" {
+		return nil, cerrors.MissingWriteIdentity(alertWriteTarget(req))
 	}
 	return &a, nil
 }

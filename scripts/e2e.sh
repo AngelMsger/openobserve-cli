@@ -228,6 +228,17 @@ check "alert disable persists" '"enabled": false' -- run alert get alert1
 check "alert enable"   '"enabled": true'      -- run alert enable alert1
 check "alert enable persists" '"enabled": true' -- run alert get alert1
 check "alert delete"   '"deleted": true'      -- run alert delete alert1 --yes
+# A write that fails after it was sent may have been applied: the error says
+# the outcome is unknown, is not retryable and names the read that shows it.
+write_err="$(run alert delete unavailable --yes 2>&1 >/dev/null || true)"
+if [[ "$write_err" == *"Write outcome is unknown for alert unavailable in folder default of org default"* &&
+      "$write_err" == *'"retryable": false'* &&
+      "$write_err" == *"openobserve-cli --org 'default' alert get 'unavailable' --folder 'default'"* ]]; then
+  echo "ok   - failed write reports an unknown outcome"
+  pass=$((pass + 1))
+else
+  echo "FAIL - failed write reports an unknown outcome"; echo "$write_err" | head -8; exit 1
+fi
 
 # Deletion refuses without --yes (exit 2, CONFIRM_REQUIRED, nothing sent).
 set +e
@@ -300,6 +311,16 @@ if [[ "$code" -eq 5 ]] && grep -q '"READONLY_BLOCKED"' "$TMP/ro.err"; then
   pass=$((pass + 1))
 else
   echo "FAIL - read-only block (exit $code)"; head -5 "$TMP/ro.err"; exit 1
+fi
+# Read-only mode is the user's setting: the error names the refused write,
+# offers --allow-writes only for an authorized write and never offers to turn
+# the mode off.
+if grep -q 'operation \\"DeleteAlert\\" blocked' "$TMP/ro.err" &&
+   grep -q "Only if the user authorized this write" "$TMP/ro.err"; then
+  echo "ok   - read-only error names the write and leaves the switch to the user"
+  pass=$((pass + 1))
+else
+  echo "FAIL - read-only error names the write and leaves the switch to the user"; head -12 "$TMP/ro.err"; exit 1
 fi
 
 set +e
