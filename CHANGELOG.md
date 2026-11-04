@@ -39,10 +39,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   empty ID when OpenObserve's response names none, or when it cannot be
   decoded: the write happened, so they fail with
   `WRITE_SUCCEEDED_RESPONSE_INVALID` and name the list that finds it.
-- Only a 2xx response counts as success: an unfollowed redirect is an error,
-  and a write answered through a followed redirect (a login page or single
-  sign-on proxy, or `http` to `https`) is an unknown outcome caused by
-  `HTTP_REDIRECTED`, instead of the page it landed on confirming the write.
+- Only a 2xx response counts as success. A write answered with a redirect (a
+  login page or single sign-on proxy, or `http` to `https`) is an unknown
+  outcome with the redirect's status and a hint on what a redirect usually
+  means, instead of the page it landed on confirming the write: agent-cli-kit
+  v0.7.0's transport returns a write's redirect instead of following it, so a
+  307 or 308 no longer sends the write again either.
 - `config init`'s plain prompts no longer take an answer cut short by a failed
   read (not the end of input) as the answer.
 

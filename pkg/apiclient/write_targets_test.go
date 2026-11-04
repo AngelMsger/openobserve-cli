@@ -3,7 +3,6 @@ package apiclient
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"net/http"
 	"strings"
 	"testing"
@@ -105,26 +104,31 @@ func TestCreateAcknowledgedButUnusable(t *testing.T) {
 	}
 }
 
-// A redirect after a write is followed with a GET, so the final 200 answers
-// that GET (here a login page) and says nothing about the write. Before this
-// rule a delete that landed on a login page read as done.
+// The transport returns a write's redirect instead of following it, so a
+// redirect (here to a login page) is an unknown outcome with its status.
+// Before, a 302 was followed with a GET and a delete that landed on a login
+// page read as done; a 307 sent the delete again.
 func TestRedirectedWriteIsAnUnknownOutcome(t *testing.T) {
-	c, _ := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/login" {
-			w.Header().Set("Content-Type", "text/html")
-			_, _ = w.Write([]byte("<html>sign in</html>"))
-			return
-		}
-		http.Redirect(w, r, "/login", http.StatusFound)
-	})
-	err := c.DeleteDashboard(context.Background(), "default", "d1", "ops")
-	ce := cerrors.AsCLIError(err)
-	if err == nil || ce.Retryable || !strings.HasPrefix(ce.Message, "Write outcome is unknown for dashboard d1") {
-		t.Fatalf("got %v; want an unknown write outcome", err)
-	}
-	var cause *cerrors.CLIError
-	if !errors.As(errors.Unwrap(ce), &cause) || cause.Code != "HTTP_REDIRECTED" {
-		t.Fatalf("cause %+v; want HTTP_REDIRECTED", cause)
+	for _, status := range []int{http.StatusFound, http.StatusTemporaryRedirect} {
+		t.Run(http.StatusText(status), func(t *testing.T) {
+			var landed int
+			c, _ := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+				if r.URL.Path == "/login" {
+					landed++
+					w.Header().Set("Content-Type", "text/html")
+					_, _ = w.Write([]byte("<html>sign in</html>"))
+					return
+				}
+				http.Redirect(w, r, "/login", status)
+			})
+			err := c.DeleteDashboard(context.Background(), "default", "d1", "ops")
+			ce := cerrors.AsCLIError(err)
+			if ce == nil || ce.Retryable || ce.HTTPStatus != status || landed != 0 ||
+				!strings.HasPrefix(ce.Message, "Write outcome is unknown for dashboard d1") ||
+				!strings.Contains(ce.Hint, "answered it with a redirect") {
+				t.Fatalf("got %+v after %d login page requests; want an unknown outcome with the %d", ce, landed, status)
+			}
+		})
 	}
 }
 

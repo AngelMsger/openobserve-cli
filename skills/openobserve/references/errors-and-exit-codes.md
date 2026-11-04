@@ -58,9 +58,9 @@ fi
 ## Common cases
 
 - **"Write outcome is unknown for …"** → an alert or dashboard write failed
-  after it may have reached OpenObserve (network error, 429, 5xx, a redirect,
-  which usually means a login page or single sign-on proxy: cause
-  `HTTP_REDIRECTED`). It is `retryable=false`, whatever its category: do not
+  after it may have reached OpenObserve (network error, 429, 5xx, or a
+  redirect, a 3xx `http_status` that usually means a login page or single
+  sign-on proxy: check the base URL with `doctor`). It is `retryable=false`, whatever its category: do not
   repeat it. Run the read in `next_steps` (`alert get`, `dashboard get`, or
   for a create `alert list --folder` / `dashboard list --folder --title`), and
   repeat the write only if the read shows it did not happen.
