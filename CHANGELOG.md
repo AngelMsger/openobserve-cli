@@ -35,6 +35,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `search` behind a 307 or 308 redirect (an http-to-https upgrade, a moved
+  route) sends the same search again, and a transient failure of a search is
+  retried, as for any read. Search is a POST, and agent-cli-kit follows and
+  retries a POST only when the CLI marks it as a read (`transport.AsRead`).
+
 - `alert create` and `dashboard create` no longer report success with an
   empty ID when OpenObserve's response names none, or when it cannot be
   decoded: the write happened, so they fail with

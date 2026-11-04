@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	cerrors "github.com/angelmsger/openobserve-cli/pkg/errors"
 	"github.com/angelmsger/openobserve-cli/pkg/transport"
@@ -141,6 +142,42 @@ func TestSearchRequestAndResponse(t *testing.T) {
 	}
 	if resp.Hits[0]["level"] != "ERROR" {
 		t.Errorf("unexpected hit: %+v", resp.Hits[0])
+	}
+}
+
+// A search is a POST that only reads, so a 307 or 308 in front of the API
+// (an http-to-https upgrade, a moved route) sends the same search again, and
+// a 503 is retried, as for any read. With agent-cli-kit v0.7.0 an unmarked
+// POST got the redirect back and was sent once.
+func TestSearchIsFollowedAndRetriedAsARead(t *testing.T) {
+	for _, status := range []int{http.StatusTemporaryRedirect, http.StatusPermanentRedirect, http.StatusServiceUnavailable} {
+		t.Run(http.StatusText(status), func(t *testing.T) {
+			var first = true
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				var body SearchRequest
+				if r.Method != http.MethodPost || json.NewDecoder(r.Body).Decode(&body) != nil || body.Query.SQL == "" {
+					t.Errorf("got %s %s without the search body", r.Method, r.URL.Path)
+				}
+				if first {
+					first = false
+					if status == http.StatusServiceUnavailable {
+						w.WriteHeader(status)
+					} else {
+						http.Redirect(w, r, "/moved"+r.URL.Path, status)
+					}
+					return
+				}
+				_, _ = w.Write([]byte(`{"took":1,"total":0,"hits":[]}`))
+			}))
+			t.Cleanup(srv.Close)
+			tc := transport.New(transport.Options{MaxRetries: 1, RetryBaseDelay: time.Millisecond})
+			c := New(Config{BaseURL: srv.URL, Org: "default", Transport: tc})
+			if _, err := c.Search(context.Background(), "default", SearchRequest{
+				Query: SearchQuery{SQL: `SELECT * FROM "app"`, StartTime: 1, EndTime: 2, Size: 10},
+			}); err != nil || first {
+				t.Fatalf("got %v; want the search sent again after the %d", err, status)
+			}
+		})
 	}
 }
 
