@@ -127,3 +127,17 @@ func TestRedirectedWriteIsAnUnknownOutcome(t *testing.T) {
 		t.Fatalf("cause %+v; want HTTP_REDIRECTED", cause)
 	}
 }
+
+// A dashboard created from a backup envelope sends its active version, so
+// the read after an uncertain create looks for that version's title. It used
+// to look for a top-level title, which a backup does not have, and listed the
+// whole folder.
+func TestDashboardBackupCreateReadsItsTitle(t *testing.T) {
+	backup := json.RawMessage(`{"version":5,"v5":{"title":"Ops overview","version":5}}`)
+	target := dashboardWriteTarget(CreateDashboardReq{Org: "team-a", Folder: "ops", Body: backup})
+	want := "openobserve-cli --org 'team-a' dashboard list --folder 'ops' --title 'Ops overview'"
+	if len(target.ReadSteps) != 1 || target.ReadSteps[0] != want ||
+		target.Description != `new dashboard "Ops overview" in folder ops of org team-a` {
+		t.Fatalf("got %+v; want the read %q", target, want)
+	}
+}

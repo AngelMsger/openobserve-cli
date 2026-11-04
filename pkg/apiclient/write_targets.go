@@ -46,13 +46,18 @@ func alertWriteTarget(op any) cerrors.WriteTarget {
 }
 
 // dashboardWriteTarget is the target of a dashboard write op (a *Req from
-// dashboards_write.go). A new dashboard is found by its title.
+// dashboards_write.go). A new dashboard is found by its title, read from the
+// definition that was sent: a backup envelope's title is in its active
+// version, not at the top.
 func dashboardWriteTarget(op any) cerrors.WriteTarget {
 	var org, id, folder string
 	var body json.RawMessage
 	switch v := op.(type) {
 	case CreateDashboardReq:
 		org, folder, body = v.Org, v.Folder, v.Body
+		if sent, err := NormalizeDashboardBody(v.Body); err == nil {
+			body = sent
+		}
 	case UpdateDashboardReq:
 		org, id, folder = v.Org, v.ID, v.Folder
 	case DeleteDashboardReq:
