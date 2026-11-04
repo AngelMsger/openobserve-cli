@@ -86,6 +86,23 @@ exact numeric values across backup/edit/restore.
 - `doJSON` builds the request, applies the transport, and on a non-2xx response
   calls `httpError`, which classifies the status into a category and — for 403 —
   attaches RBAC-aware guidance (the common "service account has no role" case).
+  Only a 2xx acknowledges a request; a decode error keeps the response status.
+  A same-origin 301, 302 or 303 is followed with a GET, so a response to a
+  POST, PUT or DELETE whose final request is a GET (often a login page) is
+  reported as `HTTP_REDIRECTED` (server, not retryable), never decoded.
+- Writes follow the family's write-outcome rule from agent-cli-kit
+  (`errors.FromWrite`). `executeAlertWrite` and `executeDashboardWrite` wrap
+  each write with a target (`write_targets.go`): what it changes and a bounded
+  read-only command that shows it, with the write's `--org` and `--folder`
+  (`alert get` / `dashboard get` for an ID, `alert list --folder` or
+  `dashboard list --folder --title` for a create). A definite refusal (usage,
+  config, auth, permission, not found, conflict such as a stale dashboard
+  hash) is returned unchanged. Any other failure, including a network error,
+  429, 5xx, a redirect or an internal error, becomes "Write outcome is unknown
+  for …" with `retryable=false`, the original code, category and HTTP status,
+  and the target's read as next steps. A 2xx response that cannot be decoded,
+  or a create whose response names no ID, reports
+  `WRITE_SUCCEEDED_RESPONSE_INVALID`.
 - **Lenient decoding where the server drifts.** `Org` decodes into a raw map and
   extracts only the fields the CLI relies on, then re-emits a lean curated
   projection — so org fields that change JSON type across OpenObserve

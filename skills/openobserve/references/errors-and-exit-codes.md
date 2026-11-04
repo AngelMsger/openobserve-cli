@@ -18,7 +18,9 @@ Every failure is JSON on **stderr** (stdout stays clean), shaped:
 
 Read `next_steps` first — it names the command to run next. `retryable` tells you
 whether a retry in the same environment could help (rate-limit / network /
-server) or not. Environment changes use the optional `recovery` object instead.
+server) or not; a failed write is never retryable, since it may have been
+applied (see "Write outcome is unknown" below). Environment changes use the
+optional `recovery` object instead.
 
 ## Category → exit code
 
@@ -55,6 +57,16 @@ fi
 
 ## Common cases
 
+- **"Write outcome is unknown for …"** → an alert or dashboard write failed
+  after it may have reached OpenObserve (network error, 429, 5xx, a redirect,
+  which usually means a login page or single sign-on proxy: cause
+  `HTTP_REDIRECTED`). It is `retryable=false`, whatever its category: do not
+  repeat it. Run the read in `next_steps` (`alert get`, `dashboard get`, or
+  for a create `alert list --folder` / `dashboard list --folder --title`), and
+  repeat the write only if the read shows it did not happen.
+- **`WRITE_SUCCEEDED_RESPONSE_INVALID`** → the write happened, but its response
+  could not be decoded or named no ID for what it created. Find it with the
+  read in `next_steps`; never create it again.
 - **`CREDENTIAL_STORE_INACCESSIBLE` / `CREDENTIAL_NOT_VISIBLE_OR_MISSING`
   (config/3)** — when `recovery.scope` is `host`, request host access and retry
   the same invocation once. Repeating it in the same sandbox will not help.

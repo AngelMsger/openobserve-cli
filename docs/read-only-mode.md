@@ -47,9 +47,12 @@ compilation:
   "error": {
     "category": "permission",
     "code": "READONLY_BLOCKED",
-    "message": "read-only mode is active; this is a write operation",
-    "hint": "Pass --allow-writes to override for this invocation.",
-    "next_steps": ["openobserve-cli --allow-writes <command>"],
+    "message": "operation \"DeleteAlert\" blocked: read-only mode is enabled",
+    "hint": "Read-only mode is on, so nothing was sent. The user turned it on (OPENOBSERVE_CLI_READ_ONLY or defaults.read_only in ~/.angelmsger/openobserve/config.yaml), and only the user turns it off. --allow-writes lifts it for one invocation and is for a write the user authorized.",
+    "next_steps": [
+      "Add --dry-run to preview the request without sending it",
+      "Only if the user authorized this write, re-run with --allow-writes"
+    ],
     "retryable": false
   }
 }

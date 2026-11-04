@@ -202,9 +202,13 @@ func (c *apiClient) GetDashboard(ctx context.Context, org, id, folder string) (*
 // POST /api/{org}/dashboards and returns it with its assigned ID and hash.
 // Body may be a definition or a get backup; the envelope is unwrapped.
 func (c *apiClient) CreateDashboard(ctx context.Context, org, folder string, body json.RawMessage) (*Dashboard, error) {
+	req := CreateDashboardReq{org, folder, body}
 	var d Dashboard
-	if err := c.executeDashboardWrite(ctx, CreateDashboardReq{org, folder, body}, &d); err != nil {
+	if err := c.executeDashboardWrite(ctx, req, &d); err != nil {
 		return nil, err
+	}
+	if d.DashboardID == "" {
+		return nil, cerrors.MissingWriteIdentity(dashboardWriteTarget(req))
 	}
 	return &d, nil
 }

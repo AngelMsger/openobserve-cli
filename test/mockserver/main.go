@@ -184,6 +184,11 @@ func main() {
 			writeJSON(w, a)
 			return
 		}
+		// A write that fails after it was sent: its outcome is unknown.
+		if id == "unavailable" && r.Method != http.MethodGet {
+			http.Error(w, `{"message":"service unavailable"}`, http.StatusServiceUnavailable)
+			return
+		}
 		a, ok := alerts[id]
 		if !ok {
 			http.Error(w, `{"message":"Alert not found"}`, http.StatusNotFound)

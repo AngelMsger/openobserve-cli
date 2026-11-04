@@ -20,39 +20,42 @@ func NewReadOnly(c Client) Client {
 	return &readOnlyClient{Reader: c}
 }
 
-// readonlyBlocked is the structured error every write returns under the
-// read-only posture. Keep the wording in sync with docs/read-only-mode.md.
-func readonlyBlocked() error {
-	return cerrors.New(cerrors.CategoryPermission, "READONLY_BLOCKED",
-		"read-only mode is active; this is a write operation").
-		WithHint("Pass --allow-writes to override for this invocation.").
-		WithNextSteps("openobserve-cli --allow-writes <command>")
+// blocked returns the family's READONLY_BLOCKED error for a refused write. op
+// names the operation (e.g. "CreateAlert") so the message says which call was
+// refused. Turning read-only mode off is the user's decision, so the error
+// names the user's switches without offering to change them.
+func blocked(op string) error {
+	return cerrors.ReadOnlyBlocked(op, cerrors.ReadOnlyMode{
+		Env:        "OPENOBSERVE_CLI_READ_ONLY",
+		ConfigFile: "~/.angelmsger/openobserve/config.yaml",
+		DryRun:     true,
+	})
 }
 
 func (c *readOnlyClient) CreateAlert(ctx context.Context, org, folder string, body json.RawMessage) (*Alert, error) {
-	return nil, readonlyBlocked()
+	return nil, blocked("CreateAlert")
 }
 
 func (c *readOnlyClient) UpdateAlert(ctx context.Context, org, id, folder string, body json.RawMessage) (*Alert, error) {
-	return nil, readonlyBlocked()
+	return nil, blocked("UpdateAlert")
 }
 
 func (c *readOnlyClient) DeleteAlert(ctx context.Context, org, id, folder string) error {
-	return readonlyBlocked()
+	return blocked("DeleteAlert")
 }
 
 func (c *readOnlyClient) SetAlertEnabled(ctx context.Context, org, id, folder string, value bool) error {
-	return readonlyBlocked()
+	return blocked("SetAlertEnabled")
 }
 
 func (c *readOnlyClient) CreateDashboard(ctx context.Context, org, folder string, body json.RawMessage) (*Dashboard, error) {
-	return nil, readonlyBlocked()
+	return nil, blocked("CreateDashboard")
 }
 
 func (c *readOnlyClient) UpdateDashboard(ctx context.Context, org, id, folder, hash string, body json.RawMessage) (*Dashboard, error) {
-	return nil, readonlyBlocked()
+	return nil, blocked("UpdateDashboard")
 }
 
 func (c *readOnlyClient) DeleteDashboard(ctx context.Context, org, id, folder string) error {
-	return readonlyBlocked()
+	return blocked("DeleteDashboard")
 }

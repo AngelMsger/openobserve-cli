@@ -239,7 +239,7 @@ func (s *appState) askInitAction() (string, error) {
 			huh.NewOption("Replace the configuration", "replace"),
 		}, "edit")
 	}
-	return promptChoice("What would you like to do (edit/add/replace)",
+	return prompter().Choice("What would you like to do (edit/add/replace)",
 		[]string{"edit", "add", "replace"}, "edit")
 }
 
@@ -257,7 +257,7 @@ func (s *appState) selectContext(file config.File) (string, error) {
 		}
 		return formSelect("Edit which context", opts, file.CurrentContext)
 	}
-	return promptChoice("Edit which context", file.ContextNames(), file.CurrentContext)
+	return prompter().Choice("Edit which context", file.ContextNames(), file.CurrentContext)
 }
 
 // promptNewContextName asks for a new context name, rejecting names already in
@@ -273,7 +273,7 @@ func (s *appState) promptNewContextName(file config.File) (string, error) {
 		if s.gflags.pretty {
 			name, err = formInput("New context name", "production")
 		} else {
-			name, err = promptLine("New context name", "")
+			name, err = prompter().Line("New context name", "")
 		}
 		if err != nil {
 			return "", err
