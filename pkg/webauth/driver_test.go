@@ -84,14 +84,16 @@ func TestPingVerifierLoggingLogsItsRequest(t *testing.T) {
 	}))
 	defer srv.Close()
 
+	// A plain marker, not an encoded credential, so secret scanners stay quiet.
+	const session = "not-a-real-session"
 	var log strings.Builder
 	verify := PingVerifierLogging(srv.URL, "default", 5*time.Second, 0, &log)
-	if !verify(pkgauth.Session{Authorization: "Basic c2Vzc2lvbi1zZWNyZXQ="}) {
+	if !verify(pkgauth.Session{Authorization: "Basic " + session}) {
 		t.Fatal("a session the server accepts must verify")
 	}
 	got := log.String()
 	if !strings.Contains(got, "GET "+srv.URL+"/") || !strings.Contains(got, " -> 200") ||
-		strings.Contains(got, "c2Vzc2lvbi1zZWNyZXQ=") {
+		strings.Contains(got, session) {
 		t.Fatalf("verbose log = %q, want the request line and no Authorization value", got)
 	}
 }
