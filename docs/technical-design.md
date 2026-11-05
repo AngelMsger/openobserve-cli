@@ -88,11 +88,13 @@ exact numeric values across backup/edit/restore.
   attaches RBAC-aware guidance (the common "service account has no role" case).
   Only a 2xx acknowledges a request; a decode error keeps the response status.
   The kit's transport follows a redirect only for a read, and only when the
-  next hop sends the same request. A read is a GET or HEAD, or a request
-  marked with `transport.AsRead`: `_search` (behind search, histogram, tail
-  and trace detail) is a POST that only reads, so it is marked. A marked POST
-  follows a 307 or 308, which Go sends again with the same method and body; a
-  301, 302 or 303 would become a GET without the query, so it reaches
+  next hop sends the same request. A read is a GET or HEAD, a method listed
+  in `transport.Options.RetryMethods` (openobserve-cli lists none), or a
+  request marked with `transport.AsRead`: `_search` (behind search,
+  histogram, tail and trace detail) is a POST that only reads, so it is
+  marked. A marked POST follows a 307 or 308, which Go sends again with the
+  same method and body; a 301, 302 or 303 would become a GET without the
+  query, so it reaches
   `doJSON` as is. A write is never followed: its 3xx reaches `doJSON` as is
   and the write rule makes it an unknown outcome with that status. Following
   it would answer a different request: a GET to the redirect's target (often a
