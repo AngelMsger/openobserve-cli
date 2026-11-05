@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/angelmsger/agent-cli-kit/doctor"
 	cerrors "github.com/angelmsger/openobserve-cli/pkg/errors"
 	"github.com/angelmsger/openobserve-cli/pkg/transport"
 )
@@ -181,15 +182,44 @@ func TestSearchIsFollowedAndRetriedAsARead(t *testing.T) {
 	}
 }
 
+// A read's redirect that comes back is reported with the kit's redirect rule:
+// not retryable, a hint naming where it points (without its query) and
+// --base-url, and doctor first. doctor reports it as redirected, not
+// unreachable. The org listing's loop ends at the tenth hop instead of
+// failing as a network error.
+func TestReadRedirectLoopIsReportedNotRetried(t *testing.T) {
+	var sent int
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		sent++
+		http.Redirect(w, r, r.URL.Path, http.StatusFound)
+	}))
+	t.Cleanup(srv.Close)
+	tc := transport.New(transport.Options{MaxRetries: 2, RetryBaseDelay: time.Millisecond})
+	c := New(Config{BaseURL: srv.URL, Org: "default", Transport: tc})
+	_, err := c.Ping(context.Background())
+	ce := cerrors.AsCLIError(err)
+	if ce == nil || ce.Code != "HTTP_FOUND" || ce.Retryable || ce.HTTPStatus != http.StatusFound || sent != 10 ||
+		!strings.Contains(ce.Hint, "check --base-url first") ||
+		len(ce.NextSteps) == 0 || ce.NextSteps[0] != "openobserve-cli doctor" {
+		t.Fatalf("got %+v after %d requests; want the tenth 302, not retryable", ce, sent)
+	}
+	if got := doctor.Status(err); got != doctor.StatusRedirected {
+		t.Fatalf("doctor.Status = %q, want redirected", got)
+	}
+	if got := doctor.Detail(err); !strings.Contains(got, "OpenObserve returned HTTP 302") || !strings.Contains(got, "check --base-url first") {
+		t.Fatalf("doctor.Detail = %q", got)
+	}
+}
+
 // A search's 301, 302 or 303 would turn it into a GET without the query, so
 // the transport returns it. It is reported with its status, not retryable
-// (the same search is redirected again), and with a hint on what a redirect
-// usually means; the search is sent once.
+// (the same search is redirected again), and with a hint naming where it
+// points (without its query); the search is sent once.
 func TestSearchRedirectIsReportedNotRetried(t *testing.T) {
 	var sent int
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		sent++
-		http.Redirect(w, r, "/login", http.StatusFound)
+		http.Redirect(w, r, "https://sso.example.test/login?ticket=sign-in-secret", http.StatusFound)
 	}))
 	t.Cleanup(srv.Close)
 	tc := transport.New(transport.Options{MaxRetries: 2, RetryBaseDelay: time.Millisecond})
@@ -199,7 +229,9 @@ func TestSearchRedirectIsReportedNotRetried(t *testing.T) {
 	})
 	ce := cerrors.AsCLIError(err)
 	if ce == nil || ce.Code != "HTTP_FOUND" || ce.Category != cerrors.CategoryServer || ce.Retryable ||
-		ce.HTTPStatus != http.StatusFound || sent != 1 || !strings.Contains(ce.Hint, "redirect") ||
+		ce.HTTPStatus != http.StatusFound || sent != 1 ||
+		!strings.Contains(ce.Hint, "redirected the request to https://sso.example.test:") ||
+		strings.Contains(ce.Hint, "sign-in-secret") ||
 		len(ce.NextSteps) == 0 || ce.NextSteps[0] != "openobserve-cli doctor" {
 		t.Fatalf("got %+v after %d requests; want the 302 reported once, not retryable", ce, sent)
 	}

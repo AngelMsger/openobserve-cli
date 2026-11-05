@@ -11,6 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `webauth.PingVerifierLogging`: `PingVerifier` with a `--verbose` request log
   writer. `PingVerifier` keeps its signature and logs nothing.
+- `pkg/errors` re-exports agent-cli-kit's `RedirectGuide`, which names the
+  setting and next steps a redirect's error gives.
 
 ### Changed
 
@@ -48,10 +50,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   retries a POST only when the CLI marks it as a read (`transport.AsRead`).
   A 301, 302 or 303, which would turn it into a GET without the query,
   reports the redirect (`HTTP_<STATUS>`, server, exit 9).
-- A redirect the client does not follow is not retryable and says what a
-  redirect usually means (a login page, a single sign-on proxy, or a
-  `--base-url` that should use https), with `doctor` as the next step. It
-  was a retryable server error, but the same request is redirected again.
+- A redirect the client does not follow is not retryable and says where it
+  points (the scheme and host only) and what a redirect usually means (a
+  login page, a single sign-on proxy, or a `--base-url` that should use
+  https), with `doctor` as the next step. It was a retryable server error,
+  but the same request is redirected again. A 3xx without a `Location` (a
+  300 or 304) is not retryable either, with a hint that the same request
+  gets the same answer. The rule is agent-cli-kit v0.9.0's
+  `CLIError.WithRedirect`, shared by the family.
+- A read that loops through 10 redirects reports the last one (`HTTP_FOUND`
+  or the redirect's own code, server, exit 9, not retryable, with the
+  redirect hint). 0.18.0 reported `NETWORK` (exit 8, retryable, a
+  DNS/TLS/timeout hint), although nothing retried it.
+- `doctor`'s `connectivity` check reports a redirect with status
+  `redirected` instead of `unreachable`, and its `detail` adds the redirect
+  hint (where it points, and to check `--base-url`). 0.18.0 showed only
+  "OpenObserve returned HTTP 302". The status and detail rules come from
+  agent-cli-kit's `doctor` package, shared by the family.
 - `alert create` and `dashboard create` no longer report success with an
   empty ID when OpenObserve's response names none, or when it cannot be
   decoded: the write happened, so they fail with
@@ -74,10 +89,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   inspection rejects ambiguous names across types with `STREAM_AMBIGUOUS`.
 - Skill management and `version` reject unexpected positional arguments instead
   of silently ignoring them.
-- Align the companion Skill (`0.6.0`) with the command tree, handshake version,
-  authentication recovery, write defaults and folder/revision handling. Correct
-  alert threshold semantics and distinguish stored definitions from working
-  delivery/rendering. Shorten the entrypoint and make backup examples fail on errors.
+- Align the companion Skill (`0.6.0`) with `doctor`'s `redirected` status, the
+  command tree, handshake version, authentication recovery, write defaults and
+  folder/revision handling. Correct alert threshold semantics and distinguish
+  stored definitions from working delivery/rendering. Shorten the entrypoint
+  and make backup examples fail on errors.
 - `--verbose` now logs each request to the server (method, URL and status) on
   stderr for every command, `doctor`, the login check and the browser-session
   check. It used to log a bare `> METHOD URL` line only for the connectivity

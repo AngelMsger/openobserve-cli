@@ -102,9 +102,13 @@ exact numeric values across backup/edit/restore.
   (`transport.Options.Doer`), which keeps its own redirect policy and may
   follow anyway, even sending a write again on a 307 or 308; the kit still
   answers the request with the redirect the write got, so the outcome is the
-  same unknown one. `httpError` reports any 3xx as `HTTP_<STATUS>` (server),
-  not retryable, since the same request is redirected again, with a hint to
-  check `--base-url`.
+  same unknown one. A read's tenth hop comes back as is too. `httpError`
+  reports any 3xx as `HTTP_<STATUS>` (server) with the kit's redirect rule
+  (`CLIError.WithRedirect`): not retryable, since the same request is
+  redirected again, with a hint naming where it points (scheme and host) and
+  `--base-url`, and `doctor` as the next step. `doctor` reports such a check
+  as `redirected` (agent-cli-kit's `doctor` package), with the hint in its
+  detail.
 - Writes follow the family's write-outcome rule from agent-cli-kit
   (`errors.FromWrite`). `executeAlertWrite` and `executeDashboardWrite` wrap
   each write with a target (`write_targets.go`): what it changes and a bounded
