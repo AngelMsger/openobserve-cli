@@ -35,21 +35,26 @@ optional `recovery` object instead.
 | `not_found`  | 6    | Unknown org / stream → `org list`, `stream list`. |
 | `rate_limit` | 7    | Too many requests; retryable. Narrow the time range / lower `--limit`. |
 | `network`    | 8    | Server unreachable; retryable → `doctor`, check `--base-url`. |
-| `server`     | 9    | OpenObserve 5xx; retryable. |
+| `server`     | 9    | OpenObserve 5xx; retryable. A redirect the CLI does not follow (a 3xx `http_status`) is not: check `--base-url` with `doctor`. |
 | `parse`      | 10   | Response didn't match expectations; retry with `--verbose`. |
 | `conflict`   | 11   | Resource changed since read; re-fetch then retry. |
 
 Scripted use:
 
 ```bash
-if openobserve-cli search run --stream app --since 1h >hits.json; then
+if openobserve-cli search run --stream app --since 1h >hits.json 2>error.json; then
   : # consume hits.json
 else
   rc=$?
   case "$rc" in
     3|4) echo "fix auth/config" ;;
     6)   echo "stream missing — run: openobserve-cli stream list" ;;
-    7|8|9) echo "transient — retry later" ;;
+    7|8|9)
+      if grep -q '"retryable": *true' error.json; then
+        echo "transient — retry later"
+      else
+        echo "not transient (a redirect, say) — follow hint and next_steps in error.json"
+      fi ;;
   esac
   exit "$rc"
 fi

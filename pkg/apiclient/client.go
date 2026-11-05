@@ -214,8 +214,21 @@ func (c *apiClient) httpError(resp *http.Response) error {
 				"In OpenObserve open IAM → Roles: grant a role the Streams resource (List + Get), then assign your user / service account to that role (its Roles or Service Accounts tab).",
 				"Confirm the organization is correct: openobserve-cli org list")
 	}
-	return cerrors.New(cat, "HTTP_"+statusSlug(resp.StatusCode), msg).
+	e := cerrors.New(cat, "HTTP_"+statusSlug(resp.StatusCode), msg).
 		WithHTTPStatus(resp.StatusCode)
+	if resp.StatusCode >= 300 && resp.StatusCode < 400 {
+		// The kit's transport follows a read's redirect when the next hop
+		// sends the same request, and returns any other: a write's, or a
+		// search's 301, 302 or 303. The same request is redirected the same
+		// way again, so retrying cannot help. For a write, the write rule
+		// replaces this hint with its own.
+		e = e.WithHint("OpenObserve answered with a redirect: usually a login page, a single sign-on " +
+			"proxy, or a --base-url that should use https. The same request is redirected again, so " +
+			"check --base-url first.").
+			WithNextSteps("openobserve-cli doctor")
+		e.Retryable = false
+	}
+	return e
 }
 
 func statusSlug(status int) string {

@@ -181,6 +181,30 @@ func TestSearchIsFollowedAndRetriedAsARead(t *testing.T) {
 	}
 }
 
+// A search's 301, 302 or 303 would turn it into a GET without the query, so
+// the transport returns it. It is reported with its status, not retryable
+// (the same search is redirected again), and with a hint on what a redirect
+// usually means; the search is sent once.
+func TestSearchRedirectIsReportedNotRetried(t *testing.T) {
+	var sent int
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		sent++
+		http.Redirect(w, r, "/login", http.StatusFound)
+	}))
+	t.Cleanup(srv.Close)
+	tc := transport.New(transport.Options{MaxRetries: 2, RetryBaseDelay: time.Millisecond})
+	c := New(Config{BaseURL: srv.URL, Org: "default", Transport: tc})
+	_, err := c.Search(context.Background(), "default", SearchRequest{
+		Query: SearchQuery{SQL: `SELECT * FROM "app"`, StartTime: 1, EndTime: 2, Size: 10},
+	})
+	ce := cerrors.AsCLIError(err)
+	if ce == nil || ce.Code != "HTTP_FOUND" || ce.Category != cerrors.CategoryServer || ce.Retryable ||
+		ce.HTTPStatus != http.StatusFound || sent != 1 || !strings.Contains(ce.Hint, "redirect") ||
+		len(ce.NextSteps) == 0 || ce.NextSteps[0] != "openobserve-cli doctor" {
+		t.Fatalf("got %+v after %d requests; want the 302 reported once, not retryable", ce, sent)
+	}
+}
+
 func TestHTTPErrorClassification(t *testing.T) {
 	client, _ := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNotFound)

@@ -39,7 +39,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   route) sends the same search again, and a transient failure of a search is
   retried, as for any read. Search is a POST, and agent-cli-kit follows and
   retries a POST only when the CLI marks it as a read (`transport.AsRead`).
-
+  A 301, 302 or 303, which would turn it into a GET without the query,
+  reports the redirect (`HTTP_<STATUS>`, server, exit 9).
+- A redirect the client does not follow is not retryable and says what a
+  redirect usually means (a login page, a single sign-on proxy, or a
+  `--base-url` that should use https), with `doctor` as the next step. It
+  was a retryable server error, but the same request is redirected again.
 - `alert create` and `dashboard create` no longer report success with an
   empty ID when OpenObserve's response names none, or when it cannot be
   decoded: the write happened, so they fail with
