@@ -35,14 +35,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `search` behind a 307 or 308 redirect (an http-to-https upgrade, a moved
+  route) sends the same search again, and a transient failure of a search is
+  retried, as for any read. Search is a POST, and agent-cli-kit follows and
+  retries a POST only when the CLI marks it as a read (`transport.AsRead`).
+  A 301, 302 or 303, which would turn it into a GET without the query,
+  reports the redirect (`HTTP_<STATUS>`, server, exit 9).
+- A redirect the client does not follow is not retryable and says what a
+  redirect usually means (a login page, a single sign-on proxy, or a
+  `--base-url` that should use https), with `doctor` as the next step. It
+  was a retryable server error, but the same request is redirected again.
 - `alert create` and `dashboard create` no longer report success with an
   empty ID when OpenObserve's response names none, or when it cannot be
   decoded: the write happened, so they fail with
   `WRITE_SUCCEEDED_RESPONSE_INVALID` and name the list that finds it.
-- Only a 2xx response counts as success: an unfollowed redirect is an error,
-  and a write answered through a followed redirect (a login page or single
-  sign-on proxy, or `http` to `https`) is an unknown outcome caused by
-  `HTTP_REDIRECTED`, instead of the page it landed on confirming the write.
+- Only a 2xx response counts as success. A write answered with a redirect (a
+  login page or single sign-on proxy, or `http` to `https`) is an unknown
+  outcome with the redirect's status and a hint on what a redirect usually
+  means, instead of the page it landed on confirming the write: agent-cli-kit
+  v0.8.0's transport returns a write's redirect instead of following it, so a
+  307 or 308 no longer sends the write again either.
 - `config init`'s plain prompts no longer take an answer cut short by a failed
   read (not the end of input) as the answer.
 

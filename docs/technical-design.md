@@ -87,9 +87,19 @@ exact numeric values across backup/edit/restore.
   calls `httpError`, which classifies the status into a category and — for 403 —
   attaches RBAC-aware guidance (the common "service account has no role" case).
   Only a 2xx acknowledges a request; a decode error keeps the response status.
-  A same-origin 301, 302 or 303 is followed with a GET, so a response to a
-  POST, PUT or DELETE whose final request is a GET (often a login page) is
-  reported as `HTTP_REDIRECTED` (server, not retryable), never decoded.
+  The kit's transport follows a redirect only for a read, and only when the
+  next hop sends the same request. A read is a GET or HEAD, or a request
+  marked with `transport.AsRead`: `_search` (behind search, histogram, tail
+  and trace detail) is a POST that only reads, so it is marked. A marked POST
+  follows a 307 or 308, which Go sends again with the same method and body; a
+  301, 302 or 303 would become a GET without the query, so it reaches
+  `doJSON` as is. A write is never followed: its 3xx reaches `doJSON` as is
+  and the write rule makes it an unknown outcome with that status. Following
+  it would answer a different request: a GET to the redirect's target (often a
+  login page) after a 301, 302 or 303, or the write sent again after a 307 or
+  308. `httpError` reports any 3xx as `HTTP_<STATUS>` (server), not
+  retryable, since the same request is redirected again, with a hint to check
+  `--base-url`.
 - Writes follow the family's write-outcome rule from agent-cli-kit
   (`errors.FromWrite`). `executeAlertWrite` and `executeDashboardWrite` wrap
   each write with a target (`write_targets.go`): what it changes and a bounded
