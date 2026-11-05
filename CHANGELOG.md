@@ -48,7 +48,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   login page or single sign-on proxy, or `http` to `https`) is an unknown
   outcome with the redirect's status and a hint on what a redirect usually
   means, instead of the page it landed on confirming the write: agent-cli-kit
-  v0.7.0's transport returns a write's redirect instead of following it, so a
+  v0.8.0's transport returns a write's redirect instead of following it, so a
   307 or 308 no longer sends the write again either.
 - `config init`'s plain prompts no longer take an answer cut short by a failed
   read (not the end of input) as the answer.
