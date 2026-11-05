@@ -87,21 +87,24 @@ exact numeric values across backup/edit/restore.
   calls `httpError`, which classifies the status into a category and — for 403 —
   attaches RBAC-aware guidance (the common "service account has no role" case).
   Only a 2xx acknowledges a request; a decode error keeps the response status.
-  The kit's transport follows a redirect only for a read, and only when the
-  next hop sends the same request. A read is a GET or HEAD, a method listed
-  in `transport.Options.RetryMethods` (openobserve-cli lists none), or a
-  request marked with `transport.AsRead`: `_search` (behind search,
+  The kit's default transport follows a redirect only for a read, and only
+  when the next hop sends the same request. A read is a GET or HEAD, a method
+  listed in `transport.Options.RetryMethods` (openobserve-cli lists none), or
+  a request marked with `transport.AsRead`: `_search` (behind search,
   histogram, tail and trace detail) is a POST that only reads, so it is
   marked. A marked POST follows a 307 or 308, which Go sends again with the
   same method and body; a 301, 302 or 303 would become a GET without the
-  query, so it reaches
-  `doJSON` as is. A write is never followed: its 3xx reaches `doJSON` as is
-  and the write rule makes it an unknown outcome with that status. Following
-  it would answer a different request: a GET to the redirect's target (often a
-  login page) after a 301, 302 or 303, or the write sent again after a 307 or
-  308. `httpError` reports any 3xx as `HTTP_<STATUS>` (server), not
-  retryable, since the same request is redirected again, with a hint to check
-  `--base-url`.
+  query, so it reaches `doJSON` as is. A write is never followed: its 3xx
+  reaches `doJSON` as is and the write rule makes it an unknown outcome with
+  that status. Following it would answer a different request: a GET to the
+  redirect's target (often a login page) after a 301, 302 or 303, or the write
+  sent again after a 307 or 308. A library caller can pass its own HTTP client
+  (`transport.Options.Doer`), which keeps its own redirect policy and may
+  follow anyway, even sending a write again on a 307 or 308; the kit still
+  answers the request with the redirect the write got, so the outcome is the
+  same unknown one. `httpError` reports any 3xx as `HTTP_<STATUS>` (server),
+  not retryable, since the same request is redirected again, with a hint to
+  check `--base-url`.
 - Writes follow the family's write-outcome rule from agent-cli-kit
   (`errors.FromWrite`). `executeAlertWrite` and `executeDashboardWrite` wrap
   each write with a target (`write_targets.go`): what it changes and a bounded
@@ -131,9 +134,10 @@ and the CLI never asks an agent to compute epochs.
 
 A re-export of agent-cli-kit's `transport` whose `New` defaults the User-Agent
 to `openobserve-cli/<version>`. A thin `Client` that applies request decorators
-(auth, user-agent) and retries transient failures. Retries are limited to
-idempotent methods (GET/HEAD); a `Retry-After` header on 429/503 takes
-precedence over linear backoff. `Doer` is an interface so tests inject fakes.
+(auth, user-agent) and retries transient failures. Only reads are retried,
+by the same definition as redirects above (GET, HEAD, a `RetryMethods` verb,
+or a request marked with `transport.AsRead`, such as `_search`); a
+`Retry-After` header on 429/503 takes precedence over linear backoff. `Doer` is an interface so tests inject fakes.
 
 ## Error model (`pkg/errors`)
 
