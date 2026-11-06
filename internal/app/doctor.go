@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/angelmsger/agent-cli-kit/doctor"
 	"github.com/angelmsger/openobserve-cli/pkg/apiclient"
 	"github.com/angelmsger/openobserve-cli/pkg/constants"
 	cerrors "github.com/angelmsger/openobserve-cli/pkg/errors"
@@ -54,8 +55,8 @@ func newDoctorCmd(s *appState) *cobra.Command {
 			reuseHelps := false
 			client, err := s.newClient()
 			if err != nil {
-				add("credentials", false, diagnosticStatus(err), err.Error(), diagnosticRecoveryScope(err))
-				reuseHelps = diagnosticStatus(err) != "inaccessible"
+				add("credentials", false, doctor.Status(err), doctor.Detail(err), doctor.RecoveryScope(err))
+				reuseHelps = doctor.Status(err) != doctor.StatusInaccessible
 			} else {
 				credOK = true
 				add("credentials", true, "ok", "scheme "+cfg.Auth.Scheme, "")
@@ -67,7 +68,7 @@ func newDoctorCmd(s *appState) *cobra.Command {
 				defer cancel()
 				orgs, perr := client.Ping(ctx)
 				if perr != nil {
-					add("connectivity", false, diagnosticStatus(perr), perr.Error(), diagnosticRecoveryScope(perr))
+					add("connectivity", false, doctor.Status(perr), doctor.Detail(perr), doctor.RecoveryScope(perr))
 					ce := cerrors.AsCLIError(perr)
 					reuseHelps = ce.Category == cerrors.CategoryAuth && ce.HTTPStatus == 401
 				} else {
@@ -148,37 +149,6 @@ func statusForOK(ok bool, failure string) string {
 		return "ok"
 	}
 	return failure
-}
-
-func diagnosticStatus(err error) string {
-	if err == nil {
-		return "ok"
-	}
-	ce := cerrors.AsCLIError(err)
-	switch ce.Code {
-	case "CREDENTIAL_STORE_INACCESSIBLE":
-		return "inaccessible"
-	case "CREDENTIAL_NOT_VISIBLE_OR_MISSING":
-		return "missing_or_inaccessible"
-	}
-	switch ce.Category {
-	case cerrors.CategoryAuth, cerrors.CategoryPermission:
-		return "rejected_by_server"
-	case cerrors.CategoryNetwork, cerrors.CategoryServer:
-		return "unreachable"
-	default:
-		return "invalid"
-	}
-}
-
-func diagnosticRecoveryScope(err error) string {
-	if err == nil {
-		return ""
-	}
-	if recovery := cerrors.AsCLIError(err).Recovery; recovery != nil {
-		return recovery.Scope
-	}
-	return ""
 }
 
 // updateContext bounds the release-update lookup by updateCheckTimeout, or the
